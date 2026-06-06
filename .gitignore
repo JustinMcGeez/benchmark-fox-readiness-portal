@@ -1,0 +1,25 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependencies / build output
+node_modules
+dist
+dist-ssr
+*.local
+*.tsbuildinfo
+dev-out.log
+dev-err.log
+
+# Editor / OS / local agent state
+.vscode/*
+!.vscode/extensions.json
+.idea
+.claude/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
