@@ -292,7 +292,7 @@ export function POAMScreen({ go }: ScreenProps) {
           <Btn primary>Save POA&M Item</Btn>
         </div>
       </Card>
-      <SourceRefs ids={['dod-assessment-methodology', 'bf-poam-template']} />
+      <SourceRefs ids={['dod-assessment-methodology', 'bf-poam-template', 'cui-poam-template']} />
     </div>
   );
 }

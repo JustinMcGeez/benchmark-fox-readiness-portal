@@ -92,7 +92,7 @@ export const SOURCE_REFS: SourceRef[] = [
     notes: 'Contractual CMMC level requirement clause.',
   },
   {
-    sourceId: '32-cfr-part-170',
+    sourceId: 'cfr-32-170',
     sourceName: '32 CFR Part 170 — Cybersecurity Maturity Model Certification (CMMC) Program',
     publisher: 'DoD',
     documentType: 'CFR',

@@ -371,11 +371,12 @@ export function PathScreen({ go }: ScreenProps) {
       </WarnBanner>
       <SourceRefs
         ids={[
-          '32-cfr-part-170',
+          'cfr-32-170',
           'far-52-204-21',
           'dfars-252-204-7012',
           'dfars-252-204-7019',
           'dfars-252-204-7020',
+          'dfars-252-204-7021',
         ]}
       />
     </div>
