@@ -11,7 +11,8 @@
     "typecheck": "tsc -b --noEmit",
     "import:sources": "node scripts/import-sp800-171.ts",
     "validate:controls": "node scripts/validate-controls.mjs",
-    "build:data": "npm run import:sources && npm run validate:controls"
+    "check:sourcerefs": "node scripts/check-sourcerefs.mjs",
+    "build:data": "npm run import:sources && npm run validate:controls && npm run check:sourcerefs"
   },
   "dependencies": {
     "lucide-react": "^1.17.0",
