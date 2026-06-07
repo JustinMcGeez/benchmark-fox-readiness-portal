@@ -51,9 +51,16 @@ export function ReportsScreen({ go }: ScreenProps) {
                 <div className="w-h2" style={{ fontSize: '1.1em' }}>
                   {r.title}
                 </div>
-                <p className="muted" style={{ margin: '2px 0 0', fontSize: '.88em' }}>
+                <p className="muted" style={{ margin: '2px 0 4px', fontSize: '.88em' }}>
                   {r.description}
                 </p>
+                <div className="row wrap gap-sm">
+                  {r.feeds.map((f) => (
+                    <span key={f} className="mono faint" style={{ fontSize: '.7rem' }}>
+                      · {f}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
             <Btn primary onClick={() => go('report-preview')}>

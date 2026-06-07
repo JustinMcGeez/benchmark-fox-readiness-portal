@@ -15,7 +15,9 @@ import {
   RiskBadge,
   Status,
   Tabs,
+  WarnBanner,
 } from '../components/primitives';
+import { Sources } from '../components/SourceBadge';
 import { useData } from '../data/store';
 import { CONTROLS_BY_ID, CONTROL_LIBRARY, FAMILIES } from '../data/controls';
 import { evidenceForControl } from '../data/evidence';
@@ -49,9 +51,9 @@ export function ControlLibraryScreen({ go }: ScreenProps) {
             <tr>
               <th>Family</th>
               <th>Code</th>
-              <th>Control Count</th>
-              <th>Avg Risk</th>
-              <th>Guidance</th>
+              <th>Requirements</th>
+              <th>Level 1</th>
+              <th>Browse</th>
             </tr>
           </thead>
           <tbody>
@@ -60,9 +62,7 @@ export function ControlLibraryScreen({ go }: ScreenProps) {
                 <td style={{ fontWeight: 700 }}>{f.name}</td>
                 <td className="mono">{f.code}</td>
                 <td className="num">{f.count}</td>
-                <td>
-                  <RiskBadge level={f.risk} />
-                </td>
+                <td className="num">{f.l1Count || '—'}</td>
                 <td>
                   <a className="annot">View</a>
                 </td>
@@ -344,6 +344,12 @@ export function ControlDetailScreen({ go }: ScreenProps) {
         </div>
         <RiskBadge level={a.risk} />
       </div>
+      {control.scoreValue == null && (
+        <WarnBanner tone="warn">
+          Scoring not finalized — the official DoD Assessment Methodology deduction value for this
+          control has not been imported. Score impact is a placeholder.
+        </WarnBanner>
+      )}
       <Tabs items={tabs} active={tab} onPick={setTab} />
       <div className="grid-2" style={{ alignItems: 'start' }}>
         <div className="col">
@@ -354,7 +360,9 @@ export function ControlDetailScreen({ go }: ScreenProps) {
               </Card>
               <Card title="Plain-English Explanation">
                 <p style={{ margin: 0 }} className="muted">
-                  {control.explanation}
+                  {control.explanation || (
+                    <span className="faint">Plain-English explanation — to be authored by Benchmark Fox (placeholder).</span>
+                  )}
                 </p>
               </Card>
               {control.commonMistakes && (
@@ -366,6 +374,20 @@ export function ControlDetailScreen({ go }: ScreenProps) {
                   </ul>
                 </Card>
               )}
+              <Card title="Assessment Objectives">
+                {control.assessmentObjectives && control.assessmentObjectives.length ? (
+                  <ul className="muted" style={{ margin: 0, paddingLeft: 18 }}>
+                    {control.assessmentObjectives.map((o) => (
+                      <li key={o}>{o}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="faint" style={{ margin: 0 }}>
+                    Assessment objectives are defined in NIST SP 800-171A and have not been imported
+                    yet (placeholder).
+                  </p>
+                )}
+              </Card>
             </>
           )}
           {tab === 'Assessment' && (
@@ -526,7 +548,11 @@ export function ControlDetailScreen({ go }: ScreenProps) {
             </div>
             <div className="between">
               <span className="w-label">Score Impact</span>
-              <span className="mono">{controlScoreDisplay(a, control)} / −{control.scoreValue}</span>
+              <span className="mono">
+                {control.scoreValue == null
+                  ? 'Not finalized'
+                  : `${controlScoreDisplay(a, control)} / −${control.scoreValue}`}
+              </span>
             </div>
             <div className="between">
               <span className="w-label">Owner</span>
@@ -547,6 +573,7 @@ export function ControlDetailScreen({ go }: ScreenProps) {
           </div>
         </Card>
       </div>
+      <Sources ids={control.sourceRefs} />
     </div>
   );
 }

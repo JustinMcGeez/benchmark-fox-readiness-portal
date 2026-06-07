@@ -18,6 +18,15 @@ export const POAM_ITEMS: PoamItem[] = [
       'Implement enclave segmentation; route CUI through GCC High; document data flow diagram.',
     resourceEstimate: '40 hrs + segmentation license',
     howIdentified: 'Scoping workshop — CUI boundary review',
+    milestones: [
+      { label: 'Map current CUI data flows', date: '07/05/2026', done: true },
+      { label: 'Design enclave segmentation', date: '07/18/2026' },
+      { label: 'Implement + validate firewall rules', date: '07/28/2026' },
+      { label: 'Document data flow diagram in SSP', date: '08/01/2026' },
+    ],
+    changesToMilestones: 'None since baseline.',
+    evidenceIds: ['ev-1'],
+    taskIds: ['tk-3'],
   },
   {
     id: 'PM-021',

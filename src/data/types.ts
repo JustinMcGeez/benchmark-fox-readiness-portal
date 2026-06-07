@@ -20,7 +20,7 @@ export type EvidenceStatus =
   | 'Expired'
   | 'Not Requested';
 export type PoamStatus = 'None' | 'Not Started' | 'Ongoing' | 'Blocked' | 'Complete' | 'Validated' | 'Closed';
-export type EvidenceQuality = 'Strong' | 'Acceptable' | 'Weak' | 'Missing';
+export type EvidenceQuality = 'Strong' | 'Acceptable' | 'Weak' | 'Missing' | 'Not Relevant' | 'Outdated';
 export type TaskStatus = 'Not Started' | 'In Progress' | 'Blocked' | 'Done';
 export type PoamClass = 'Blocker' | 'Readiness' | 'Internal';
 
@@ -76,20 +76,32 @@ export interface Client {
 
 /** Library-level control definition (client-independent). */
 export interface Control {
-  id: string; // e.g. '3.1.1'
-  code: string; // e.g. 'AC.L2-3.1.1'
+  id: string; // e.g. '3.1.1' (same as number)
+  number: string; // e.g. '3.1.1'
+  code: string; // e.g. 'AC.L1-3.1.1'
   familyCode: string; // e.g. 'AC'
   familyName: string; // e.g. 'Access Control'
+  /** lowest CMMC level at which the requirement applies */
   level: 'L1' | 'L2';
-  /** SPRS point weight deducted when the control is not implemented (1, 3 or 5). */
-  scoreValue: number;
-  title: string;
-  summary: string; // short requirement summary for tables
-  requirement: string; // full requirement text
-  explanation: string; // plain-English explanation
+  /**
+   * SPRS point weight deducted when the control is not implemented.
+   * `null` = NOT FINALIZED — the official DoD Assessment Methodology value is
+   * not available from a bundled local source, so it must not be guessed.
+   */
+  scoreValue: number | null;
+  title: string; // short display label (derived from requirement)
+  summary: string; // requirement summary for tables
+  requirement: string; // official NIST SP 800-171 Rev. 2 requirement text
+  explanation: string; // Benchmark Fox plain-English explanation ('' = TODO placeholder)
   commonMistakes?: string[];
   evidenceExamples?: string[];
   guidance?: { implementation?: string; interview?: string };
+  sspGuidance?: string | null; // BF SSP language guidance (null = TODO)
+  poamGuidance?: string | null; // BF POA&M guidance (null = TODO)
+  /** NIST SP 800-171A assessment objectives (null = TODO, not bundled locally) */
+  assessmentObjectives?: string[] | null;
+  /** sourceId references into SOURCE_REFS */
+  sourceRefs: string[];
 }
 
 /** Per-client assessment of a control — the editable, persisted record. */
@@ -113,12 +125,24 @@ export interface EvidenceItem {
   clientId: string;
   title: string;
   controlId: string;
+  /** NIST SP 800-171A assessment objective this evidence supports (e.g. '3.5.3[a]') */
+  assessmentObjective?: string;
   owner: string;
   status: EvidenceStatus;
   quality: EvidenceQuality;
   freshness: 'Current' | 'Expired' | 'N/A';
+  /** does the evidence support the SSP statement? */
+  sspSupported?: 'Yes' | 'Partial' | 'No';
+  poamId?: string;
+  taskId?: string;
   method?: string;
   notes?: string;
+}
+
+export interface PoamMilestone {
+  label: string;
+  date: string;
+  done?: boolean;
 }
 
 export interface PoamItem {
@@ -136,6 +160,11 @@ export interface PoamItem {
   resourceEstimate?: string;
   howIdentified?: string;
   evidenceForClosure?: string;
+  milestones?: PoamMilestone[];
+  changesToMilestones?: string;
+  /** relationship mapping */
+  evidenceIds?: string[];
+  taskIds?: string[];
 }
 
 export interface TaskItem {
@@ -149,12 +178,15 @@ export interface TaskItem {
   description?: string;
   relatedControlId?: string;
   relatedPoamId?: string;
+  relatedEvidenceId?: string;
 }
 
 export interface ReportItem {
   id: string;
   title: string;
   description: string;
+  /** which data the report is generated from */
+  feeds: string[];
 }
 
 export interface AuditEvent {

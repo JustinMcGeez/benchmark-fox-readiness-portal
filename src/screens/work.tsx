@@ -24,7 +24,17 @@ import { useData } from '../data/store';
 import { EVIDENCE_ITEMS } from '../data/evidence';
 import { POAM_ITEMS } from '../data/poam';
 import { TASKS } from '../data/tasks';
-import type { ClientControlAssessment } from '../data/types';
+import type { ClientControlAssessment, SspStatus } from '../data/types';
+import { Sources } from '../components/SourceBadge';
+
+const SSP_FILTERS: { label: string; value: SspStatus | 'All' }[] = [
+  { label: 'All', value: 'All' },
+  { label: 'Complete', value: 'Complete' },
+  { label: 'Needs Update', value: 'Needs Fix' },
+  { label: 'Missing', value: 'Missing' },
+  { label: 'Mismatch With Evidence', value: 'Mismatch' },
+  { label: 'Not Reviewed', value: 'Not Reviewed' },
+];
 
 const implOf = (a: ClientControlAssessment) =>
   a.status === 'Met' || a.status === 'Partial' ? 'Implemented' : 'Not Implemented';
@@ -35,6 +45,7 @@ const evSupports = (a: ClientControlAssessment) =>
 export function SSPScreen({ go }: ScreenProps) {
   const { assessments, selectControl } = useData();
   const [tab, setTab] = useState('Control Statements');
+  const [filter, setFilter] = useState<SspStatus | 'All'>('All');
 
   const counts = useMemo(() => {
     const c = { Complete: 0, 'Needs Fix': 0, Missing: 0, Mismatch: 0, 'Not Reviewed': 0 } as Record<string, number>;
@@ -42,7 +53,9 @@ export function SSPScreen({ go }: ScreenProps) {
     return c;
   }, [assessments]);
 
-  const rows = assessments.slice(0, 10);
+  const rows = assessments
+    .filter((a) => filter === 'All' || a.sspStatus === filter)
+    .slice(0, 14);
   const editor = assessments.find((a) => a.controlId === '3.1.1') ?? assessments[0];
 
   return (
@@ -61,6 +74,17 @@ export function SSPScreen({ go }: ScreenProps) {
       <Tabs items={['SSP Summary', 'Control Statements', 'Gaps', 'Export']} active={tab} onPick={setTab} />
       <div className="grid-2" style={{ alignItems: 'start' }}>
         <Card style={{ padding: '6px 6px' }}>
+          <div className="row wrap gap-sm" style={{ padding: '8px 10px' }}>
+            {SSP_FILTERS.map((f) => (
+              <button
+                key={f.label}
+                className={'w-btn sm' + (filter === f.value ? ' primary' : ' ghost')}
+                onClick={() => setFilter(f.value)}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
           <table className="w-table">
             <thead>
               <tr>
@@ -123,6 +147,7 @@ export function SSPScreen({ go }: ScreenProps) {
           </div>
         </Card>
       </div>
+      <Sources ids={['nist-sp-800-171r2', 'cmmc-l2-assessment', 'cui-poam-template', 'bf-internal']} />
     </div>
   );
 }
@@ -203,11 +228,40 @@ export function POAMScreen({ go }: ScreenProps) {
           <Field label="HOW IDENTIFIED" value={detail.howIdentified ?? ''} />
           <Field label="EVIDENCE FOR CLOSURE" placeholder="e.g. data flow diagram + firewall rules export" />
         </div>
+        {detail.milestones && (
+          <div className="mt">
+            <span className="w-label">MILESTONES & INTERIM COMPLETION DATES</span>
+            <div className="col" style={{ gap: 6, marginTop: 8 }}>
+              {detail.milestones.map((m) => (
+                <div key={m.label} className="between w-box" style={{ padding: '7px 12px' }}>
+                  <span className="center" style={{ gap: 8 }}>
+                    <span
+                      className={'dot ' + (m.done ? 'ok' : 'none')}
+                      style={{ width: 8, height: 8, borderRadius: '50%' }}
+                    />
+                    {m.label}
+                  </span>
+                  <span className="mono faint" style={{ fontSize: '.82em' }}>{m.date}</span>
+                </div>
+              ))}
+            </div>
+            <p className="faint" style={{ margin: '8px 0 0', fontSize: '.82em' }}>
+              Changes to milestones: {detail.changesToMilestones ?? '—'}
+            </p>
+          </div>
+        )}
+        <div className="row wrap gap-sm mt" style={{ fontSize: '.82rem' }}>
+          <span className="muted">Linked:</span>
+          <Badge tone="none">Control {detail.controlId}</Badge>
+          {detail.evidenceIds?.map((id) => <Badge key={id} tone="none">Evidence {id}</Badge>)}
+          {detail.taskIds?.map((id) => <Badge key={id} tone="none">Task {id}</Badge>)}
+        </div>
         <div className="row gap-sm mt" style={{ justifyContent: 'flex-end' }}>
           <Btn ghost>Save Draft</Btn>
           <Btn primary>Save POA&M Item</Btn>
         </div>
       </Card>
+      <Sources ids={['cui-poam-template', 'nist-sp-800-171r2', 'dfars-252-204-7012', 'cmmc-l2-assessment']} />
     </div>
   );
 }
@@ -267,6 +321,10 @@ export function EvidenceScreen(_: ScreenProps) {
               <span className="mono">{detail.controlId}</span>
             </div>
             <div className="between">
+              <span className="w-label">ASSESSMENT OBJECTIVE</span>
+              <span className="mono">{detail.assessmentObjective ?? '—'}</span>
+            </div>
+            <div className="between">
               <span className="w-label">METHOD</span>
               <span>{detail.method ?? '—'}</span>
             </div>
@@ -274,15 +332,25 @@ export function EvidenceScreen(_: ScreenProps) {
               <span className="w-label">STATUS</span>
               <Status s={detail.status} />
             </div>
-            <Ph h={120}>[ uploaded file preview / secure link ]</Ph>
+            <div className="between">
+              <span className="w-label">QUALITY</span>
+              <Status s={detail.quality} />
+            </div>
+            <Ph h={110}>[ uploaded file preview / secure link ]</Ph>
             <Field label="CONSULTANT REVIEW NOTES" value={detail.notes ?? ''} placeholder="Quality, gaps, follow-ups…" area />
             <div className="between">
               <span className="w-label">SUPPORTS SSP STATEMENT?</span>
               <div className="row gap-sm">
-                {['Yes', 'Partial', 'No'].map((s, i) => (
-                  <Check key={s} label={s} on={i === 1} radio />
+                {(['Yes', 'Partial', 'No'] as const).map((s) => (
+                  <Check key={s} label={s} on={(detail.sspSupported ?? 'Partial') === s} radio />
                 ))}
               </div>
+            </div>
+            <div className="row wrap gap-sm" style={{ fontSize: '.82rem' }}>
+              <span className="muted">Linked:</span>
+              {detail.poamId ? <Badge tone="none">POA&M {detail.poamId}</Badge> : null}
+              {detail.taskId ? <Badge tone="none">Task {detail.taskId}</Badge> : null}
+              {!detail.poamId && !detail.taskId && <span className="faint">none</span>}
             </div>
             <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
               <Btn ghost>Reject</Btn>
@@ -292,6 +360,7 @@ export function EvidenceScreen(_: ScreenProps) {
           </div>
         </Card>
       </div>
+      <Sources ids={['nist-sp-800-171a', 'cmmc-l2-assessment', 'dfars-252-204-7012', 'bf-internal']} />
     </div>
   );
 }

@@ -32,8 +32,16 @@ function isDeducted(status: ReadinessStatus): boolean {
 }
 
 export function deductionFor(a: ClientControlAssessment, control?: Control): number {
-  if (!control) return 0;
+  // scoreValue null = official deduction not finalized → contributes 0 (and the
+  // UI surfaces a "scoring not finalized" warning via scoringFinalized()).
+  if (!control || control.scoreValue == null) return 0;
   return isDeducted(a.status) ? control.scoreValue : 0;
+}
+
+/** True only when every control carries an official (non-null) deduction value. */
+export function scoringFinalized(controlsById: Record<string, Control>): boolean {
+  const list = Object.values(controlsById);
+  return list.length > 0 && list.every((c) => c.scoreValue != null);
 }
 
 export function statusCounts(assessments: ClientControlAssessment[]): StatusCounts {
@@ -96,7 +104,8 @@ export function readinessPct(assessments: ClientControlAssessment[]): number {
 export function controlScoreDisplay(a: ClientControlAssessment, control?: Control): string {
   if (a.status === 'Not Reviewed') return 'TBD';
   if (a.status === 'Met' || a.status === 'Not Applicable') return '0';
-  return `−${control?.scoreValue ?? 0}`;
+  if (control?.scoreValue == null) return '—'; // deduction not finalized
+  return `−${control.scoreValue}`;
 }
 
 export interface FamilyScore {

@@ -29,10 +29,12 @@ import {
   formatScore,
   readinessPct,
   scoreByFamily,
+  scoringFinalized,
   sprsScore,
   SPRS_MAX,
   statusCounts,
 } from '../lib/scoring';
+import { Sources } from '../components/SourceBadge';
 
 const POAM_OPEN_STATES = new Set(['Not Started', 'Ongoing', 'Blocked']);
 const priorityRank = (p: string) => ({ Critical: 3, High: 2, Medium: 1, Low: 0 })[p] ?? 0;
@@ -62,9 +64,20 @@ export function ClientDashboardScreen({ go }: ScreenProps) {
     .slice(0, 3);
 
   const notMetTotal = counts.notMet + counts.notReviewed;
+  const finalized = scoringFinalized(CONTROLS_BY_ID);
 
   return (
     <div className="col">
+      <WarnBanner tone="none">
+        Readiness support only — these figures help plan remediation and do not guarantee CMMC
+        certification or constitute an official assessment.
+      </WarnBanner>
+      {!finalized && (
+        <WarnBanner tone="warn">
+          Scoring not finalized — SPRS deduction values are placeholders pending import of the DoD
+          Assessment Methodology. The readiness % (status-based) is unaffected.
+        </WarnBanner>
+      )}
       <div className="grid-4">
         <StatCard k="Readiness" v={`${readiness}%`} />
         <StatCard k="Current Score" v={formatScore(score)} d={`Target: ${SPRS_MAX}`} tone="warn" />
@@ -103,9 +116,13 @@ export function ClientDashboardScreen({ go }: ScreenProps) {
             ))}
           </ol>
         </Card>
-        <Card title="Score by Family">
+        <Card title={finalized ? 'Score by Family' : 'Readiness by Family'}>
           <BarChart
-            rows={families.map((f) => ({ l: f.name, p: f.readiness, v: `−${f.deduction}` }))}
+            rows={families.map((f) => ({
+              l: f.name,
+              p: f.readiness,
+              v: finalized ? `−${f.deduction}` : `${f.readiness}%`,
+            }))}
           />
         </Card>
         <Card title="Next Recommended Actions">
@@ -352,8 +369,9 @@ export function PathScreen({ go }: ScreenProps) {
       </div>
       <WarnBanner tone="none">
         This recommendation supports readiness planning only and does not replace legal, contracting,
-        government, or C3PAO determination.
+        government, or C3PAO determination. CMMC path determination is not legal or contracting advice.
       </WarnBanner>
+      <Sources ids={['far-52-204-21', 'dfars-252-204-7012', 'cfr-32-170', 'cmmc-l2-scoping', 'nara-cui-registry']} />
     </div>
   );
 }

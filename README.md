@@ -89,37 +89,79 @@ top of `src/styles/wireframe.css`.
 
 ## Data-driven MVP
 
-Screen values are **computed from a structured data layer**, not hard-coded text:
+Every major screen is **computed from a structured data layer**, not hard-coded text.
 
 ```
 src/
   data/
-    types.ts        # domain interfaces (Client, Control, ClientControlAssessment,
-                    #   EvidenceItem, PoamItem, TaskItem, ReportItem, AuditEvent)
-                    #   + status option lists
-    clients.ts      # clients + audit log + CURRENT_CLIENT_ID
-    controls.ts     # control library, family summary, seed assessments
-    evidence.ts     # evidence items
-    poam.ts         # POA&M items
-    tasks.ts        # remediation tasks
-    reports.ts      # report deliverables + export formats
-    store.ts        # <DataProvider> — seed merged with localStorage edits;
-                    #   useData() exposes assessments, updateAssessment, selectControl
+    types.ts             # domain interfaces (Client, Control, ClientControlAssessment,
+                         #   EvidenceItem, PoamItem, TaskItem, ReportItem, AuditEvent) + enums
+    controlFamilies.ts   # the 14 NIST 800-171 families
+    controls.generated.ts# AUTO-GENERATED — all 110 NIST SP 800-171 Rev. 2 requirements
+    controls.ts          # generated library + Benchmark Fox overlay + seed assessments
+    clients.ts           # clients + audit log + CURRENT_CLIENT_ID
+    evidence.ts          # evidence items (mapped to control/objective/SSP/POA&M/task)
+    poam.ts              # POA&M items (weakness, milestones, relationships)
+    tasks.ts             # remediation tasks
+    reports.ts           # report deliverables + what data feeds each
+    sourceRefs.ts        # official source-document registry (cited across the app)
+    store.ts             # <DataProvider> — seed merged with localStorage edits
   lib/
-    scoring.ts      # isolated scoring engine (readiness %, SPRS score, by-family)
+    scoring.ts           # isolated scoring engine (readiness %, SPRS score, by-family)
+data-sources/
+    sp800-171r2.json     # LOCAL SOURCE — 110 official Rev. 2 requirement statements
+scripts/
+    build-controls.mjs   # regenerates controls.generated.ts from the local source
 ```
 
-- **Client Dashboard** and **Control Matrix** derive readiness %, SPRS score,
-  status counts, open POA&Ms, blockers, missing evidence, and score-by-family
-  from the assessments via `lib/scoring.ts`.
-- The **Control Matrix** has real search + family/status/SSP/evidence filters and
-  inline dropdowns for readiness, SSP, evidence, POA&M status and owner. Edits
-  **persist to `localStorage`** (`bf_assessments_v1`) and update the dashboard
-  live. Clicking a row opens **Control Detail** for that control.
-- **Scoring is intentionally isolated** in `lib/scoring.ts` so the prototype model
-  (Met = 0 deduction, otherwise full; readiness gives Partial half credit) can be
-  swapped for official CMMC/SPRS rules without touching any screen.
-- **No backend.** `store.ts` is the seam where Supabase/Postgres will slot in.
+- **Full 110-requirement library.** All NIST SP 800-171 Rev. 2 requirements are
+  loaded with official requirement text, family, and CMMC level applicability.
+- **Computed dashboards.** Client Dashboard / internal Dashboard / Report Preview
+  derive readiness %, score, status counts, open POA&Ms, blockers, missing/weak
+  evidence, top blockers, next actions, and by-family breakdowns via `lib/scoring.ts`.
+- **Functional Control Matrix.** Real search + family/status/SSP/evidence filters,
+  inline editable dropdowns (readiness/SSP/evidence/POA&M/owner) that **persist to
+  `localStorage`** and flow to every screen. Clicking a row opens that control's
+  **Control Detail**.
+- **Source attribution everywhere.** Control Detail, SSP, POA&M, Evidence, and CMMC
+  Path screens show a **Sources** strip citing the official documents behind the data.
+
+### Official source documents
+
+Content and data modeling are based **only** on official sources (see
+`src/data/sourceRefs.ts`): NIST SP 800-171 Rev. 2 & 800-171A, the NIST SP 800-171
+DoD Assessment Methodology, FAR 52.204-21, DFARS 252.204-7012/7019/7020,
+32 CFR Part 170, the CMMC Level 1/2/3 scoping & assessment guides, the NARA CUI
+Registry, and Benchmark Fox internal templates. Requirement text in
+`data-sources/sp800-171r2.json` is reproduced verbatim from NIST SP 800-171 Rev. 2
+(public-domain U.S. Government work).
+
+### Local source file process
+
+`data-sources/sp800-171r2.json` is the source of truth for the control library.
+`scripts/build-controls.mjs` parses it into `src/data/controls.generated.ts`:
+
+```bash
+node scripts/build-controls.mjs   # regenerate after editing the source file
+```
+
+To import official data we don't bundle yet (e.g. a NIST CSV/XLSX or the DoD
+Assessment Methodology scoring), drop the file in `data-sources/` and extend the
+script — no screen changes required.
+
+### What is data-driven vs. placeholder
+
+| Area | State |
+| --- | --- |
+| 110 requirement texts, numbers, families, L1/L2 applicability | ✅ official (NIST 800-171 Rev. 2) |
+| Readiness %, status counts, dashboards, matrix, detail, SSP/POA&M/Evidence/Tasks/Reports | ✅ computed from data |
+| SPRS deduction values (`scoreValue`) | ⚠️ **placeholder (`null`)** — DoD Assessment Methodology not bundled; UI shows a "scoring not finalized" warning |
+| Assessment objectives (800-171A) | ⚠️ placeholder (not bundled) |
+| Plain-English explanations / evidence examples / SSP & POA&M guidance | ✏️ Benchmark Fox-authored for a curated subset; the rest show TODO placeholders |
+
+Scoring is isolated in `lib/scoring.ts` so the placeholder model (Met = 0
+deduction, otherwise full; readiness gives Partial half credit) can be replaced
+with official rules without touching any screen.
 
 ## App structure
 
@@ -133,14 +175,22 @@ src/
     primitives.tsx         # Btn, Field, Badge, Status, InlineSelect, charts, Card, …
     Shell.tsx              # app shell — sidebar / topnav / hybrid + client tabs
     Brand.tsx              # BrandMark / BrandLockup / BrandLogo (real logo assets)
+    SourceBadge.tsx        # SourceBadge / Sources attribution UI
   tweaks/TweaksPanel.tsx   # floating tweaks panel + useTweaks (localStorage)
   screens/                 # core / client / controls / work / output + index barrel
 ```
 
-## Notes
+## Clearing local data
 
-This is a **prototype** — seed data describes one active engagement (Acme Defense),
-inputs other than the matrix dropdowns are non-functional, and there's no backend.
-Matrix edits persist locally; clear them by removing the `bf_*` keys from
-`localStorage`. The goal is a working, data-driven internal prototype before
-Supabase/Postgres integration.
+Matrix/detail edits persist in `localStorage`. To reset to seed data, clear the
+`bf_*` keys (`bf_assessments_v1`, `bf_selected_control`, `bf_screen`, `bf_tweaks`)
+in your browser's devtools → Application → Local Storage, or run
+`localStorage.clear()` in the console.
+
+## Disclaimer
+
+This is a **readiness-support tool, not an official CMMC assessment platform**.
+Nothing here constitutes a certification result, an official SPRS score, or legal,
+contracting, or C3PAO determination. SPRS scoring values are placeholders pending
+import of the official DoD Assessment Methodology. Always validate against the
+official source documents and qualified assessors.
