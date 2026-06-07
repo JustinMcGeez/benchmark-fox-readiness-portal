@@ -51,3 +51,14 @@ export const ASSET_CATEGORIES: ScopeAssetCategory[] = [
   'Specialized',
   'Out-of-Scope',
 ];
+
+/** Editable scope state (persisted to localStorage). See store.ts. */
+export interface ScopeState {
+  summary: ScopeSummary;
+  assets: ScopeAsset[];
+}
+
+export const DEFAULT_SCOPE: ScopeState = {
+  summary: SCOPE_SUMMARY,
+  assets: SCOPE_ASSETS,
+};

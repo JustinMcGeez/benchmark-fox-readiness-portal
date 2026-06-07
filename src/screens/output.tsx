@@ -22,9 +22,11 @@ import { POAM_ITEMS } from '../data/poam';
 import { EVIDENCE_ITEMS } from '../data/evidence';
 import { TASKS } from '../data/tasks';
 import { useData } from '../data/store';
-import { CONTROLS_BY_ID } from '../data/controls';
-import { formatScore, readinessPct, sprsScore } from '../lib/scoring';
+import { CONTROLS_BY_ID, LIBRARY_COMPLETE } from '../data/controls';
+import { formatScore, readinessPct, scoringFinalized, sprsScore } from '../lib/scoring';
 import { blockerItems, missingEvidenceCount, openTaskCount, topBlockers } from '../lib/selectors';
+import { SourceRefs } from '../components/SourceRefs';
+import { ScoringWarning } from '../components/ScoringWarning';
 
 /* ---------- 16. REPORTS ---------- */
 export function ReportsScreen({ go }: ScreenProps) {
@@ -107,6 +109,7 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
           </>
         }
       />
+      <ScoringWarning />
       <Tabs items={['Preview', 'Edit Sections', 'Export']} active="Preview" />
       <div style={{ display: 'flex', justifyContent: 'center' }}>
         <div className="w-card" style={{ width: 680, padding: 40, background: 'var(--white)' }}>
@@ -160,6 +163,7 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
           </Ph>
         </div>
       </div>
+      <SourceRefs ids={['nist-sp-800-171r2', 'dod-assessment-methodology', 'cmmc-l2-assessment', 'bf-internal']} />
     </div>
   );
 }
@@ -245,11 +249,37 @@ export function AuditScreen(_: ScreenProps) {
 }
 
 /* ---------- 20. SETTINGS ---------- */
+/** Small Yes/No status row for the MVP status card. */
+function StatusRow({ label, value }: { label: string; value: boolean | string }) {
+  const isText = typeof value === 'string';
+  return (
+    <div className="between" style={{ padding: '7px 0', borderBottom: '1px solid var(--line-soft)' }}>
+      <span className="muted" style={{ fontSize: '.9em' }}>{label}</span>
+      {isText ? (
+        <Badge tone="none">{value}</Badge>
+      ) : (
+        <Badge tone={value ? 'ok' : 'bad'}>{value ? 'Yes' : 'No'}</Badge>
+      )}
+    </div>
+  );
+}
+
 export function SettingsScreen(_: ScreenProps) {
   const [tab, setTab] = useState('Users');
   return (
     <div className="col">
       <PageHead title="Settings" sub="Manage platform configuration." />
+      <Card title="Current MVP status">
+        <div className="grid-2" style={{ gap: '0 var(--gap)' }}>
+          <StatusRow label="Full 110 controls loaded" value={LIBRARY_COMPLETE} />
+          <StatusRow label="Official scoring values loaded" value={scoringFinalized(CONTROLS_BY_ID)} />
+          <StatusRow label="Assessment objectives loaded" value={false} />
+          <StatusRow label="Backend connected" value={false} />
+          <StatusRow label="Client portal enabled" value={false} />
+          <StatusRow label="Evidence file storage enabled" value={false} />
+          <StatusRow label="Data persistence" value="localStorage only" />
+        </div>
+      </Card>
       <Tabs
         items={['Users', 'Roles', 'Branding', 'Report Templates', 'Control Library', 'Security']}
         active={tab}
@@ -334,6 +364,9 @@ export function MobileScreen(_: ScreenProps) {
         title="Mobile Direction"
         sub="Desktop-first, but mobile-friendly for review & quick updates."
       />
+      <div style={{ width: '100%', maxWidth: 620 }}>
+        <ScoringWarning />
+      </div>
       <div className="row wrap" style={{ justifyContent: 'center', gap: 30 }}>
         <div>
           <div className="annot" style={{ marginBottom: 8 }}>

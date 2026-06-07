@@ -8,7 +8,10 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc -b --noEmit"
+    "typecheck": "tsc -b --noEmit",
+    "import:sources": "node scripts/import-sp800-171.ts",
+    "validate:controls": "node scripts/validate-controls.mjs",
+    "build:data": "npm run import:sources && npm run validate:controls"
   },
   "dependencies": {
     "lucide-react": "^1.17.0",

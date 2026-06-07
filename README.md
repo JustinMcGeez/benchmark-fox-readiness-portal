@@ -9,10 +9,15 @@ Montserrat/Inter typography, and crisp Lucide line icons.
 
 ```bash
 npm install
-npm run dev      # start the dev server (opens http://localhost:5173)
-npm run build    # type-check + production build to dist/
-npm run preview  # preview the production build
+npm run dev               # start the dev server (opens http://localhost:5173)
+npm run build             # type-check + production build to dist/
+npm run preview           # preview the production build
 npm run typecheck
+
+# data pipeline
+npm run import:sources    # regenerate src/data/generated/controls.generated.ts
+npm run validate:controls # validate the generated 110-control library
+npm run build:data        # import:sources + validate:controls
 ```
 
 ### Network / proxy
@@ -143,10 +148,12 @@ Registry, and Benchmark Fox internal templates. Requirement text in
 ### Local source file process
 
 `data-sources/sp800-171r2.json` is the source of truth for the control library.
-`scripts/import-sp800-171.ts` parses it into `src/data/generated/controls.generated.ts`:
+`scripts/import-sp800-171.ts` parses it into `src/data/generated/controls.generated.ts`,
+and `scripts/validate-controls.mjs` checks the result (count = 110, 14 families, no
+duplicates, required fields, `nist-sp-800-171r2` cited, `scoreSource` valid):
 
 ```bash
-node scripts/import-sp800-171.ts   # regenerate after editing the source file (Node 22.6+/24)
+npm run build:data   # import:sources + validate:controls (Node 22.6+/24)
 ```
 
 To import official data we don't bundle yet (e.g. a NIST CSV/XLSX or the DoD
@@ -159,7 +166,7 @@ Assessment Methodology scoring), drop the file in `data-sources/`, extend
 | --- | --- |
 | 110 requirement texts, numbers, families, L1/L2 applicability | ✅ official (NIST 800-171 Rev. 2) |
 | Readiness %, status counts, dashboards, matrix, detail, SSP/POA&M/Evidence/Tasks/Reports/Mobile | ✅ computed from data |
-| Intake summary, CMMC path recommendation, scope summary + assets | ✅ data-driven (`intake.ts` / `scope.ts`) — prototype values |
+| Intake summary, CMMC path recommendation, scope summary + assets | ✅ data-driven **and editable** (`intake.ts` / `scope.ts`, persisted to localStorage) |
 | SPRS deduction values (`scoreValue`, `scoreSource`) | ⚠️ **placeholder** (`scoreValue: null`, `scoreSource: 'placeholder'`) — DoD Assessment Methodology not bundled; UI shows a "scoring not finalized" warning |
 | Assessment objectives (800-171A) | ⚠️ placeholder (not bundled) |
 | Plain-English explanations / evidence examples / SSP & POA&M guidance | ✏️ Benchmark Fox-authored for a curated subset; the rest show TODO placeholders |
@@ -191,9 +198,9 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
 
 - **In-app:** open the **⚙ Tweaks** panel (bottom-right) → **Developer → ↺ Reset
   demo data**. This clears the `bf_*` keys and reloads.
-- **Manually:** clear the `bf_*` keys (`bf_assessments_v1`, `bf_selected_control`,
-  `bf_screen`, `bf_tweaks`) in devtools → Application → Local Storage, or run
-  `localStorage.clear()` in the console.
+- **Manually:** clear the `bf_*` keys (`bf_assessments_v1`, `bf_intake_v1`,
+  `bf_scope_v1`, `bf_selected_control`, `bf_screen`, `bf_tweaks`) in devtools →
+  Application → Local Storage, or run `localStorage.clear()` in the console.
 
 ## Current MVP status
 
@@ -234,8 +241,9 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   the DoD Assessment Methodology — the SPRS-style score is flagged "scoring not
   finalized" everywhere.
 - NIST SP 800-171A assessment objectives (not bundled).
-- Intake / Path / Scope use prototype values from `intake.ts` / `scope.ts` — read
-  from the data layer, but not yet editable or persisted.
+- Intake / Path / Scope are seeded from `intake.ts` / `scope.ts` and are now
+  **editable with localStorage persistence** (summary fields, contract/data
+  selections, scope assets) — prototype workflows, not yet backed by a database.
 
 **Known limitations**
 - No backend; single active client; auth is a prototype shell only.

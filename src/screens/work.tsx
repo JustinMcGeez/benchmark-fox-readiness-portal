@@ -26,7 +26,7 @@ import { EVIDENCE_ITEMS } from '../data/evidence';
 import { POAM_ITEMS } from '../data/poam';
 import { TASKS } from '../data/tasks';
 import type { ClientControlAssessment, SspStatus } from '../data/types';
-import { Sources } from '../components/SourceBadge';
+import { SourceRefs } from '../components/SourceRefs';
 
 const SSP_FILTERS: { label: string; value: SspStatus | 'All' }[] = [
   { label: 'All', value: 'All' },
@@ -148,7 +148,7 @@ export function SSPScreen({ go }: ScreenProps) {
           </div>
         </Card>
       </div>
-      <Sources ids={['nist-sp-800-171r2', 'cmmc-l2-assessment', 'cui-poam-template', 'bf-internal']} />
+      <SourceRefs ids={['nist-sp-800-171r2', 'cmmc-l2-assessment', 'cui-poam-template', 'bf-internal']} />
     </div>
   );
 }
@@ -182,39 +182,47 @@ export function POAMScreen({ go }: ScreenProps) {
               <th>Due</th>
               <th>Status</th>
               <th>Class</th>
+              <th>Links</th>
             </tr>
           </thead>
           <tbody>
-            {POAM_ITEMS.map((p) => (
-              <tr
-                key={p.id}
-                onClick={() => {
-                  selectControl(p.controlId);
-                  go('control-detail');
-                }}
-              >
-                <td className="mono" style={{ fontWeight: 700 }}>
-                  {p.id}
-                </td>
-                <td className="mono faint">{p.controlId}</td>
-                <td>{p.weakness}</td>
-                <td className="muted">{p.owner}</td>
-                <td>
-                  <RiskBadge level={p.risk} />
-                </td>
-                <td className="mono">{p.dueDate}</td>
-                <td>
-                  <Status s={p.status} />
-                </td>
-                <td>
-                  {p.classification === 'Blocker' ? (
-                    <Badge tone="bad">Blocker</Badge>
-                  ) : (
-                    <Badge tone="none">{p.classification}</Badge>
-                  )}
-                </td>
-              </tr>
-            ))}
+            {POAM_ITEMS.map((p) => {
+              const ms = p.milestones ?? [];
+              const msDone = ms.filter((m) => m.done).length;
+              return (
+                <tr
+                  key={p.id}
+                  onClick={() => {
+                    selectControl(p.controlId);
+                    go('control-detail');
+                  }}
+                >
+                  <td className="mono" style={{ fontWeight: 700 }}>
+                    {p.id}
+                  </td>
+                  <td className="mono faint">{p.controlId}</td>
+                  <td>{p.weakness}</td>
+                  <td className="muted">{p.owner}</td>
+                  <td>
+                    <RiskBadge level={p.risk} />
+                  </td>
+                  <td className="mono">{p.dueDate}</td>
+                  <td>
+                    <Status s={p.status} />
+                  </td>
+                  <td>
+                    {p.classification === 'Blocker' ? (
+                      <Badge tone="bad">Blocker</Badge>
+                    ) : (
+                      <Badge tone="none">{p.classification}</Badge>
+                    )}
+                  </td>
+                  <td className="mono faint" style={{ fontSize: '.8em', whiteSpace: 'nowrap' }}>
+                    {p.evidenceIds?.length ?? 0}ev · {p.taskIds?.length ?? 0}tk · {msDone}/{ms.length}ms
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </Card>
@@ -262,7 +270,7 @@ export function POAMScreen({ go }: ScreenProps) {
           <Btn primary>Save POA&M Item</Btn>
         </div>
       </Card>
-      <Sources ids={['cui-poam-template', 'nist-sp-800-171r2', 'dfars-252-204-7012', 'cmmc-l2-assessment']} />
+      <SourceRefs ids={['cui-poam-template', 'nist-sp-800-171r2', 'dfars-252-204-7012', 'cmmc-l2-assessment']} />
     </div>
   );
 }
@@ -361,7 +369,7 @@ export function EvidenceScreen(_: ScreenProps) {
           </div>
         </Card>
       </div>
-      <Sources ids={['nist-sp-800-171a', 'cmmc-l2-assessment', 'dfars-252-204-7012', 'bf-internal']} />
+      <SourceRefs ids={['nist-sp-800-171a', 'cmmc-l2-assessment', 'dfars-252-204-7012', 'bf-internal']} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
    Screens — client: Client Dashboard, Intake, Path, Scoping
    (these render inside the client context bar from Shell)
    ============================================================ */
-import { Fragment, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState, type CSSProperties } from 'react';
 import type { ScreenProps } from '../types';
 import {
   Badge,
@@ -23,8 +23,8 @@ import {
 import { useData } from '../data/store';
 import { CURRENT_CLIENT } from '../data/clients';
 import { CONTROLS_BY_ID } from '../data/controls';
-import { INTAKE_SUMMARY, PATH_RECOMMENDATION } from '../data/intake';
-import { SCOPE_ASSETS, SCOPE_SUMMARY } from '../data/scope';
+import { INTAKE_SUMMARY_FIELDS, PATH_RECOMMENDATION } from '../data/intake';
+import { ASSET_CATEGORIES } from '../data/scope';
 import { POAM_ITEMS } from '../data/poam';
 import { EVIDENCE_ITEMS } from '../data/evidence';
 import { TASKS } from '../data/tasks';
@@ -37,7 +37,8 @@ import {
   SPRS_MAX,
   statusCounts,
 } from '../lib/scoring';
-import { Sources } from '../components/SourceBadge';
+import { SourceRefs } from '../components/SourceRefs';
+import { ScoringWarning } from '../components/ScoringWarning';
 import {
   blockerItems,
   missingEvidenceCount,
@@ -70,12 +71,7 @@ export function ClientDashboardScreen({ go }: ScreenProps) {
         Readiness support only — these figures help plan remediation and do not guarantee CMMC
         certification or constitute an official assessment.
       </WarnBanner>
-      {!finalized && (
-        <WarnBanner tone="warn">
-          Scoring not finalized — SPRS deduction values are placeholders pending import of the DoD
-          Assessment Methodology. The readiness % (status-based) is unaffected.
-        </WarnBanner>
-      )}
+      <ScoringWarning />
       <div className="grid-4">
         <StatCard k="Readiness" v={`${readiness}%`} />
         <StatCard k="Current Score" v={formatScore(score)} d={`Target: ${SPRS_MAX}`} tone="warn" />
@@ -165,6 +161,7 @@ const INTAKE_STEPS = [
 ];
 
 export function IntakeScreen({ go }: ScreenProps) {
+  const { intake, updateIntake, toggleContractClause, toggleDataHandling } = useData();
   const [step, setStep] = useState(0);
   const last = step === INTAKE_STEPS.length - 1;
   return (
@@ -205,15 +202,14 @@ export function IntakeScreen({ go }: ScreenProps) {
           <div className="col">
             <span className="muted">Which contract clauses apply?</span>
             <div className="grid-2">
-              {[
-                'FAR 52.204-21',
-                'DFARS 252.204-7012',
-                'DFARS 252.204-7019',
-                'DFARS 252.204-7020',
-                'DFARS 252.204-7021',
-                'Unknown / Needs review',
-              ].map((c, i) => (
-                <Check key={c} label={c} on={i === 1} />
+              {intake.contractClauses.map((c) => (
+                <span
+                  key={c.label}
+                  onClick={() => toggleContractClause(c.label)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <Check label={c.label} on={c.selected} />
+                </span>
               ))}
             </div>
           </div>
@@ -222,11 +218,15 @@ export function IntakeScreen({ go }: ScreenProps) {
           <div className="col">
             <span className="muted">What data does the client handle?</span>
             <div className="grid-2">
-              {['FCI only', 'CUI', 'CDI / CTI', 'ITAR / Export-Controlled', 'Engineering drawings / CAD'].map(
-                (c, i) => (
-                  <Check key={c} label={c} on={i === 1 || i === 4} />
-                ),
-              )}
+              {intake.dataHandling.map((c) => (
+                <span
+                  key={c.label}
+                  onClick={() => toggleDataHandling(c.label)}
+                  style={{ cursor: 'pointer' }}
+                >
+                  <Check label={c.label} on={c.selected} />
+                </span>
+              ))}
             </div>
           </div>
         )}
@@ -263,17 +263,22 @@ export function IntakeScreen({ go }: ScreenProps) {
         )}
         {step === 6 && (
           <div className="w-box fill" style={{ padding: 18 }}>
-            <span className="w-eyebrow">Internal summary — auto-drafted</span>
+            <span className="w-eyebrow">Internal summary — editable, auto-drafted</span>
             <div className="grid-2 mt" style={{ gap: 10 }}>
-              {INTAKE_SUMMARY.map((it) => (
-                <div
-                  key={it.label}
+              {INTAKE_SUMMARY_FIELDS.map((f) => (
+                <label
+                  key={f.key}
                   className="between w-box"
-                  style={{ padding: '8px 12px', background: 'var(--white)' }}
+                  style={{ padding: '8px 12px', background: 'var(--white)', gap: 10 }}
                 >
-                  <span className="muted">{it.label}</span>
-                  <strong>{it.value}</strong>
-                </div>
+                  <span className="muted">{f.label}</span>
+                  <input
+                    className="w-input"
+                    style={{ maxWidth: 210, textAlign: 'right', padding: '4px 8px' }}
+                    value={intake[f.key]}
+                    onChange={(e) => updateIntake({ [f.key]: e.target.value })}
+                  />
+                </label>
               ))}
             </div>
           </div>
@@ -303,6 +308,7 @@ export function IntakeScreen({ go }: ScreenProps) {
 
 /* ---------- 7. CMMC PATH DETERMINATION ---------- */
 export function PathScreen({ go }: ScreenProps) {
+  const { intake, toggleContractClause, toggleDataHandling } = useData();
   return (
     <div className="col" style={{ maxWidth: 860 }}>
       <PageHead
@@ -312,15 +318,19 @@ export function PathScreen({ go }: ScreenProps) {
       <div className="grid-2">
         <Card title="Contract Clauses">
           <div className="col" style={{ gap: 11 }}>
-            {PATH_RECOMMENDATION.contractClauses.map((c) => (
-              <Check key={c.label} label={c.label} on={c.selected} />
+            {intake.contractClauses.map((c) => (
+              <span key={c.label} onClick={() => toggleContractClause(c.label)} style={{ cursor: 'pointer' }}>
+                <Check label={c.label} on={c.selected} />
+              </span>
             ))}
           </div>
         </Card>
         <Card title="Data Handling">
           <div className="col" style={{ gap: 11 }}>
-            {PATH_RECOMMENDATION.dataHandling.map((c) => (
-              <Check key={c.label} label={c.label} on={c.selected} />
+            {intake.dataHandling.map((c) => (
+              <span key={c.label} onClick={() => toggleDataHandling(c.label)} style={{ cursor: 'pointer' }}>
+                <Check label={c.label} on={c.selected} />
+              </span>
             ))}
           </div>
         </Card>
@@ -351,15 +361,19 @@ export function PathScreen({ go }: ScreenProps) {
         This recommendation supports readiness planning only and does not replace legal, contracting,
         government, or C3PAO determination. CMMC path determination is not legal or contracting advice.
       </WarnBanner>
-      <Sources ids={['far-52-204-21', 'dfars-252-204-7012', 'cfr-32-170', 'cmmc-l2-scoping', 'nara-cui-registry']} />
+      <SourceRefs ids={['far-52-204-21', 'dfars-252-204-7012', 'cfr-32-170', 'cmmc-l2-scoping', 'nara-cui-registry']} />
     </div>
   );
 }
 
 /* ---------- 8. SCOPING WORKSPACE ---------- */
 export function ScopeScreen({ go }: ScreenProps) {
+  const { scope, updateScopeSummary, addAsset, updateAsset, toggleAssetInScope, toggleAssetHandlesCui } =
+    useData();
   const [tab, setTab] = useState('Scope Summary');
   const tabs = ['Scope Summary', 'Assets', 'Users', 'Locations', 'Providers', 'CUI Flows'];
+  const summary = scope.summary;
+  const cellInput: CSSProperties = { padding: '4px 8px', fontSize: '.88em' };
   return (
     <div className="col">
       <PageHead
@@ -371,23 +385,37 @@ export function ScopeScreen({ go }: ScreenProps) {
       {tab === 'Scope Summary' ? (
         <Card>
           <div className="grid-2">
-            <Select label="ASSESSMENT BOUNDARY" value={SCOPE_SUMMARY.assessmentBoundary} />
-            <Select label="CUI STRATEGY" value={SCOPE_SUMMARY.cuiStrategy} />
-            <Select label="MSP / ESP INVOLVED" value={SCOPE_SUMMARY.mspInvolved} />
-            <Select label="CLOUD SERVICES" value={SCOPE_SUMMARY.cloudServices} />
+            <div className="w-field">
+              <span className="w-label">ASSESSMENT BOUNDARY</span>
+              <input className="w-input" value={summary.assessmentBoundary} onChange={(e) => updateScopeSummary({ assessmentBoundary: e.target.value })} />
+            </div>
+            <div className="w-field">
+              <span className="w-label">CUI STRATEGY</span>
+              <input className="w-input" value={summary.cuiStrategy} onChange={(e) => updateScopeSummary({ cuiStrategy: e.target.value })} />
+            </div>
+            <div className="w-field">
+              <span className="w-label">MSP / ESP INVOLVED</span>
+              <input className="w-input" value={summary.mspInvolved} onChange={(e) => updateScopeSummary({ mspInvolved: e.target.value })} />
+            </div>
+            <div className="w-field">
+              <span className="w-label">CLOUD SERVICES</span>
+              <input className="w-input" value={summary.cloudServices} onChange={(e) => updateScopeSummary({ cloudServices: e.target.value })} />
+            </div>
           </div>
           <div className="w-field mt">
             <span className="w-label">SCOPE NOTES</span>
-            <textarea className="w-input" rows={3} defaultValue={SCOPE_SUMMARY.notes} />
+            <textarea className="w-input" rows={3} value={summary.notes} onChange={(e) => updateScopeSummary({ notes: e.target.value })} />
           </div>
           <div className="row gap-sm wrap mt">
-            <Btn>+ Add Asset</Btn>
-            <Btn>+ Add User Group</Btn>
-            <Btn>+ Add Provider</Btn>
+            <Btn primary onClick={addAsset}>+ Add Asset</Btn>
+            <Btn onClick={() => setTab('Assets')}>View Assets ({scope.assets.length})</Btn>
           </div>
         </Card>
       ) : (
-        <Card title={tab}>
+        <Card
+          title={tab}
+          action={<Btn sm primary onClick={addAsset}>+ Add Asset</Btn>}
+        >
           <table className="w-table">
             <thead>
               <tr>
@@ -400,14 +428,34 @@ export function ScopeScreen({ go }: ScreenProps) {
               </tr>
             </thead>
             <tbody>
-              {SCOPE_ASSETS.map((a) => (
+              {scope.assets.map((a) => (
                 <tr key={a.id}>
-                  <td>{a.name}</td>
-                  <td>{a.type}</td>
-                  <td>{a.category}</td>
-                  <td>{a.handlesCui ? <Status s="Yes" /> : <Badge tone="none">No</Badge>}</td>
-                  <td>{a.owner}</td>
-                  <td>{a.inScope ? <Status s="Yes" /> : <Badge tone="none">No</Badge>}</td>
+                  <td>
+                    <input className="w-input" style={cellInput} value={a.name} onChange={(e) => updateAsset(a.id, { name: e.target.value })} />
+                  </td>
+                  <td>
+                    <input className="w-input" style={{ ...cellInput, width: 100 }} value={a.type} onChange={(e) => updateAsset(a.id, { type: e.target.value })} />
+                  </td>
+                  <td>
+                    <select className="w-inline-select" value={a.category} onChange={(e) => updateAsset(a.id, { category: e.target.value as typeof a.category })}>
+                      {ASSET_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <span style={{ cursor: 'pointer' }} onClick={() => toggleAssetHandlesCui(a.id)}>
+                      {a.handlesCui ? <Status s="Yes" /> : <Badge tone="none">No</Badge>}
+                    </span>
+                  </td>
+                  <td>
+                    <input className="w-input" style={{ ...cellInput, width: 100 }} value={a.owner} onChange={(e) => updateAsset(a.id, { owner: e.target.value })} />
+                  </td>
+                  <td>
+                    <span style={{ cursor: 'pointer' }} onClick={() => toggleAssetInScope(a.id)}>
+                      {a.inScope ? <Status s="Yes" /> : <Badge tone="none">No</Badge>}
+                    </span>
+                  </td>
                 </tr>
               ))}
             </tbody>

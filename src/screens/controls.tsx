@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import type { ScreenProps } from '../types';
 import {
+  Badge,
   Btn,
   Card,
   Field,
@@ -17,7 +18,8 @@ import {
   Tabs,
   WarnBanner,
 } from '../components/primitives';
-import { Sources } from '../components/SourceBadge';
+import { SourceRefs } from '../components/SourceRefs';
+import { ScoringWarning } from '../components/ScoringWarning';
 import { useData } from '../data/store';
 import { CURRENT_CLIENT } from '../data/clients';
 import {
@@ -176,6 +178,7 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
           requirements are imported ({CONTROL_LIBRARY.length} loaded).
         </WarnBanner>
       )}
+      <ScoringWarning />
 
       {/* filter bar */}
       <div className="w-card row wrap" style={{ alignItems: 'center', padding: '10px 12px', gap: 10 }}>
@@ -585,6 +588,14 @@ export function ControlDetailScreen({ go }: ScreenProps) {
               <span className="w-label">Last Reviewed</span>
               <span className="mono faint">{a.lastReviewed}</span>
             </div>
+            <div className="between">
+              <span className="w-label">Linked Items</span>
+              <span className="row gap-sm" style={{ fontSize: '.8rem' }}>
+                <Badge tone={evidence.length ? 'ok' : 'none'}>{evidence.length} evidence</Badge>
+                <Badge tone={poam.length ? 'warn' : 'none'}>{poam.length} POA&amp;M</Badge>
+                <Badge tone={tasks.length ? 'warn' : 'none'}>{tasks.length} tasks</Badge>
+              </span>
+            </div>
             <hr className="w-hr" style={{ margin: '4px 0' }} />
             <Btn primary>Save Changes</Btn>
             <Btn onClick={() => go('evidence')}>Request Evidence</Btn>
@@ -592,7 +603,7 @@ export function ControlDetailScreen({ go }: ScreenProps) {
           </div>
         </Card>
       </div>
-      <Sources ids={control.sourceRefs} />
+      <SourceRefs ids={control.sourceRefs} />
     </div>
   );
 }

@@ -1,10 +1,9 @@
 /* ============================================================
-   Source attribution UI — shows which official documents back the
-   data on a screen. Used on Control Detail, SSP, POA&M, Evidence,
-   and CMMC Path screens.
+   SourceBadge — a single source-document badge.
+   Composed into the reusable SourceRefs list (see SourceRefs.tsx).
    ============================================================ */
 import { BookMarked } from 'lucide-react';
-import { getSources, type SourceRef } from '../data/sourceRefs';
+import type { SourceRef } from '../data/sourceRefs';
 
 export function SourceBadge({ source }: { source: SourceRef }) {
   const title = [source.sourceName, source.version, source.reference, source.notes]
@@ -37,26 +36,3 @@ export function SourceBadge({ source }: { source: SourceRef }) {
     </span>
   );
 }
-
-/** A small "Sources" block listing the documents that back a screen's data. */
-export function Sources({ ids, title = 'Sources' }: { ids: string[]; title?: string }) {
-  const sources = getSources(ids);
-  if (!sources.length) return null;
-  return (
-    <div className="w-card" style={{ padding: '12px 16px' }}>
-      <div className="center" style={{ gap: 8, marginBottom: 10 }}>
-        <BookMarked size={15} strokeWidth={2} className="faint" />
-        <span className="w-eyebrow">{title}</span>
-      </div>
-      <div className="row wrap" style={{ gap: 8 }}>
-        {sources.map((s) => (
-          <SourceBadge key={s.sourceId} source={s} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/** Aliases — reusable source list component. */
-export const SourceList = Sources;
-export const SourceBadges = Sources;
