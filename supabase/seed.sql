@@ -19,9 +19,9 @@
 --   * control_families — all 14 NIST SP 800-171 Rev. 2 families
 --
 -- The 110 controls, the source registry, and the control->source mapping are
--- generated from TypeScript and seeded by:
---   npm run db:seed:refs        (scripts/seed-supabase-reference-data.ts)
--- so they always match the app's library. Run that after `supabase db reset`.
+-- generated from TypeScript and seeded separately by the npm script
+-- `db:seed:refs` (scripts/seed-supabase-reference-data.ts) AFTER a
+-- `supabase db reset`, so they always match the app's library.
 -- ============================================================================
 
 -- --- Benchmark Fox internal organization (idempotent on slug) ---------------

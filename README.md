@@ -389,6 +389,13 @@ npx supabase gen types typescript --local > src/lib/database.types.ts
 - **`service_role` is server-only.** `db:seed:refs` / `db:validate` read
   `SUPABASE_SERVICE_ROLE_KEY` from the environment to bypass RLS. **Never**
   commit it, put it in a `VITE_` var, or ship it to the browser.
+- **Data-sensitivity rules (repeat).**
+  - **Never commit real secrets** — only `.env.example` is tracked; real values
+    live in gitignored `.env*` files.
+  - **Never seed CUI.**
+  - **Never seed real evidence files.**
+  - **`evidence_items` are metadata + external links only** (no file column by
+    design); `reports` likewise hold metadata + external links only.
 
 ## Disclaimer
 
