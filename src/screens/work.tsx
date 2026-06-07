@@ -158,7 +158,7 @@ export function SSPScreen({ go }: ScreenProps) {
           </div>
         </Card>
       </div>
-      <SourceRefs ids={['nist-sp-800-171r2', 'nist-sp-800-171a', 'bf-ssp-template']} />
+      <SourceRefs title="Sources" ids={['nist-sp-800-171r2', 'nist-sp-800-171a', 'bf-ssp-template']} />
     </div>
   );
 }
@@ -292,7 +292,7 @@ export function POAMScreen({ go }: ScreenProps) {
           <Btn primary>Save POA&M Item</Btn>
         </div>
       </Card>
-      <SourceRefs ids={['dod-assessment-methodology', 'bf-poam-template', 'cui-poam-template']} />
+      <SourceRefs title="Sources" ids={['dod-assessment-methodology', 'bf-poam-template', 'cui-poam-template']} />
     </div>
   );
 }
@@ -399,7 +399,7 @@ export function EvidenceScreen(_: ScreenProps) {
           </div>
         </Card>
       </div>
-      <SourceRefs ids={['nist-sp-800-171a', 'bf-evidence-guidance']} />
+      <SourceRefs title="Sources" ids={['nist-sp-800-171a', 'bf-evidence-guidance']} />
     </div>
   );
 }

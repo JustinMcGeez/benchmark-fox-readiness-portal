@@ -370,6 +370,7 @@ export function PathScreen({ go }: ScreenProps) {
         government, or C3PAO determination. CMMC path determination is not legal or contracting advice.
       </WarnBanner>
       <SourceRefs
+        title="Sources"
         ids={[
           'cfr-32-170',
           'far-52-204-21',
