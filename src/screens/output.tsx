@@ -15,19 +15,13 @@ import {
   Toolbar,
 } from '../components/primitives';
 import { BrandLockup } from '../components/Brand';
+import { EXPORT_FORMATS, REPORTS } from '../data/reports';
+import { AUDIT_EVENTS } from '../data/clients';
+import { useData } from '../data/store';
+import { CONTROLS_BY_ID } from '../data/controls';
+import { formatScore, readinessPct, sprsScore } from '../lib/scoring';
 
 /* ---------- 16. REPORTS ---------- */
-const REPORTS: [string, string][] = [
-  ['Executive Readiness Summary', 'High-level leadership report'],
-  ['Detailed Gap Assessment', 'Control-by-control report'],
-  ['POA&M Summary', 'Remediation tracker export'],
-  ['Evidence Gap Report', 'Missing / weak evidence report'],
-  ['SPRS Score Summary', 'Current score and deltas'],
-  ['Final Go/No-Go Memo', 'C3PAO readiness decision'],
-  ['Remediation Roadmap', 'Sequenced action plan'],
-  ['C3PAO Readiness Checklist', 'Pre-assessment checklist'],
-];
-
 export function ReportsScreen({ go }: ScreenProps) {
   return (
     <div className="col">
@@ -36,8 +30,8 @@ export function ReportsScreen({ go }: ScreenProps) {
         sub="Generate client-ready Benchmark Fox readiness deliverables."
       />
       <div className="grid-2">
-        {REPORTS.map((r, i) => (
-          <div key={i} className="w-card between" style={{ alignItems: 'center' }}>
+        {REPORTS.map((r) => (
+          <div key={r.id} className="w-card between" style={{ alignItems: 'center' }}>
             <div className="center" style={{ gap: 14 }}>
               <span
                 className="center"
@@ -55,10 +49,10 @@ export function ReportsScreen({ go }: ScreenProps) {
               </span>
               <div>
                 <div className="w-h2" style={{ fontSize: '1.1em' }}>
-                  {r[0]}
+                  {r.title}
                 </div>
                 <p className="muted" style={{ margin: '2px 0 0', fontSize: '.88em' }}>
-                  {r[1]}
+                  {r.description}
                 </p>
               </div>
             </div>
@@ -70,7 +64,7 @@ export function ReportsScreen({ go }: ScreenProps) {
       </div>
       <Card title="Export Options">
         <div className="row gap-sm wrap">
-          {['PDF', 'DOCX', 'XLSX / CSV Matrix', 'ZIP Evidence Binder'].map((e) => (
+          {EXPORT_FORMATS.map((e) => (
             <Badge key={e} fill>
               {e}
             </Badge>
@@ -83,6 +77,10 @@ export function ReportsScreen({ go }: ScreenProps) {
 
 /* ---------- 17. REPORT PREVIEW ---------- */
 export function ReportPreviewScreen({ go }: ScreenProps) {
+  const { assessments } = useData();
+  const readiness = readinessPct(assessments);
+  const score = sprsScore(assessments, CONTROLS_BY_ID);
+  const risk = readiness >= 80 ? 'Low' : readiness >= 60 ? 'Medium' : 'High';
   return (
     <div className="col">
       <PageHead
@@ -119,20 +117,20 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
               <div className="mono faint" style={{ fontSize: '.7em' }}>
                 READINESS
               </div>
-              <div className="w-h1">62%</div>
+              <div className="w-h1">{readiness}%</div>
             </div>
             <div className="w-box" style={{ padding: 12, textAlign: 'center' }}>
               <div className="mono faint" style={{ fontSize: '.7em' }}>
                 SCORE
               </div>
-              <div className="w-h1">−38</div>
+              <div className="w-h1">{formatScore(score)}</div>
             </div>
             <div className="w-box" style={{ padding: 12, textAlign: 'center' }}>
               <div className="mono faint" style={{ fontSize: '.7em' }}>
                 RISK
               </div>
               <div className="w-h1" style={{ fontSize: '1.5em', marginTop: 8 }}>
-                High
+                {risk}
               </div>
             </div>
           </div>
@@ -205,15 +203,6 @@ export function KnowledgeScreen(_: ScreenProps) {
 }
 
 /* ---------- 19. AUDIT LOG ---------- */
-const AUDIT: [string, string, string, string, string][] = [
-  ['07/01 09:15', 'Justin', 'Acme Defense', 'Control status changed', '3.5.3 → Partial'],
-  ['07/01 09:22', 'Justin', 'Acme Defense', 'Evidence accepted', 'MFA screenshot'],
-  ['07/01 10:01', 'Admin', 'Bravo Machine', 'Report generated', 'Executive Summary'],
-  ['07/01 10:14', 'Dana', 'Cobalt Aero', 'POA&M created', '3.13.1'],
-  ['07/01 11:02', 'Justin', 'Acme Defense', 'SSP updated', '3.1.1 statement'],
-  ['07/01 11:40', 'it@client.com', 'Acme Defense', 'Evidence uploaded', 'Firewall export'],
-];
-
 export function AuditScreen(_: ScreenProps) {
   return (
     <div className="col">
@@ -231,16 +220,16 @@ export function AuditScreen(_: ScreenProps) {
             </tr>
           </thead>
           <tbody>
-            {AUDIT.map((a, i) => (
-              <tr key={i}>
+            {AUDIT_EVENTS.map((a) => (
+              <tr key={a.id}>
                 <td className="mono faint" style={{ fontSize: '.85em' }}>
-                  {a[0]}
+                  {a.timestamp}
                 </td>
-                <td>{a[1]}</td>
-                <td className="muted">{a[2]}</td>
-                <td>{a[3]}</td>
+                <td>{a.user}</td>
+                <td className="muted">{a.client}</td>
+                <td>{a.action}</td>
                 <td className="mono" style={{ fontSize: '.85em' }}>
-                  {a[4]}
+                  {a.details}
                 </td>
               </tr>
             ))}

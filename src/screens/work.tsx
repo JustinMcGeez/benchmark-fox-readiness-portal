@@ -1,8 +1,9 @@
 /* ============================================================
    Screens — work: SSP, POA&M, Evidence, Tasks
+   Data-driven from the assessment store + evidence/poam/tasks seeds.
    ============================================================ */
-import { useState } from 'react';
-import type { RiskLevel, ScreenProps } from '../types';
+import { useMemo, useState } from 'react';
+import type { ScreenProps } from '../types';
 import {
   Badge,
   Btn,
@@ -19,10 +20,31 @@ import {
   Toolbar,
   WarnBanner,
 } from '../components/primitives';
+import { useData } from '../data/store';
+import { EVIDENCE_ITEMS } from '../data/evidence';
+import { POAM_ITEMS } from '../data/poam';
+import { TASKS } from '../data/tasks';
+import type { ClientControlAssessment } from '../data/types';
+
+const implOf = (a: ClientControlAssessment) =>
+  a.status === 'Met' || a.status === 'Partial' ? 'Implemented' : 'Not Implemented';
+const evSupports = (a: ClientControlAssessment) =>
+  a.evidenceStatus === 'Accepted' ? 'Yes' : a.evidenceStatus === 'Missing' || a.evidenceStatus === 'Not Requested' ? 'No' : 'Partial';
 
 /* ---------- 12. SSP WORKSPACE ---------- */
 export function SSPScreen({ go }: ScreenProps) {
+  const { assessments, selectControl } = useData();
   const [tab, setTab] = useState('Control Statements');
+
+  const counts = useMemo(() => {
+    const c = { Complete: 0, 'Needs Fix': 0, Missing: 0, Mismatch: 0, 'Not Reviewed': 0 } as Record<string, number>;
+    for (const a of assessments) c[a.sspStatus] = (c[a.sspStatus] ?? 0) + 1;
+    return c;
+  }, [assessments]);
+
+  const rows = assessments.slice(0, 10);
+  const editor = assessments.find((a) => a.controlId === '3.1.1') ?? assessments[0];
+
   return (
     <div className="col">
       <PageHead
@@ -31,10 +53,10 @@ export function SSPScreen({ go }: ScreenProps) {
         actions={<Btn onClick={() => go('reports')}>Export SSP</Btn>}
       />
       <div className="grid-4">
-        <StatCard k="Complete" v="61" d="statements" tone="ok" />
-        <StatCard k="Needs Update" v="22" tone="warn" />
-        <StatCard k="Missing" v="27" tone="bad" />
-        <StatCard k="Mismatch w/ Evidence" v="8" tone="warn" />
+        <StatCard k="Complete" v={counts.Complete} d="statements" tone="ok" />
+        <StatCard k="Needs Update" v={counts['Needs Fix']} tone="warn" />
+        <StatCard k="Missing" v={counts.Missing} tone="bad" />
+        <StatCard k="Not Reviewed" v={counts['Not Reviewed']} tone="warn" />
       </div>
       <Tabs items={['SSP Summary', 'Control Statements', 'Gaps', 'Export']} active={tab} onPick={setTab} />
       <div className="grid-2" style={{ alignItems: 'start' }}>
@@ -50,88 +72,44 @@ export function SSPScreen({ go }: ScreenProps) {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td className="mono">3.1.1</td>
-                <td>
-                  <Status s="Complete" />
-                </td>
-                <td>
-                  <Status s="Implemented" />
-                </td>
-                <td>
-                  <Status s="Yes" />
-                </td>
-                <td>
-                  <a className="annot" style={{ cursor: 'pointer' }}>
-                    Edit
-                  </a>
-                </td>
-              </tr>
-              <tr>
-                <td className="mono">3.1.2</td>
-                <td>
-                  <Status s="Needs Fix" />
-                </td>
-                <td>
-                  <Status s="Implemented" />
-                </td>
-                <td>
-                  <Status s="Partial" />
-                </td>
-                <td>
-                  <a className="annot" style={{ cursor: 'pointer' }}>
-                    Edit
-                  </a>
-                </td>
-              </tr>
-              <tr>
-                <td className="mono">3.1.3</td>
-                <td>
-                  <Status s="Missing" />
-                </td>
-                <td>
-                  <Status s="Not Implemented" />
-                </td>
-                <td>
-                  <Status s="No" />
-                </td>
-                <td>
-                  <a className="annot" style={{ cursor: 'pointer' }}>
-                    Draft
-                  </a>
-                </td>
-              </tr>
-              <tr>
-                <td className="mono">3.5.3</td>
-                <td>
-                  <Status s="Complete" />
-                </td>
-                <td>
-                  <Status s="Implemented" />
-                </td>
-                <td>
-                  <Status s="Partial" />
-                </td>
-                <td>
-                  <a className="annot" style={{ cursor: 'pointer' }}>
-                    Edit
-                  </a>
-                </td>
-              </tr>
+              {rows.map((a) => (
+                <tr
+                  key={a.controlId}
+                  onClick={() => {
+                    selectControl(a.controlId);
+                    go('control-detail');
+                  }}
+                >
+                  <td className="mono">{a.controlId}</td>
+                  <td>
+                    <Status s={a.sspStatus} />
+                  </td>
+                  <td>
+                    <Status s={implOf(a)} />
+                  </td>
+                  <td>
+                    <Status s={evSupports(a)} />
+                  </td>
+                  <td>
+                    <a className="annot">{a.sspStatus === 'Missing' ? 'Draft' : 'Edit'}</a>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </Card>
-        <Card title="SSP Statement Editor — 3.1.1">
+        <Card title={`SSP Statement Editor — ${editor.controlId}`}>
           <Field
-            label="CURRENT SSP STATEMENT"
+            label="Current SSP Statement"
             area
-            value="Access to CUI systems is restricted to authorized personnel via Entra ID role-based groups, with device compliance enforced through Intune."
+            value={editor.sspStatement ?? ''}
+            placeholder="Document how this control is implemented…"
             rows={5}
           />
           <div className="grid-3 mt">
-            <Select label="COMPLETENESS" value="Complete" />
+            <Select label="COMPLETENESS" value={editor.sspStatus} />
             <Select label="ACCURACY" value="Accurate" />
-            <Select label="EVIDENCE SUPPORTS" value="Yes" />
+            <Select label="EVIDENCE SUPPORTS" value={evSupports(editor)} />
           </div>
           <div className="w-field mt">
             <span className="w-label">RECOMMENDED BENCHMARK FOX LANGUAGE</span>
@@ -150,15 +128,10 @@ export function SSPScreen({ go }: ScreenProps) {
 }
 
 /* ---------- 13. POA&M TRACKER ---------- */
-const POAM: [string, string, string, RiskLevel, string, string, string][] = [
-  ['3.1.3', 'CUI flow not controlled', 'CIO', 'High', '08/01', 'Ongoing', 'Blocker'],
-  ['3.5.3', 'MFA evidence incomplete', 'IT Lead', 'High', '07/15', 'Ongoing', 'Readiness'],
-  ['3.3.1', 'Audit logging not centralized', 'MSP', 'High', '07/22', 'Blocked', 'Blocker'],
-  ['3.12.4', 'SSP outdated', 'CIO', 'Medium', '07/30', 'Ongoing', 'Internal'],
-  ['3.13.1', 'Boundary defense partial', 'MSP', 'Medium', '08/05', 'Not Started', 'Readiness'],
-];
-
 export function POAMScreen({ go }: ScreenProps) {
+  const { selectControl } = useData();
+  const detail = POAM_ITEMS[0];
+
   return (
     <div className="col">
       <PageHead
@@ -175,6 +148,7 @@ export function POAMScreen({ go }: ScreenProps) {
         <table className="w-table">
           <thead>
             <tr>
+              <th>ID</th>
               <th>Control</th>
               <th>Weakness</th>
               <th>Owner</th>
@@ -185,45 +159,48 @@ export function POAMScreen({ go }: ScreenProps) {
             </tr>
           </thead>
           <tbody>
-            {POAM.map((p, i) => (
-              <tr key={i} onClick={() => go('control-detail')}>
+            {POAM_ITEMS.map((p) => (
+              <tr
+                key={p.id}
+                onClick={() => {
+                  selectControl(p.controlId);
+                  go('control-detail');
+                }}
+              >
                 <td className="mono" style={{ fontWeight: 700 }}>
-                  {p[0]}
+                  {p.id}
                 </td>
-                <td>{p[1]}</td>
-                <td className="muted">{p[2]}</td>
+                <td className="mono faint">{p.controlId}</td>
+                <td>{p.weakness}</td>
+                <td className="muted">{p.owner}</td>
                 <td>
-                  <RiskBadge level={p[3]} />
+                  <RiskBadge level={p.risk} />
                 </td>
-                <td className="mono">{p[4]}</td>
+                <td className="mono">{p.dueDate}</td>
                 <td>
-                  <Status s={p[5]} />
+                  <Status s={p.status} />
                 </td>
                 <td>
-                  {p[6] === 'Blocker' ? <Badge tone="bad">Blocker</Badge> : <Badge tone="none">{p[6]}</Badge>}
+                  {p.classification === 'Blocker' ? (
+                    <Badge tone="bad">Blocker</Badge>
+                  ) : (
+                    <Badge tone="none">{p.classification}</Badge>
+                  )}
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </Card>
-      <Card title="POA&M Detail — 3.1.3  ·  CUI flow not controlled">
+      <Card title={`POA&M Detail — ${detail.id} · ${detail.controlId}`}>
         <div className="grid-2">
-          <Field
-            label="WEAKNESS"
-            value="CUI data flow between CAD workstations and file share is not controlled or documented."
-            area
-          />
-          <Field
-            label="REMEDIATION PLAN"
-            value="Implement enclave segmentation; route CUI through GCC High; document data flow diagram."
-            area
-          />
-          <Select label="RESPONSIBLE OWNER" value="CIO" />
-          <Select label="RESPONSIBLE OFFICE" value="IT / Security" />
-          <Field label="RESOURCE ESTIMATE" value="40 hrs + segmentation license" />
-          <Field label="SCHEDULED COMPLETION" value="08/01/2026" />
-          <Field label="HOW IDENTIFIED" value="Scoping workshop — CUI boundary review" />
+          <Field label="WEAKNESS" value={detail.weakness} area />
+          <Field label="REMEDIATION PLAN" value={detail.remediationPlan ?? ''} area />
+          <Select label="RESPONSIBLE OWNER" value={detail.owner} />
+          <Select label="RESPONSIBLE OFFICE" value={detail.office ?? ''} />
+          <Field label="RESOURCE ESTIMATE" value={detail.resourceEstimate ?? ''} />
+          <Field label="SCHEDULED COMPLETION" value={detail.dueDate} />
+          <Field label="HOW IDENTIFIED" value={detail.howIdentified ?? ''} />
           <Field label="EVIDENCE FOR CLOSURE" placeholder="e.g. data flow diagram + firewall rules export" />
         </div>
         <div className="row gap-sm mt" style={{ justifyContent: 'flex-end' }}>
@@ -236,15 +213,8 @@ export function POAMScreen({ go }: ScreenProps) {
 }
 
 /* ---------- 14. EVIDENCE HUB ---------- */
-const EVIDENCE: [string, string, string, string, string, string][] = [
-  ['MFA Configuration Screenshot', '3.5.3', 'IT Lead', 'In Review', 'Acceptable', 'Current'],
-  ['Quarterly Access Review', '3.1.5', 'HR / IT', 'Missing', 'Missing', 'N/A'],
-  ['Firewall Rules Export', '3.13.1', 'MSP', 'Accepted', 'Strong', 'Current'],
-  ['Audit Log Retention Policy', '3.3.1', 'MSP', 'Requested', 'Missing', 'N/A'],
-  ['Entra ID Group Export', '3.1.1', 'IT Lead', 'Accepted', 'Strong', 'Current'],
-];
-
 export function EvidenceScreen(_: ScreenProps) {
+  const detail = EVIDENCE_ITEMS[0];
   return (
     <div className="col">
       <PageHead
@@ -270,16 +240,16 @@ export function EvidenceScreen(_: ScreenProps) {
               </tr>
             </thead>
             <tbody>
-              {EVIDENCE.map((e, i) => (
-                <tr key={i}>
-                  <td style={{ fontWeight: 700 }}>{e[0]}</td>
-                  <td className="mono">{e[1]}</td>
-                  <td className="muted">{e[2]}</td>
+              {EVIDENCE_ITEMS.map((e) => (
+                <tr key={e.id}>
+                  <td style={{ fontWeight: 700 }}>{e.title}</td>
+                  <td className="mono">{e.controlId}</td>
+                  <td className="muted">{e.owner}</td>
                   <td>
-                    <Status s={e[3]} />
+                    <Status s={e.status} />
                   </td>
                   <td>
-                    <Status s={e[4]} />
+                    <Status s={e.quality} />
                   </td>
                 </tr>
               ))}
@@ -290,22 +260,22 @@ export function EvidenceScreen(_: ScreenProps) {
           <div className="col" style={{ gap: 12 }}>
             <div className="between">
               <span className="w-label">TITLE</span>
-              <strong>MFA Config Screenshot</strong>
+              <strong>{detail.title}</strong>
             </div>
             <div className="between">
               <span className="w-label">RELATED CONTROL</span>
-              <span className="mono">3.5.3</span>
+              <span className="mono">{detail.controlId}</span>
             </div>
             <div className="between">
               <span className="w-label">METHOD</span>
-              <span>Examine / Test</span>
+              <span>{detail.method ?? '—'}</span>
             </div>
             <div className="between">
               <span className="w-label">STATUS</span>
-              <Status s="In Review" />
+              <Status s={detail.status} />
             </div>
             <Ph h={120}>[ uploaded file preview / secure link ]</Ph>
-            <Field label="CONSULTANT REVIEW NOTES" placeholder="Quality, gaps, follow-ups…" area />
+            <Field label="CONSULTANT REVIEW NOTES" value={detail.notes ?? ''} placeholder="Quality, gaps, follow-ups…" area />
             <div className="between">
               <span className="w-label">SUPPORTS SSP STATEMENT?</span>
               <div className="row gap-sm">
@@ -327,15 +297,8 @@ export function EvidenceScreen(_: ScreenProps) {
 }
 
 /* ---------- 15. TASKS ---------- */
-const TASKS: [string, string, RiskLevel, string, string][] = [
-  ['Upload MFA evidence', 'IT Lead', 'High', '07/15', 'In Progress'],
-  ['Update SSP for AC controls', 'CIO', 'High', '07/20', 'Not Started'],
-  ['Provide CUI data flow diagram', 'IT / MSP', 'Critical', '07/12', 'Blocked'],
-  ['Configure audit log retention', 'MSP', 'High', '07/22', 'Not Started'],
-  ['Quarterly access review export', 'HR / IT', 'Medium', '07/28', 'In Progress'],
-];
-
 export function TasksScreen(_: ScreenProps) {
+  const detail = TASKS.find((t) => t.status === 'Blocked') ?? TASKS[0];
   return (
     <div className="col">
       <PageHead
@@ -357,46 +320,42 @@ export function TasksScreen(_: ScreenProps) {
               </tr>
             </thead>
             <tbody>
-              {TASKS.map((t, i) => (
-                <tr key={i}>
-                  <td style={{ fontWeight: 700 }}>{t[0]}</td>
-                  <td className="muted">{t[1]}</td>
+              {TASKS.map((t) => (
+                <tr key={t.id}>
+                  <td style={{ fontWeight: 700 }}>{t.title}</td>
+                  <td className="muted">{t.owner}</td>
                   <td>
-                    <RiskBadge level={t[2]} />
+                    <RiskBadge level={t.priority} />
                   </td>
-                  <td className="mono">{t[3]}</td>
+                  <td className="mono">{t.dueDate}</td>
                   <td>
-                    <Status s={t[4]} />
+                    <Status s={t.status} />
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </Card>
-        <Card title="Task Detail — Provide CUI data flow diagram">
+        <Card title={`Task Detail — ${detail.title}`}>
           <div className="col" style={{ gap: 12 }}>
-            <Field
-              label="DESCRIPTION"
-              value="Document how CUI moves between CAD workstations, file share, and GCC High tenant."
-              area
-            />
+            <Field label="DESCRIPTION" value={detail.description ?? ''} area />
             <div className="grid-2">
               <div className="between">
                 <span className="w-label">RELATED CONTROL</span>
-                <span className="mono">3.1.3</span>
+                <span className="mono">{detail.relatedControlId ?? '—'}</span>
               </div>
               <div className="between">
                 <span className="w-label">RELATED POA&M</span>
-                <span className="mono">PM-014</span>
+                <span className="mono">{detail.relatedPoamId ?? '—'}</span>
               </div>
-              <Select label="OWNER" value="IT / MSP" />
-              <Select label="PRIORITY" value="Critical" />
+              <Select label="OWNER" value={detail.owner} />
+              <Select label="PRIORITY" value={detail.priority} />
             </div>
             <div className="between">
               <span className="w-label">STATUS</span>
               <div className="row gap-sm">
-                {['Not Started', 'In Progress', 'Blocked', 'Done'].map((s, i) => (
-                  <Check key={s} label={s} on={i === 2} radio />
+                {['Not Started', 'In Progress', 'Blocked', 'Done'].map((s) => (
+                  <Check key={s} label={s} on={s === detail.status} radio />
                 ))}
               </div>
             </div>

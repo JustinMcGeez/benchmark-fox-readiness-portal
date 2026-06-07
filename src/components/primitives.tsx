@@ -145,6 +145,7 @@ export const TONE: Record<string, Tone> = {
   Accepted: 'ok',
   Strong: 'ok',
   Validated: 'ok',
+  Closed: 'ok',
   Current: 'ok',
   Implemented: 'ok',
   Yes: 'ok',
@@ -158,6 +159,7 @@ export const TONE: Record<string, Tone> = {
   Weak: 'warn',
   'In Progress': 'warn',
   'Needs Revision': 'warn',
+  Uploaded: 'warn',
   'Not Met': 'bad',
   Missing: 'bad',
   Rejected: 'bad',
@@ -168,17 +170,50 @@ export const TONE: Record<string, Tone> = {
   Expired: 'bad',
   No: 'bad',
   'Not Implemented': 'bad',
+  Mismatch: 'bad',
   'Not Reviewed': 'none',
   'Not Review': 'none',
   'Not Started': 'none',
   'Not Applicable': 'none',
   None: 'none',
   TBD: 'none',
+  Requested: 'none',
+  'Not Requested': 'none',
   'Not Request': 'none',
 };
 
 export function Status({ s }: { s: string }) {
   return <Badge tone={TONE[s] || 'none'}>{s}</Badge>;
+}
+
+/** Compact inline dropdown used in editable table cells. Colors itself by value tone. */
+export function InlineSelect<T extends string>({
+  value,
+  options,
+  onChange,
+  ariaLabel,
+}: {
+  value: T;
+  options: readonly T[];
+  onChange: (v: T) => void;
+  ariaLabel?: string;
+}) {
+  const tone = TONE[value] || 'none';
+  return (
+    <select
+      className={'w-inline-select t-' + tone}
+      value={value}
+      aria-label={ariaLabel}
+      onClick={(e) => e.stopPropagation()}
+      onChange={(e) => onChange(e.target.value as T)}
+    >
+      {options.map((o) => (
+        <option key={o} value={o}>
+          {o}
+        </option>
+      ))}
+    </select>
+  );
 }
 
 /* ---------- charts (simple sketch shapes) ---------- */

@@ -15,11 +15,21 @@ npm run preview  # preview the production build
 npm run typecheck
 ```
 
-> **Network note:** this machine sits behind a TLS-intercepting proxy, so npm
-> fails with `UNABLE_TO_VERIFY_LEAF_SIGNATURE` unless TLS verification is
-> relaxed. The committed `.npmrc` sets `strict-ssl=false` as a workaround. If you
-> can point npm at the proxy's root CA instead (`npm config set cafile …`),
-> prefer that and remove the line.
+### Network / proxy
+
+The committed `.npmrc` does **not** disable TLS verification. If you are behind a
+corporate TLS-intercepting proxy and `npm install` fails with
+`UNABLE_TO_VERIFY_LEAF_SIGNATURE`, fix it **locally** (don't commit it):
+
+```bash
+# Preferred — trust the proxy's root CA (export it from your OS trust store):
+npm config set cafile "C:\\path\\to\\proxy-root-ca.pem"
+
+# Or, as a last resort, relax verification only in your user config (not the repo):
+npm config set strict-ssl false
+```
+
+`git` already works through the proxy because it uses the OS (SChannel) trust store.
 
 ## Navigating the wireframes
 
@@ -77,32 +87,60 @@ neutrals and tinted status colors. Type: **Montserrat** (headings), **Inter**
 (body), **Roboto Mono** (data). Icons: **lucide-react**. All tokens live at the
 top of `src/styles/wireframe.css`.
 
-## Structure
+## Data-driven MVP
+
+Screen values are **computed from a structured data layer**, not hard-coded text:
 
 ```
 src/
-  main.tsx                 # React entry
-  App.tsx                  # router, screen-index launcher, tweaks wiring
-  types.ts                 # shared types (ScreenKey, tones, tweak values…)
+  data/
+    types.ts        # domain interfaces (Client, Control, ClientControlAssessment,
+                    #   EvidenceItem, PoamItem, TaskItem, ReportItem, AuditEvent)
+                    #   + status option lists
+    clients.ts      # clients + audit log + CURRENT_CLIENT_ID
+    controls.ts     # control library, family summary, seed assessments
+    evidence.ts     # evidence items
+    poam.ts         # POA&M items
+    tasks.ts        # remediation tasks
+    reports.ts      # report deliverables + export formats
+    store.ts        # <DataProvider> — seed merged with localStorage edits;
+                    #   useData() exposes assessments, updateAssessment, selectControl
+  lib/
+    scoring.ts      # isolated scoring engine (readiness %, SPRS score, by-family)
+```
+
+- **Client Dashboard** and **Control Matrix** derive readiness %, SPRS score,
+  status counts, open POA&Ms, blockers, missing evidence, and score-by-family
+  from the assessments via `lib/scoring.ts`.
+- The **Control Matrix** has real search + family/status/SSP/evidence filters and
+  inline dropdowns for readiness, SSP, evidence, POA&M status and owner. Edits
+  **persist to `localStorage`** (`bf_assessments_v1`) and update the dashboard
+  live. Clicking a row opens **Control Detail** for that control.
+- **Scoring is intentionally isolated** in `lib/scoring.ts` so the prototype model
+  (Met = 0 deduction, otherwise full; readiness gives Partial half credit) can be
+  swapped for official CMMC/SPRS rules without touching any screen.
+- **No backend.** `store.ts` is the seam where Supabase/Postgres will slot in.
+
+## App structure
+
+```
+src/
+  main.tsx                 # React entry (wraps App in <DataProvider>)
+  App.tsx                  # router, screen-index launcher, tweaks, ?screen= deep-link
+  types.ts                 # app/nav types (ScreenKey, tones, tweak values…)
   styles/wireframe.css     # the design system (navy/silver brand tokens)
   components/
-    primitives.tsx         # Btn, Field, Badge, Status, charts, Card, Tabs, …
+    primitives.tsx         # Btn, Field, Badge, Status, InlineSelect, charts, Card, …
     Shell.tsx              # app shell — sidebar / topnav / hybrid + client tabs
     Brand.tsx              # BrandMark / BrandLockup / BrandLogo (real logo assets)
-  tweaks/
-    TweaksPanel.tsx        # floating tweaks panel + useTweaks (localStorage)
-  screens/
-    core.tsx               # Login, Dashboard, Clients, Create Client
-    client.tsx             # Client Dashboard, Intake, Path, Scoping
-    controls.tsx           # Control Library, Matrix, Detail
-    work.tsx               # SSP, POA&M, Evidence, Tasks
-    output.tsx             # Reports, Preview, Knowledge, Audit, Settings, Mobile
-    index.ts               # barrel
+  tweaks/TweaksPanel.tsx   # floating tweaks panel + useTweaks (localStorage)
+  screens/                 # core / client / controls / work / output + index barrel
 ```
 
 ## Notes
 
-This is a **prototype** — sample data (Acme Defense @ 62%, score −38, controls
-3.1.x) is hard-coded, inputs are non-functional, and there's no backend. The goal
-is to validate structure, flow, and the branded visual language before wiring up
-the real product on top of this scaffold.
+This is a **prototype** — seed data describes one active engagement (Acme Defense),
+inputs other than the matrix dropdowns are non-functional, and there's no backend.
+Matrix edits persist locally; clear them by removing the `bf_*` keys from
+`localStorage`. The goal is a working, data-driven internal prototype before
+Supabase/Postgres integration.

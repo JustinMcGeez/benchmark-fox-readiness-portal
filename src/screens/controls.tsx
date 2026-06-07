@@ -1,43 +1,48 @@
 /* ============================================================
    Screens — controls: Library, Matrix (the heart), Detail
+   Data-driven: reads the control library + the active client's
+   assessments from the data layer; the matrix edits persist via the store.
    ============================================================ */
-import { useState } from 'react';
-import type { RiskLevel, ScreenProps } from '../types';
+import { useMemo, useState } from 'react';
+import { Search } from 'lucide-react';
+import type { ScreenProps } from '../types';
 import {
   Btn,
   Card,
-  Check,
   Field,
+  InlineSelect,
   PageHead,
   RiskBadge,
-  Select,
   Status,
   Tabs,
-  Toolbar,
 } from '../components/primitives';
+import { useData } from '../data/store';
+import { CONTROLS_BY_ID, CONTROL_LIBRARY, FAMILIES } from '../data/controls';
+import { evidenceForControl } from '../data/evidence';
+import { poamForControl } from '../data/poam';
+import { tasksForControl } from '../data/tasks';
+import {
+  EVIDENCE_OPTIONS,
+  OWNER_OPTIONS,
+  POAM_OPTIONS,
+  READINESS_OPTIONS,
+  SSP_OPTIONS,
+} from '../data/types';
+import { controlScoreDisplay, statusCounts } from '../lib/scoring';
 
 /* ---------- 9. CONTROL LIBRARY ---------- */
-const FAMILIES: [string, string, number, RiskLevel][] = [
-  ['Access Control', 'AC', 22, 'High'],
-  ['Awareness & Training', 'AT', 3, 'Medium'],
-  ['Audit & Accountability', 'AU', 9, 'High'],
-  ['Configuration Management', 'CM', 9, 'High'],
-  ['Identification & Authentication', 'IA', 11, 'High'],
-  ['Incident Response', 'IR', 3, 'Medium'],
-  ['Maintenance', 'MA', 6, 'Low'],
-  ['Media Protection', 'MP', 9, 'Medium'],
-  ['System & Comms Protection', 'SC', 16, 'High'],
-  ['System & Info Integrity', 'SI', 7, 'High'],
-];
-
 export function ControlLibraryScreen({ go }: ScreenProps) {
+  const { selectControl } = useData();
+  const [q, setQ] = useState('');
+  const acControls = CONTROL_LIBRARY.filter((c) => c.familyCode === 'AC');
+  const matches = (s: string) => s.toLowerCase().includes(q.toLowerCase());
+
   return (
     <div className="col">
       <PageHead
         title="Control Library"
         sub="Browse CMMC / NIST SP 800-171 controls and Benchmark Fox guidance."
       />
-      <Toolbar search="Search controls…" filters={['Family', 'Level', 'Score']} />
       <Card style={{ padding: '6px 6px' }}>
         <table className="w-table">
           <thead>
@@ -50,18 +55,16 @@ export function ControlLibraryScreen({ go }: ScreenProps) {
             </tr>
           </thead>
           <tbody>
-            {FAMILIES.map((f, i) => (
-              <tr key={i} onClick={() => go('control-detail')}>
-                <td style={{ fontWeight: 700 }}>{f[0]}</td>
-                <td className="mono">{f[1]}</td>
-                <td className="num">{f[2]}</td>
+            {FAMILIES.map((f) => (
+              <tr key={f.code} onClick={() => go('controls')}>
+                <td style={{ fontWeight: 700 }}>{f.name}</td>
+                <td className="mono">{f.code}</td>
+                <td className="num">{f.count}</td>
                 <td>
-                  <RiskBadge level={f[3]} />
+                  <RiskBadge level={f.risk} />
                 </td>
                 <td>
-                  <a className="annot" style={{ cursor: 'pointer' }}>
-                    View
-                  </a>
+                  <a className="annot">View</a>
                 </td>
               </tr>
             ))}
@@ -69,6 +72,18 @@ export function ControlLibraryScreen({ go }: ScreenProps) {
         </table>
       </Card>
       <Card title="Controls — Access Control">
+        <div
+          className="w-input center"
+          style={{ maxWidth: 320, gap: 8, marginBottom: 12, padding: '7px 12px' }}
+        >
+          <Search size={15} strokeWidth={2} className="faint" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search Access Control…"
+            style={{ border: 'none', outline: 'none', background: 'transparent', font: 'inherit', width: '100%' }}
+          />
+        </div>
         <table className="w-table">
           <thead>
             <tr>
@@ -80,39 +95,25 @@ export function ControlLibraryScreen({ go }: ScreenProps) {
             </tr>
           </thead>
           <tbody>
-            <tr onClick={() => go('control-detail')}>
-              <td className="mono">AC.L2-3.1.1</td>
-              <td className="muted">Limit access to authorized users…</td>
-              <td>L2</td>
-              <td className="num">−5</td>
-              <td>
-                <a className="annot" style={{ cursor: 'pointer' }}>
-                  Open
-                </a>
-              </td>
-            </tr>
-            <tr onClick={() => go('control-detail')}>
-              <td className="mono">AC.L2-3.1.2</td>
-              <td className="muted">Limit access to permitted transactions…</td>
-              <td>L2</td>
-              <td className="num">−3</td>
-              <td>
-                <a className="annot" style={{ cursor: 'pointer' }}>
-                  Open
-                </a>
-              </td>
-            </tr>
-            <tr onClick={() => go('control-detail')}>
-              <td className="mono">AC.L2-3.1.3</td>
-              <td className="muted">Control the flow of CUI…</td>
-              <td>L2</td>
-              <td className="num">−5</td>
-              <td>
-                <a className="annot" style={{ cursor: 'pointer' }}>
-                  Open
-                </a>
-              </td>
-            </tr>
+            {acControls
+              .filter((c) => matches(c.id) || matches(c.title) || matches(c.summary))
+              .map((c) => (
+                <tr
+                  key={c.id}
+                  onClick={() => {
+                    selectControl(c.id);
+                    go('control-detail');
+                  }}
+                >
+                  <td className="mono">{c.code}</td>
+                  <td className="muted">{c.summary}</td>
+                  <td>{c.level}</td>
+                  <td className="num">−{c.scoreValue}</td>
+                  <td>
+                    <a className="annot">Open</a>
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
       </Card>
@@ -121,40 +122,70 @@ export function ControlLibraryScreen({ go }: ScreenProps) {
 }
 
 /* ---------- 10. CLIENT CONTROL MATRIX (the heart) ---------- */
-const MATRIX: [string, string, string, string, string, string, string, RiskLevel, string][] = [
-  ['3.1.1', 'AC', 'Met', '0', 'Complete', 'Accepted', 'None', 'Low', 'IT Lead'],
-  ['3.1.2', 'AC', 'Partial', '−3', 'Needs Fix', 'Weak', 'Open', 'Medium', 'IT Lead'],
-  ['3.1.3', 'AC', 'Not Met', '−5', 'Missing', 'Missing', 'Needed', 'Critical', 'CIO'],
-  ['3.1.4', 'AC', 'Not Reviewed', 'TBD', 'Not Reviewed', 'Not Request', 'None', 'Medium', 'Unassigned'],
-  ['3.5.3', 'IA', 'Partial', '−3', 'Complete', 'In Review', 'Open', 'High', 'IT Lead'],
-  ['3.13.1', 'SC', 'Met', '0', 'Complete', 'Accepted', 'None', 'Low', 'MSP'],
-  ['3.3.1', 'AU', 'Not Met', '−5', 'Needs Fix', 'Missing', 'Needed', 'High', 'CIO'],
-  ['3.4.2', 'CM', 'Met', '0', 'Complete', 'Accepted', 'None', 'Low', 'IT Lead'],
-];
+const ALL = 'All';
 
 export function ControlMatrixScreen({ go }: ScreenProps) {
+  const { assessments, updateAssessment, selectControl } = useData();
+  const [q, setQ] = useState('');
+  const [fam, setFam] = useState(ALL);
+  const [status, setStatus] = useState(ALL);
+  const [ssp, setSsp] = useState(ALL);
+  const [evidence, setEvidence] = useState(ALL);
+
+  const counts = useMemo(() => statusCounts(assessments), [assessments]);
+
+  const rows = useMemo(() => {
+    const term = q.toLowerCase();
+    return assessments
+      .map((a) => ({ a, c: CONTROLS_BY_ID[a.controlId] }))
+      .filter(({ a, c }) => {
+        if (!c) return false;
+        if (fam !== ALL && c.familyCode !== fam) return false;
+        if (status !== ALL && a.status !== status) return false;
+        if (ssp !== ALL && a.sspStatus !== ssp) return false;
+        if (evidence !== ALL && a.evidenceStatus !== evidence) return false;
+        if (term && !(`${c.id} ${c.title} ${c.familyName}`.toLowerCase().includes(term))) return false;
+        return true;
+      });
+  }, [assessments, q, fam, status, ssp, evidence]);
+
+  const famOptions = [ALL, ...FAMILIES.map((f) => f.code)];
+
   return (
     <div className="col">
       <PageHead
         title="Controls — Acme Defense Systems"
         sub="Track readiness, SSP, evidence, POA&M, score impact, and ownership."
       />
-      <Toolbar search="Search controls…" filters={['Family', 'Status', 'Evidence', 'SSP']} />
+
+      {/* filter bar */}
+      <div className="w-card row wrap" style={{ alignItems: 'center', padding: '10px 12px', gap: 10 }}>
+        <div className="w-input center grow" style={{ maxWidth: 300, gap: 8, padding: '7px 12px' }}>
+          <Search size={15} strokeWidth={2} className="faint" />
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search controls…"
+            style={{ border: 'none', outline: 'none', background: 'transparent', font: 'inherit', width: '100%' }}
+          />
+        </div>
+        <div className="grow" />
+        <FilterSelect label="Family" value={fam} options={famOptions} onChange={setFam} />
+        <FilterSelect label="Status" value={status} options={[ALL, ...READINESS_OPTIONS]} onChange={setStatus} />
+        <FilterSelect label="SSP" value={ssp} options={[ALL, ...SSP_OPTIONS]} onChange={setSsp} />
+        <FilterSelect label="Evidence" value={evidence} options={[ALL, ...EVIDENCE_OPTIONS]} onChange={setEvidence} />
+      </div>
+
       <Card style={{ padding: '6px 6px' }}>
-        <div className="between" style={{ padding: '6px 12px' }}>
+        <div className="between wrap" style={{ padding: '6px 12px', gap: 8 }}>
           <span className="mono faint" style={{ fontSize: '.78em' }}>
-            110 CONTROLS · 49 MET · 28 PARTIAL · 33 NOT MET
+            {counts.total} CONTROLS · {counts.met} MET · {counts.partial} PARTIAL · {counts.notMet} NOT MET
+            {rows.length !== counts.total && ` · ${rows.length} SHOWN`}
           </span>
-          <div className="row gap-sm">
-            <Btn sm ghost>
-              Assign Owner
-            </Btn>
-            <Btn sm ghost>
-              Request Evidence
-            </Btn>
-            <Btn sm ghost>
-              Create POA&M
-            </Btn>
+          <div className="row gap-sm wrap">
+            <Btn sm ghost>Assign Owner</Btn>
+            <Btn sm ghost onClick={() => go('evidence')}>Request Evidence</Btn>
+            <Btn sm ghost onClick={() => go('poam')}>Create POA&M</Btn>
             <Btn sm>Export Matrix</Btn>
           </div>
         </div>
@@ -173,35 +204,69 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
             </tr>
           </thead>
           <tbody>
-            {MATRIX.map((r, i) => (
-              <tr key={i} onClick={() => go('control-detail')}>
-                <td className="mono" style={{ fontWeight: 700 }}>
-                  {r[0]}
-                </td>
-                <td className="mono faint">{r[1]}</td>
+            {rows.map(({ a, c }) => (
+              <tr
+                key={a.controlId}
+                onClick={() => {
+                  selectControl(a.controlId);
+                  go('control-detail');
+                }}
+              >
+                <td className="mono" style={{ fontWeight: 700 }}>{a.controlId}</td>
+                <td className="mono faint">{c.familyCode}</td>
                 <td>
-                  <Status s={r[2]} />
+                  <InlineSelect
+                    ariaLabel="Readiness status"
+                    value={a.status}
+                    options={READINESS_OPTIONS}
+                    onChange={(v) => updateAssessment(a.controlId, { status: v })}
+                  />
                 </td>
-                <td className="num">{r[3]}</td>
+                <td className="num">{controlScoreDisplay(a, c)}</td>
                 <td>
-                  <Status s={r[4]} />
+                  <InlineSelect
+                    ariaLabel="SSP status"
+                    value={a.sspStatus}
+                    options={SSP_OPTIONS}
+                    onChange={(v) => updateAssessment(a.controlId, { sspStatus: v })}
+                  />
                 </td>
                 <td>
-                  <Status s={r[5]} />
+                  <InlineSelect
+                    ariaLabel="Evidence status"
+                    value={a.evidenceStatus}
+                    options={EVIDENCE_OPTIONS}
+                    onChange={(v) => updateAssessment(a.controlId, { evidenceStatus: v })}
+                  />
                 </td>
                 <td>
-                  {r[6] === 'None' ? (
-                    <span className="faint">—</span>
-                  ) : (
-                    <Status s={r[6] === 'Needed' ? 'Missing' : 'Ongoing'} />
-                  )}
+                  <InlineSelect
+                    ariaLabel="POA&M status"
+                    value={a.poamStatus}
+                    options={POAM_OPTIONS}
+                    onChange={(v) => updateAssessment(a.controlId, { poamStatus: v })}
+                  />
                 </td>
                 <td>
-                  <RiskBadge level={r[7]} />
+                  <RiskBadge level={a.risk} />
                 </td>
-                <td className="muted">{r[8]}</td>
+                <td>
+                  <InlineSelect
+                    ariaLabel="Owner"
+                    value={a.owner}
+                    options={OWNER_OPTIONS}
+                    onChange={(v) => updateAssessment(a.controlId, { owner: v })}
+                  />
+                </td>
               </tr>
             ))}
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 24 }}>
+                  No controls match these filters.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </Card>
@@ -209,10 +274,55 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
   );
 }
 
+function FilterSelect({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: string[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <select
+      className="w-input"
+      aria-label={label}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{ width: 'auto', padding: '7px 10px', fontSize: '.85rem', cursor: 'pointer', color: 'var(--ink-soft)' }}
+    >
+      {options.map((o) => (
+        <option key={o} value={o}>
+          {o === ALL ? label : o}
+        </option>
+      ))}
+    </select>
+  );
+}
+
 /* ---------- 11. CONTROL DETAIL ---------- */
 export function ControlDetailScreen({ go }: ScreenProps) {
+  const { selectedControlId, assessmentFor, updateAssessment } = useData();
   const [tab, setTab] = useState('Overview');
   const tabs = ['Overview', 'Assessment', 'SSP', 'Evidence', 'POA&M', 'Tasks', 'Guidance'];
+
+  const control = CONTROLS_BY_ID[selectedControlId];
+  const a = assessmentFor(selectedControlId);
+  const evidence = evidenceForControl(selectedControlId);
+  const poam = poamForControl(selectedControlId);
+  const tasks = tasksForControl(selectedControlId);
+
+  if (!control || !a) {
+    return (
+      <div className="col">
+        <Btn ghost onClick={() => go('controls')}>← Back to Controls</Btn>
+        <Card>Control not found.</Card>
+      </div>
+    );
+  }
+
   return (
     <div className="col">
       <div className="between" style={{ alignItems: 'flex-start' }}>
@@ -222,14 +332,17 @@ export function ControlDetailScreen({ go }: ScreenProps) {
               Controls
             </a>
             <span className="faint">/</span>
-            <span className="mono">3.1.1</span>
+            <span className="mono">{control.id}</span>
           </div>
-          <h1 className="w-h1">3.1.1 — Limit system access to authorized users</h1>
+          <h1 className="w-h1">
+            {control.id} — {control.title}
+          </h1>
           <p className="w-sub mono" style={{ fontSize: '.8em' }}>
-            ACCESS CONTROL · LEVEL 2 · SCORE VALUE −5
+            {control.familyName.toUpperCase()} · LEVEL {control.level.slice(1)} · SCORE VALUE −
+            {control.scoreValue}
           </p>
         </div>
-        <RiskBadge level="High" />
+        <RiskBadge level={a.risk} />
       </div>
       <Tabs items={tabs} active={tab} onPick={setTab} />
       <div className="grid-2" style={{ alignItems: 'start' }}>
@@ -237,46 +350,46 @@ export function ControlDetailScreen({ go }: ScreenProps) {
           {tab === 'Overview' && (
             <>
               <Card title="Requirement">
-                <p style={{ margin: 0 }}>
-                  Limit system access to authorized users, processes acting on behalf of users, and
-                  devices.
-                </p>
+                <p style={{ margin: 0 }}>{control.requirement}</p>
               </Card>
               <Card title="Plain-English Explanation">
                 <p style={{ margin: 0 }} className="muted">
-                  Only approved users, services, and devices should be able to access systems that
-                  store, process, or transmit CUI.
+                  {control.explanation}
                 </p>
               </Card>
-              <Card title="Common Mistakes">
-                <ul className="muted" style={{ margin: 0, paddingLeft: 18 }}>
-                  <li>Shared/generic admin accounts</li>
-                  <li>No device authorization list</li>
-                  <li>Stale accounts not disabled</li>
-                </ul>
-              </Card>
+              {control.commonMistakes && (
+                <Card title="Common Mistakes">
+                  <ul className="muted" style={{ margin: 0, paddingLeft: 18 }}>
+                    {control.commonMistakes.map((m) => (
+                      <li key={m}>{m}</li>
+                    ))}
+                  </ul>
+                </Card>
+              )}
             </>
           )}
           {tab === 'Assessment' && (
             <Card title="Assessment">
               <div className="col" style={{ gap: 14 }}>
                 <div className="between">
-                  <span className="w-label">READINESS STATUS</span>
-                  <div className="row gap-sm">
-                    {['Met', 'Partial', 'Not Met', 'Not Reviewed'].map((s, i) => (
-                      <Check key={s} label={s} on={i === 0} radio />
-                    ))}
-                  </div>
+                  <span className="w-label">Readiness Status</span>
+                  <InlineSelect
+                    ariaLabel="Readiness status"
+                    value={a.status}
+                    options={READINESS_OPTIONS}
+                    onChange={(v) => updateAssessment(control.id, { status: v })}
+                  />
                 </div>
                 <div className="between">
-                  <span className="w-label">VALIDATION METHOD</span>
-                  <div className="row gap-sm">
-                    {['Examine', 'Interview', 'Test'].map((s, i) => (
-                      <Check key={s} label={s} on={i !== 1} />
-                    ))}
-                  </div>
+                  <span className="w-label">Validation Method</span>
+                  <span className="muted" style={{ fontSize: '.9em' }}>Examine · Test</span>
                 </div>
-                <Field label="CONSULTANT NOTES" value="RBAC enforced via Entra ID groups. Verified Jul 1." area />
+                <Field
+                  label="Consultant Notes"
+                  value={a.consultantNotes ?? ''}
+                  placeholder="Findings, verification, follow-ups…"
+                  area
+                />
               </div>
             </Card>
           )}
@@ -284,77 +397,119 @@ export function ControlDetailScreen({ go }: ScreenProps) {
             <Card title="SSP Statement">
               <Field
                 area
-                value="Access to CUI systems is restricted to authorized personnel via Entra ID role-based groups. Device compliance enforced through Intune. Reviewed quarterly."
+                value={a.sspStatement ?? ''}
+                placeholder="Document how this control is implemented…"
               />
-              <div className="grid-3 mt">
-                <Select label="COMPLETENESS" value="Complete" />
-                <Select label="ACCURACY" value="Accurate" />
-                <Select label="EVIDENCE SUPPORTS?" value="Yes" />
+              <div className="grid-2 mt">
+                <div className="between">
+                  <span className="w-label">SSP Status</span>
+                  <InlineSelect
+                    ariaLabel="SSP status"
+                    value={a.sspStatus}
+                    options={SSP_OPTIONS}
+                    onChange={(v) => updateAssessment(control.id, { sspStatus: v })}
+                  />
+                </div>
+                <div className="between">
+                  <span className="w-label">Evidence Supports?</span>
+                  <Status s={a.evidenceStatus === 'Accepted' ? 'Yes' : a.evidenceStatus === 'Missing' ? 'No' : 'Partial'} />
+                </div>
               </div>
             </Card>
           )}
           {tab === 'Evidence' && (
             <Card title="Evidence" action={<Btn sm onClick={() => go('evidence')}>Request</Btn>}>
-              <table className="w-table">
-                <tbody>
-                  <tr>
-                    <td>Entra ID group export</td>
-                    <td>
-                      <Status s="Accepted" />
-                    </td>
-                    <td className="faint mono">Current</td>
-                  </tr>
-                  <tr>
-                    <td>Intune compliance policy</td>
-                    <td>
-                      <Status s="In Review" />
-                    </td>
-                    <td className="faint mono">Current</td>
-                  </tr>
-                </tbody>
-              </table>
+              {evidence.length ? (
+                <table className="w-table">
+                  <tbody>
+                    {evidence.map((e) => (
+                      <tr key={e.id}>
+                        <td>{e.title}</td>
+                        <td>
+                          <Status s={e.status} />
+                        </td>
+                        <td className="faint mono">{e.freshness}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="muted" style={{ margin: 0 }}>No evidence mapped to this control yet.</p>
+              )}
             </Card>
           )}
           {tab === 'POA&M' && (
             <Card title="POA&M">
-              <p className="muted" style={{ margin: 0 }}>
-                No open POA&M item for this control.
-              </p>
-              <Btn style={{ marginTop: 12 }} onClick={() => go('poam')}>
-                + Create POA&M
-              </Btn>
+              {poam.length ? (
+                <div className="col" style={{ gap: 10 }}>
+                  {poam.map((p) => (
+                    <div key={p.id} className="w-box" style={{ padding: '10px 12px' }}>
+                      <div className="between">
+                        <span className="mono" style={{ fontWeight: 700 }}>{p.id}</span>
+                        <div className="row gap-sm">
+                          <RiskBadge level={p.risk} />
+                          <Status s={p.status} />
+                        </div>
+                      </div>
+                      <p className="muted" style={{ margin: '6px 0 0', fontSize: '.92em' }}>{p.weakness}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="muted" style={{ margin: 0 }}>No open POA&M item for this control.</p>
+              )}
+              <Btn style={{ marginTop: 12 }} onClick={() => go('poam')}>+ Create POA&M</Btn>
             </Card>
           )}
           {tab === 'Tasks' && (
             <Card title="Tasks">
-              <table className="w-table">
-                <tbody>
-                  <tr>
-                    <td>Quarterly access review</td>
-                    <td>IT Lead</td>
-                    <td>
-                      <Status s="In Progress" />
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
+              {tasks.length ? (
+                <table className="w-table">
+                  <tbody>
+                    {tasks.map((t) => (
+                      <tr key={t.id}>
+                        <td>{t.title}</td>
+                        <td>{t.owner}</td>
+                        <td>
+                          <Status s={t.status} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <p className="muted" style={{ margin: 0 }}>No tasks linked to this control.</p>
+              )}
             </Card>
           )}
           {tab === 'Guidance' && (
             <Card title="Benchmark Fox Guidance">
               <div className="col" style={{ gap: 12 }}>
-                <div>
-                  <span className="w-eyebrow">Implementation example</span>
-                  <p className="muted" style={{ margin: '4px 0 0' }}>
-                    Use Entra ID security groups + Conditional Access to scope CUI app access.
-                  </p>
-                </div>
-                <div>
-                  <span className="w-eyebrow">Interview questions</span>
-                  <p className="muted" style={{ margin: '4px 0 0' }}>
-                    “How is a new employee granted access to CUI systems?”
-                  </p>
-                </div>
+                {control.guidance?.implementation && (
+                  <div>
+                    <span className="w-eyebrow">Implementation example</span>
+                    <p className="muted" style={{ margin: '4px 0 0' }}>{control.guidance.implementation}</p>
+                  </div>
+                )}
+                {control.guidance?.interview && (
+                  <div>
+                    <span className="w-eyebrow">Interview question</span>
+                    <p className="muted" style={{ margin: '4px 0 0' }}>{control.guidance.interview}</p>
+                  </div>
+                )}
+                {control.evidenceExamples && (
+                  <div>
+                    <span className="w-eyebrow">Evidence examples</span>
+                    <ul className="muted" style={{ margin: '4px 0 0', paddingLeft: 18 }}>
+                      {control.evidenceExamples.map((e) => (
+                        <li key={e}>{e}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                {!control.guidance && !control.evidenceExamples && (
+                  <p className="muted" style={{ margin: 0 }}>No guidance authored yet for this control.</p>
+                )}
               </div>
             </Card>
           )}
@@ -362,28 +517,28 @@ export function ControlDetailScreen({ go }: ScreenProps) {
         <Card title="Current Client Status">
           <div className="col" style={{ gap: 14 }}>
             <div className="between">
-              <span className="w-label">READINESS</span>
-              <Status s="Met" />
+              <span className="w-label">Readiness</span>
+              <Status s={a.status} />
             </div>
             <div className="between">
-              <span className="w-label">RISK RATING</span>
-              <RiskBadge level="High" />
+              <span className="w-label">Risk Rating</span>
+              <RiskBadge level={a.risk} />
             </div>
             <div className="between">
-              <span className="w-label">SCORE IMPACT</span>
-              <span className="mono">0 / −5</span>
+              <span className="w-label">Score Impact</span>
+              <span className="mono">{controlScoreDisplay(a, control)} / −{control.scoreValue}</span>
             </div>
             <div className="between">
-              <span className="w-label">OWNER</span>
-              <span>IT Lead</span>
+              <span className="w-label">Owner</span>
+              <span>{a.owner}</span>
             </div>
             <div className="between">
-              <span className="w-label">DUE DATE</span>
-              <span className="mono">08/15/2026</span>
+              <span className="w-label">Due Date</span>
+              <span className="mono">{a.dueDate}</span>
             </div>
             <div className="between">
-              <span className="w-label">LAST REVIEWED</span>
-              <span className="mono faint">Jul 1, 2026</span>
+              <span className="w-label">Last Reviewed</span>
+              <span className="mono faint">{a.lastReviewed}</span>
             </div>
             <hr className="w-hr" style={{ margin: '4px 0' }} />
             <Btn primary>Save Changes</Btn>

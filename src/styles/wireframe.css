@@ -213,6 +213,33 @@ textarea.w-input { resize: vertical; min-height: 64px; line-height: 1.55; }
 .dot.bad { background: var(--bad); }
 .dot.none { background: var(--line-strong); }
 
+/* ---- inline editable dropdown (matrix cells) ---- */
+.w-inline-select {
+  font-family: var(--body);
+  font-weight: 600;
+  font-size: .74rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 24px 3px 10px;
+  background-color: var(--surface-2);
+  color: var(--ink-soft);
+  cursor: pointer;
+  max-width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%238a94a3' d='M0 0h10L5 6z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 9px center;
+  transition: border-color .12s, box-shadow .12s;
+}
+.w-inline-select:focus-visible { outline: none; box-shadow: var(--ring); border-color: var(--navy-500); }
+.w-inline-select.t-low, .w-inline-select.t-ok   { background-color: var(--ok-bg);   border-color: var(--ok-bd);   color: #146b3c; }
+.w-inline-select.t-med, .w-inline-select.t-warn { background-color: var(--warn-bg); border-color: var(--warn-bd); color: #8a5d09; }
+.w-inline-select.t-high, .w-inline-select.t-bad { background-color: var(--bad-bg);  border-color: var(--bad-bd);  color: #a23a20; }
+.w-inline-select.t-crit  { background-color: var(--crit-bg); border-color: var(--crit-bd); color: #9c2a22; }
+.w-inline-select.t-none  { background-color: var(--surface-2); border-color: var(--line); color: var(--ink-soft); }
+.w-inline-select option { color: var(--ink); background: var(--white); font-weight: 500; }
+
 /* ---- tables ---- */
 .w-table { width: 100%; border-collapse: collapse; font-size: .9rem; }
 .w-table th {

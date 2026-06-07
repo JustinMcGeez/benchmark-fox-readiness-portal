@@ -2,7 +2,7 @@
    Screens — client: Client Dashboard, Intake, Path, Scoping
    (these render inside the client context bar from Shell)
    ============================================================ */
-import { Fragment, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import type { ScreenProps } from '../types';
 import {
   Badge,
@@ -20,83 +20,119 @@ import {
   Tabs,
   WarnBanner,
 } from '../components/primitives';
+import { useData } from '../data/store';
+import { CONTROLS_BY_ID } from '../data/controls';
+import { POAM_ITEMS } from '../data/poam';
+import { EVIDENCE_ITEMS } from '../data/evidence';
+import { TASKS } from '../data/tasks';
+import {
+  formatScore,
+  readinessPct,
+  scoreByFamily,
+  sprsScore,
+  SPRS_MAX,
+  statusCounts,
+} from '../lib/scoring';
+
+const POAM_OPEN_STATES = new Set(['Not Started', 'Ongoing', 'Blocked']);
+const priorityRank = (p: string) => ({ Critical: 3, High: 2, Medium: 1, Low: 0 })[p] ?? 0;
 
 /* ---------- 5. CLIENT DASHBOARD ---------- */
 export function ClientDashboardScreen({ go }: ScreenProps) {
+  const { assessments } = useData();
+
+  const counts = useMemo(() => statusCounts(assessments), [assessments]);
+  const readiness = useMemo(() => readinessPct(assessments), [assessments]);
+  const score = useMemo(() => sprsScore(assessments, CONTROLS_BY_ID), [assessments]);
+  const families = useMemo(() => scoreByFamily(assessments, CONTROLS_BY_ID).slice(0, 5), [assessments]);
+
+  const openPoam = POAM_ITEMS.filter((p) => POAM_OPEN_STATES.has(p.status));
+  const blockers = POAM_ITEMS.filter((p) => p.classification === 'Blocker');
+  const missingEvidence = EVIDENCE_ITEMS.filter(
+    (e) => e.status === 'Missing' || e.status === 'Requested',
+  ).length;
+
+  const topBlockers = [...POAM_ITEMS]
+    .sort((a, b) => Number(b.classification === 'Blocker') - Number(a.classification === 'Blocker'))
+    .slice(0, 4);
+
+  const nextActions = [...TASKS]
+    .filter((t) => t.status !== 'Done')
+    .sort((a, b) => priorityRank(b.priority) - priorityRank(a.priority))
+    .slice(0, 3);
+
+  const notMetTotal = counts.notMet + counts.notReviewed;
+
   return (
     <div className="col">
       <div className="grid-4">
-        <StatCard k="Readiness" v="62%" />
-        <StatCard k="Current Score" v="−38" d="Target: +110" tone="warn" />
-        <StatCard k="Open POA&Ms" v="14" />
-        <StatCard k="Critical Blockers" v="5" d="High" tone="crit" />
+        <StatCard k="Readiness" v={`${readiness}%`} />
+        <StatCard k="Current Score" v={formatScore(score)} d={`Target: ${SPRS_MAX}`} tone="warn" />
+        <StatCard k="Open POA&Ms" v={openPoam.length} />
+        <StatCard k="Critical Blockers" v={blockers.length} d="High" tone="crit" />
       </div>
       <div className="grid-2">
         <Card title="Overall Readiness">
           <div className="row" style={{ alignItems: 'center', gap: 24 }}>
-            <Donut met={45} partial={25} value="62%" label="READY" />
+            <Donut
+              met={counts.applicable ? (counts.met / counts.applicable) * 100 : 0}
+              partial={counts.applicable ? (counts.partial / counts.applicable) * 100 : 0}
+              value={`${readiness}%`}
+              label="READY"
+            />
             <Legend
               items={[
-                { bg: 'var(--navy)', t: 'Met — 49 controls' },
-                { bg: 'var(--silver)', t: 'Partial — 28 controls' },
-                { bg: 'var(--fill-2)', t: 'Not Met — 33 controls' },
+                { bg: 'var(--navy)', t: `Met — ${counts.met} controls` },
+                { bg: 'var(--silver)', t: `Partial — ${counts.partial} controls` },
+                { bg: 'var(--fill-2)', t: `Not Met — ${notMetTotal} controls` },
               ]}
             />
           </div>
         </Card>
         <Card title="Top Readiness Blockers">
           <ol className="col" style={{ gap: 10, margin: 0, paddingLeft: 20, fontSize: '.95em' }}>
-            <li>Missing SSP implementation details (AC family)</li>
-            <li>
-              MFA evidence incomplete <Badge tone="warn">3.5.3</Badge>
-            </li>
-            <li>
-              CUI data flow unclear <Badge tone="bad">Blocker</Badge>
-            </li>
-            <li>Audit log retention not configured</li>
+            {topBlockers.map((p) => (
+              <li key={p.id}>
+                {p.weakness}{' '}
+                {p.classification === 'Blocker' ? (
+                  <Badge tone="bad">Blocker</Badge>
+                ) : (
+                  <Badge tone="none">{p.controlId}</Badge>
+                )}
+              </li>
+            ))}
           </ol>
         </Card>
         <Card title="Score by Family">
           <BarChart
-            rows={[
-              { l: 'Access Control', p: 55, v: '−12' },
-              { l: 'Audit & Acct.', p: 40, v: '−9' },
-              { l: 'Config. Mgmt', p: 60, v: '−6' },
-              { l: 'Ident. & Auth', p: 35, v: '−8' },
-              { l: 'Sys & Comms', p: 70, v: '−3' },
-            ]}
+            rows={families.map((f) => ({ l: f.name, p: f.readiness, v: `−${f.deduction}` }))}
           />
         </Card>
         <Card title="Next Recommended Actions">
           <div className="col" style={{ gap: 10 }}>
-            <div className="between w-box" style={{ padding: '8px 12px' }}>
-              <span>Complete CUI scoping</span>
-              <Btn sm onClick={() => go('scope')}>
-                Go
-              </Btn>
-            </div>
-            <div className="between w-box" style={{ padding: '8px 12px' }}>
-              <span>Upload MFA evidence</span>
-              <Btn sm onClick={() => go('evidence')}>
-                Go
-              </Btn>
-            </div>
-            <div className="between w-box" style={{ padding: '8px 12px' }}>
-              <span>Update SSP for AC controls</span>
-              <Btn sm onClick={() => go('ssp')}>
-                Go
-              </Btn>
-            </div>
+            {nextActions.map((t) => (
+              <div key={t.id} className="between w-box" style={{ padding: '8px 12px' }}>
+                <span>{t.title}</span>
+                <Btn sm onClick={() => go('tasks')}>
+                  Go
+                </Btn>
+              </div>
+            ))}
           </div>
         </Card>
       </div>
-      <div className="row gap-sm wrap">
-        <Btn primary onClick={() => go('controls')}>
-          Continue Control Review
-        </Btn>
-        <Btn onClick={() => go('evidence')}>Request Evidence</Btn>
-        <Btn onClick={() => go('report-preview')}>Generate Executive Summary</Btn>
-        <Btn ghost>View Go/No-Go Status</Btn>
+      <div className="between wrap" style={{ gap: 12 }}>
+        <div className="row gap-sm wrap">
+          <Btn primary onClick={() => go('controls')}>
+            Continue Control Review
+          </Btn>
+          <Btn onClick={() => go('evidence')}>Request Evidence</Btn>
+          <Btn onClick={() => go('report-preview')}>Generate Executive Summary</Btn>
+          <Btn ghost>View Go/No-Go Status</Btn>
+        </div>
+        <span className="mono faint" style={{ fontSize: '.78rem' }}>
+          {missingEvidence} MISSING EVIDENCE · {counts.total} CONTROLS ASSESSED
+        </span>
       </div>
     </div>
   );

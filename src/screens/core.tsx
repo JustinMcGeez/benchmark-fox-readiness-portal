@@ -1,7 +1,7 @@
 /* ============================================================
    Screens — core: Login, Internal Dashboard, Clients, Create Client
    ============================================================ */
-import type { ScreenProps, RiskLevel } from '../types';
+import type { ScreenProps } from '../types';
 import { ShieldCheck } from 'lucide-react';
 import {
   BarChart,
@@ -16,6 +16,25 @@ import {
   Toolbar,
 } from '../components/primitives';
 import { BrandLockup, BrandLogo } from '../components/Brand';
+import { AUDIT_EVENTS, CLIENTS } from '../data/clients';
+import { POAM_ITEMS } from '../data/poam';
+import { useData } from '../data/store';
+import { CONTROLS_BY_ID } from '../data/controls';
+import { formatScore, readinessPct, sprsScore } from '../lib/scoring';
+
+const POAM_OPEN = new Set(['Not Started', 'Ongoing', 'Blocked']);
+const RISK_REASON: Record<string, string> = {
+  Intake: 'Intake incomplete',
+  Controls: 'Control gaps',
+  Evidence: 'Evidence gaps',
+  SSP: 'SSP in progress',
+  Report: 'Report pending',
+};
+const activityTone = (action: string): 'ok' | 'warn' | 'none' => {
+  if (/accepted|uploaded|met|complete/i.test(action)) return 'ok';
+  if (/created|changed|updated/i.test(action)) return 'warn';
+  return 'none';
+};
 
 /* ---------- 1. LOGIN ---------- */
 export function LoginScreen({ go }: ScreenProps) {
@@ -138,6 +157,32 @@ export function LoginScreen({ go }: ScreenProps) {
 
 /* ---------- 2. INTERNAL DASHBOARD ---------- */
 export function DashboardScreen({ go }: ScreenProps) {
+  const { assessments } = useData();
+
+  // active client computes live; others use their seed summary
+  const activeReadiness = readinessPct(assessments);
+  const activeScore = sprsScore(assessments, CONTROLS_BY_ID);
+  const clientReadiness = (id: string, fallback: number) =>
+    id === 'acme' ? activeReadiness : fallback;
+
+  const activeClients = CLIENTS.filter((c) => c.active);
+  const avgReadiness = Math.round(
+    activeClients.reduce((s, c) => s + clientReadiness(c.id, c.readiness), 0) / activeClients.length,
+  );
+  const openPoam = POAM_ITEMS.filter((p) => POAM_OPEN.has(p.status)).length;
+  const blockers = POAM_ITEMS.filter((p) => p.classification === 'Blocker').length;
+
+  const readinessByClient = [...activeClients]
+    .map((c) => ({ name: c.name, r: clientReadiness(c.id, c.readiness) }))
+    .sort((a, b) => b.r - a.r)
+    .slice(0, 5);
+
+  const atRisk = activeClients
+    .filter((c) => c.riskRating === 'High' || c.riskRating === 'Medium')
+    .slice(0, 3);
+
+  const deadlines = activeClients.filter((c) => c.deadline).slice(0, 3);
+
   return (
     <div className="col">
       <PageHead
@@ -153,118 +198,74 @@ export function DashboardScreen({ go }: ScreenProps) {
         }
       />
       <div className="grid-4">
-        <StatCard k="Active Clients" v="12" />
-        <StatCard k="Avg Readiness" v="58%" d="+4 this mo" tone="ok" />
-        <StatCard k="Open POA&Ms" v="47" />
-        <StatCard k="Critical Blockers" v="9" d="High" tone="crit" />
+        <StatCard k="Active Clients" v={activeClients.length} />
+        <StatCard k="Avg Readiness" v={`${avgReadiness}%`} tone="ok" />
+        <StatCard k="Open POA&Ms" v={openPoam} />
+        <StatCard k="Critical Blockers" v={blockers} d="High" tone="crit" />
       </div>
       <div className="grid-2">
         <Card title="Readiness by Client">
           <BarChart
-            rows={[
-              { l: 'Bravo Machine', p: 84, v: '84%' },
-              { l: 'Acme Defense', p: 62, v: '62%' },
-              { l: 'Cobalt Aero', p: 49, v: '49%' },
-              { l: 'Delta Systems', p: 20, v: '20%' },
-              { l: 'Echo Logistics', p: 71, v: '71%' },
-            ]}
+            rows={readinessByClient.map((c) => ({
+              l: c.name.split(' ').slice(0, 2).join(' '),
+              p: c.r,
+              v: `${c.r}%`,
+            }))}
           />
         </Card>
         <Card title="Clients at Risk" action={<Btn sm ghost onClick={() => go('clients')}>View all</Btn>}>
           <table className="w-table">
             <tbody>
-              <tr onClick={() => go('client-dashboard')}>
-                <td>Acme Defense</td>
-                <td>
-                  <RiskBadge level="High" />
-                </td>
-                <td className="muted">Missing SSP</td>
-              </tr>
-              <tr onClick={() => go('client-dashboard')}>
-                <td>Delta Systems</td>
-                <td>
-                  <RiskBadge level="High" />
-                </td>
-                <td className="muted">Intake incomplete</td>
-              </tr>
-              <tr onClick={() => go('client-dashboard')}>
-                <td>Cobalt Aero</td>
-                <td>
-                  <RiskBadge level="Medium" />
-                </td>
-                <td className="muted">Evidence gaps</td>
-              </tr>
+              {atRisk.map((c) => (
+                <tr key={c.id} onClick={() => go('client-dashboard')}>
+                  <td>{c.name.split(' ').slice(0, 2).join(' ')}</td>
+                  <td>
+                    <RiskBadge level={c.riskRating} />
+                  </td>
+                  <td className="muted">{RISK_REASON[c.phase] ?? c.phase}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </Card>
         <Card title="Upcoming Deadlines">
           <table className="w-table">
             <tbody>
-              <tr>
-                <td className="mono">Aug 15</td>
-                <td>Acme Defense</td>
-                <td className="muted">Readiness report due</td>
-              </tr>
-              <tr>
-                <td className="mono">Jul 30</td>
-                <td>Bravo Machine</td>
-                <td className="muted">Go/No-Go memo</td>
-              </tr>
-              <tr>
-                <td className="mono">Jul 12</td>
-                <td>Acme Defense</td>
-                <td className="muted">POA&M item due</td>
-              </tr>
+              {deadlines.map((c) => (
+                <tr key={c.id}>
+                  <td className="mono">{c.deadline}</td>
+                  <td>{c.name.split(' ').slice(0, 2).join(' ')}</td>
+                  <td className="muted">Engagement deadline</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </Card>
         <Card title="Recent Activity" action={<Btn sm ghost onClick={() => go('audit')}>Audit log</Btn>}>
           <div className="col" style={{ gap: 11, fontSize: '.92em' }}>
-            <div className="center" style={{ gap: 10 }}>
-              <span className="dot ok" style={{ width: 9, height: 9, borderRadius: '50%' }} /> Evidence
-              uploaded — MFA screenshot{' '}
-              <span className="faint mono" style={{ marginLeft: 'auto', fontSize: '.8em' }}>
-                9:22
-              </span>
-            </div>
-            <div className="center" style={{ gap: 10 }}>
-              <span className="dot ok" style={{ width: 9, height: 9, borderRadius: '50%' }} /> Control
-              3.5.3 marked Met{' '}
-              <span className="faint mono" style={{ marginLeft: 'auto', fontSize: '.8em' }}>
-                9:15
-              </span>
-            </div>
-            <div className="center" style={{ gap: 10 }}>
-              <span className="dot warn" style={{ width: 9, height: 9, borderRadius: '50%' }} /> POA&M
-              created — CUI flow{' '}
-              <span className="faint mono" style={{ marginLeft: 'auto', fontSize: '.8em' }}>
-                8:51
-              </span>
-            </div>
-            <div className="center" style={{ gap: 10 }}>
-              <span className="dot none" style={{ width: 9, height: 9, borderRadius: '50%' }} /> Report
-              generated — Executive{' '}
-              <span className="faint mono" style={{ marginLeft: 'auto', fontSize: '.8em' }}>
-                8:40
-              </span>
-            </div>
+            {AUDIT_EVENTS.slice(0, 4).map((e) => (
+              <div key={e.id} className="center" style={{ gap: 10 }}>
+                <span
+                  className={'dot ' + activityTone(e.action)}
+                  style={{ width: 9, height: 9, borderRadius: '50%' }}
+                />
+                {e.action} — {e.details}
+                <span className="faint mono" style={{ marginLeft: 'auto', fontSize: '.8em' }}>
+                  {e.timestamp.split(' ')[1]}
+                </span>
+              </div>
+            ))}
           </div>
         </Card>
       </div>
+      <span className="mono faint" style={{ fontSize: '.78rem' }}>
+        ACTIVE CLIENT · ACME DEFENSE · {activeReadiness}% READY · SCORE {formatScore(activeScore)}
+      </span>
     </div>
   );
 }
 
 /* ---------- 3. CLIENTS LIST ---------- */
-const CLIENTS: [string, string, number, string, RiskLevel, string, string, string][] = [
-  ['Acme Defense Systems', 'Level 2 · C3PAO', 62, '−38', 'High', 'Evidence', 'Justin', '2d ago'],
-  ['Bravo Machine Works', 'Level 1', 84, '+6', 'Medium', 'Report', 'Justin', '1d ago'],
-  ['Cobalt Aerospace', 'Level 2 · C3PAO', 49, '−61', 'Medium', 'Controls', 'Dana', '5h ago'],
-  ['Delta Systems', 'Unknown', 20, 'TBD', 'High', 'Intake', 'Justin', '3d ago'],
-  ['Echo Logistics', 'Level 2 · Self', 71, '−22', 'Low', 'SSP', 'Dana', '6h ago'],
-  ['Foxtrot Materials', 'Level 1', 90, '+9', 'Low', 'Report', 'Justin', '1w ago'],
-];
-
 export function ClientsScreen({ go }: ScreenProps) {
   return (
     <div className="col">
@@ -293,30 +294,30 @@ export function ClientsScreen({ go }: ScreenProps) {
             </tr>
           </thead>
           <tbody>
-            {CLIENTS.map((c, i) => (
-              <tr key={i} onClick={() => go('client-dashboard')}>
-                <td style={{ fontWeight: 700 }}>{c[0]}</td>
+            {CLIENTS.map((c) => (
+              <tr key={c.id} onClick={() => go('client-dashboard')}>
+                <td style={{ fontWeight: 700 }}>{c.name}</td>
                 <td className="mono" style={{ fontSize: '.85em' }}>
-                  {c[1]}
+                  {c.cmmcPath}
                 </td>
                 <td>
                   <div className="center" style={{ gap: 8 }}>
                     <span className="bar-track" style={{ width: 60 }}>
-                      <span className="bar-fill" style={{ width: c[2] + '%' }} />
+                      <span className="bar-fill" style={{ width: c.readiness + '%' }} />
                     </span>
                     <span className="mono" style={{ fontSize: '.85em' }}>
-                      {c[2]}%
+                      {c.readiness}%
                     </span>
                   </div>
                 </td>
-                <td className="num">{c[3]}</td>
+                <td className="num">{c.score}</td>
                 <td>
-                  <RiskBadge level={c[4]} />
+                  <RiskBadge level={c.riskRating} />
                 </td>
-                <td className="muted">{c[5]}</td>
-                <td>{c[6]}</td>
+                <td className="muted">{c.phase}</td>
+                <td>{c.owner}</td>
                 <td className="faint mono" style={{ fontSize: '.82em' }}>
-                  {c[7]}
+                  {c.lastUpdated}
                 </td>
               </tr>
             ))}
