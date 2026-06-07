@@ -302,7 +302,9 @@ export function ClientsScreen({ go }: ScreenProps) {
             </tr>
           </thead>
           <tbody>
-            {CLIENTS.map((c) => (
+            {CLIENTS.map((c) => {
+              const live = c.id === CURRENT_CLIENT_ID;
+              return (
               <tr key={c.id} onClick={() => go('client-dashboard')}>
                 <td style={{ fontWeight: 700 }}>{c.name}</td>
                 <td className="mono" style={{ fontSize: '.85em' }}>
@@ -316,9 +318,21 @@ export function ClientsScreen({ go }: ScreenProps) {
                     <span className="mono" style={{ fontSize: '.85em' }}>
                       {rowReadiness(c)}%
                     </span>
+                    <span
+                      className="mono faint"
+                      title={live ? 'Computed from assessments' : 'Seed summary only — no assessment data yet'}
+                      style={{ fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.04em' }}
+                    >
+                      {live ? 'live' : 'seed'}
+                    </span>
                   </div>
                 </td>
-                <td className="num">{rowScore(c)}</td>
+                <td
+                  className="num"
+                  title={live ? 'Computed SPRS-style score (placeholder deductions)' : 'Seed summary only'}
+                >
+                  {rowScore(c)}
+                </td>
                 <td>
                   <RiskBadge level={c.riskRating} />
                 </td>
@@ -328,7 +342,8 @@ export function ClientsScreen({ go }: ScreenProps) {
                   {c.lastUpdated}
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </Card>

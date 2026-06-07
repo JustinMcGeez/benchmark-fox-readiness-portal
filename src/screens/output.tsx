@@ -277,6 +277,8 @@ export function SettingsScreen(_: ScreenProps) {
           <StatusRow label="Backend connected" value={false} />
           <StatusRow label="Client portal enabled" value={false} />
           <StatusRow label="Evidence file storage enabled" value={false} />
+          <StatusRow label="Intake editable" value={true} />
+          <StatusRow label="Scope editable" value={true} />
           <StatusRow label="Data persistence" value="localStorage only" />
         </div>
       </Card>

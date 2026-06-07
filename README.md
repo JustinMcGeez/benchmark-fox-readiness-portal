@@ -209,6 +209,7 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
 - **All 14 families present?** ✅ Yes (AC, AT, AU, CM, IA, IR, MA, MP, PS, PE, RA, CA, SC, SI).
 - **Scoring values official or placeholder?** ⚠️ Placeholder (`scoreValue: null`,
   `scoreSource: 'placeholder'`) — readiness % is real; SPRS score is flagged "not finalized".
+- **Intake / Scope editable?** ✅ Yes — localStorage-backed, with auto-save and reset-to-seed.
 - **Type-safe / builds?** ✅ `npm run typecheck` and `npm run build` pass.
 - **Backend?** ❌ None — TypeScript seed + `localStorage` only.
 
@@ -223,8 +224,9 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   missing/weak evidence, open tasks) centralized in `lib/scoring.ts` + `lib/selectors.ts`.
 - Control Matrix: search + filters + inline editable dropdowns persisted to
   `localStorage`; selecting a row opens that control's detail; refresh-safe.
-- Source attribution (`sourceRefs.ts` + `Sources`) on Control Detail, SSP, POA&M,
-  Evidence, and CMMC Path; every control carries ≥1 source reference.
+- Source attribution (`sourceRefs.ts` + `SourceRefs.tsx`) on Control Detail, CMMC
+  Path, SSP, POA&M, Evidence, and the Report Preview footer; every control carries
+  ≥1 source reference.
 - Disclaimers/warnings: readiness ≠ certification, scoring-not-finalized, CUI
   handling, POA&M reliance, path-not-legal-advice.
 - Type-safe: `npm run typecheck` and `npm run build` pass (strict TS).
@@ -233,17 +235,19 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
 - Benchmark Fox plain-English explanations / evidence examples / SSP & POA&M
   guidance authored for a curated control subset; remaining controls show TODO
   placeholders.
-- Worked client data covers one active engagement (Acme Defense); other clients
-  use seed summary rows in the Clients list.
+- Worked client data covers one active engagement (Acme Defense); its Clients-list
+  row computes live (labeled `live`), while the other clients show seed summaries
+  (labeled `seed`) rather than fake computed scores.
 
 **Placeholder**
 - SPRS deduction values (`scoreValue = null`, `scoreSource = 'placeholder'`) pending
   the DoD Assessment Methodology — the SPRS-style score is flagged "scoring not
   finalized" everywhere.
 - NIST SP 800-171A assessment objectives (not bundled).
-- Intake / Path / Scope are seeded from `intake.ts` / `scope.ts` and are now
+- Intake / Path / Scope are seeded from `intake.ts` / `scope.ts` and are
   **editable with localStorage persistence** (summary fields, contract/data
-  selections, scope assets) — prototype workflows, not yet backed by a database.
+  selections, scope assets) — auto-saved with reset-to-seed controls; prototype
+  workflows, not yet backed by a database.
 
 **Known limitations**
 - No backend; single active client; auth is a prototype shell only.

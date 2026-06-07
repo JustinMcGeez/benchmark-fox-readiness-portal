@@ -76,6 +76,7 @@ interface DataContextValue {
   updateIntake: (patch: Partial<IntakeState>) => void;
   toggleContractClause: (label: string) => void;
   toggleDataHandling: (label: string) => void;
+  resetIntake: () => void;
 
   /* editable scope workflow */
   scope: ScopeState;
@@ -84,6 +85,7 @@ interface DataContextValue {
   updateAsset: (id: string, patch: Partial<ScopeAsset>) => void;
   toggleAssetInScope: (id: string) => void;
   toggleAssetHandlesCui: (id: string) => void;
+  resetScope: () => void;
 }
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -157,6 +159,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ),
     [persistIntake],
   );
+  const resetIntake = useCallback(() => setIntake(persistIntake(DEFAULT_INTAKE)), [persistIntake]);
 
   /* ---- scope ---- */
   const persistScope = useCallback((next: ScopeState) => {
@@ -219,6 +222,7 @@ export function DataProvider({ children }: { children: ReactNode }) {
       ),
     [persistScope],
   );
+  const resetScope = useCallback(() => setScope(persistScope(DEFAULT_SCOPE)), [persistScope]);
 
   const value: DataContextValue = {
     currentClientId: CURRENT_CLIENT_ID,
@@ -231,12 +235,14 @@ export function DataProvider({ children }: { children: ReactNode }) {
     updateIntake,
     toggleContractClause,
     toggleDataHandling,
+    resetIntake,
     scope,
     updateScopeSummary,
     addAsset,
     updateAsset,
     toggleAssetInScope,
     toggleAssetHandlesCui,
+    resetScope,
   };
 
   return createElement(DataContext.Provider, { value }, children);

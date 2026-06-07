@@ -161,7 +161,7 @@ const INTAKE_STEPS = [
 ];
 
 export function IntakeScreen({ go }: ScreenProps) {
-  const { intake, updateIntake, toggleContractClause, toggleDataHandling } = useData();
+  const { intake, updateIntake, toggleContractClause, toggleDataHandling, resetIntake } = useData();
   const [step, setStep] = useState(0);
   const last = step === INTAKE_STEPS.length - 1;
   return (
@@ -281,6 +281,14 @@ export function IntakeScreen({ go }: ScreenProps) {
                 </label>
               ))}
             </div>
+            <div className="between mt">
+              <span className="faint" style={{ fontSize: '.8em' }}>
+                ✓ Auto-saved to this browser (localStorage)
+              </span>
+              <Btn sm ghost onClick={resetIntake}>
+                ↺ Reset to seed
+              </Btn>
+            </div>
           </div>
         )}
         <hr className="w-hr" />
@@ -368,8 +376,15 @@ export function PathScreen({ go }: ScreenProps) {
 
 /* ---------- 8. SCOPING WORKSPACE ---------- */
 export function ScopeScreen({ go }: ScreenProps) {
-  const { scope, updateScopeSummary, addAsset, updateAsset, toggleAssetInScope, toggleAssetHandlesCui } =
-    useData();
+  const {
+    scope,
+    updateScopeSummary,
+    addAsset,
+    updateAsset,
+    toggleAssetInScope,
+    toggleAssetHandlesCui,
+    resetScope,
+  } = useData();
   const [tab, setTab] = useState('Scope Summary');
   const tabs = ['Scope Summary', 'Assets', 'Users', 'Locations', 'Providers', 'CUI Flows'];
   const summary = scope.summary;
@@ -406,9 +421,19 @@ export function ScopeScreen({ go }: ScreenProps) {
             <span className="w-label">SCOPE NOTES</span>
             <textarea className="w-input" rows={3} value={summary.notes} onChange={(e) => updateScopeSummary({ notes: e.target.value })} />
           </div>
-          <div className="row gap-sm wrap mt">
-            <Btn primary onClick={addAsset}>+ Add Asset</Btn>
-            <Btn onClick={() => setTab('Assets')}>View Assets ({scope.assets.length})</Btn>
+          <div className="between wrap mt" style={{ gap: 8 }}>
+            <div className="row gap-sm wrap">
+              <Btn primary onClick={addAsset}>+ Add Asset</Btn>
+              <Btn onClick={() => setTab('Assets')}>View Assets ({scope.assets.length})</Btn>
+            </div>
+            <div className="center gap-sm">
+              <span className="faint" style={{ fontSize: '.8em' }}>
+                ✓ Auto-saved to this browser
+              </span>
+              <Btn sm ghost onClick={resetScope}>
+                ↺ Reset to seed
+              </Btn>
+            </div>
           </div>
         </Card>
       ) : (
