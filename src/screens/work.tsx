@@ -57,7 +57,11 @@ export function SSPScreen({ go }: ScreenProps) {
   const rows = assessments
     .filter((a) => filter === 'All' || a.sspStatus === filter)
     .slice(0, 14);
-  const editor = assessments.find((a) => a.controlId === '3.1.1') ?? assessments[0];
+  // editable side panel follows the selected row (defaults to the first row)
+  const [editorId, setEditorId] = useState<string>(
+    () => assessments.find((a) => a.controlId === '3.1.1')?.controlId ?? assessments[0]?.controlId ?? '',
+  );
+  const editor = assessments.find((a) => a.controlId === editorId) ?? rows[0] ?? assessments[0];
 
   return (
     <div className="col">
@@ -100,10 +104,8 @@ export function SSPScreen({ go }: ScreenProps) {
               {rows.map((a) => (
                 <tr
                   key={a.controlId}
-                  onClick={() => {
-                    selectControl(a.controlId);
-                    go('control-detail');
-                  }}
+                  onClick={() => setEditorId(a.controlId)}
+                  style={{ background: a.controlId === editor.controlId ? 'var(--surface-2)' : undefined }}
                 >
                   <td className="mono">{a.controlId}</td>
                   <td>
@@ -116,7 +118,16 @@ export function SSPScreen({ go }: ScreenProps) {
                     <Status s={evSupports(a)} />
                   </td>
                   <td>
-                    <a className="annot">{a.sspStatus === 'Missing' ? 'Draft' : 'Edit'}</a>
+                    <a
+                      className="annot"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        selectControl(a.controlId);
+                        go('control-detail');
+                      }}
+                    >
+                      {a.sspStatus === 'Missing' ? 'Draft' : 'Edit'}
+                    </a>
                   </td>
                 </tr>
               ))}
@@ -156,7 +167,8 @@ export function SSPScreen({ go }: ScreenProps) {
 /* ---------- 13. POA&M TRACKER ---------- */
 export function POAMScreen({ go }: ScreenProps) {
   const { selectControl } = useData();
-  const detail = POAM_ITEMS[0];
+  const [selectedId, setSelectedId] = useState<string>(POAM_ITEMS[0]?.id ?? '');
+  const detail = POAM_ITEMS.find((p) => p.id === selectedId) ?? POAM_ITEMS[0];
 
   return (
     <div className="col">
@@ -192,15 +204,24 @@ export function POAMScreen({ go }: ScreenProps) {
               return (
                 <tr
                   key={p.id}
-                  onClick={() => {
-                    selectControl(p.controlId);
-                    go('control-detail');
-                  }}
+                  onClick={() => setSelectedId(p.id)}
+                  style={{ background: p.id === detail.id ? 'var(--surface-2)' : undefined }}
                 >
                   <td className="mono" style={{ fontWeight: 700 }}>
                     {p.id}
                   </td>
-                  <td className="mono faint">{p.controlId}</td>
+                  <td>
+                    <a
+                      className="mono annot"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        selectControl(p.controlId);
+                        go('control-detail');
+                      }}
+                    >
+                      {p.controlId}
+                    </a>
+                  </td>
                   <td>{p.weakness}</td>
                   <td className="muted">{p.owner}</td>
                   <td>
@@ -277,7 +298,8 @@ export function POAMScreen({ go }: ScreenProps) {
 
 /* ---------- 14. EVIDENCE HUB ---------- */
 export function EvidenceScreen(_: ScreenProps) {
-  const detail = EVIDENCE_ITEMS[0];
+  const [selectedId, setSelectedId] = useState<string>(EVIDENCE_ITEMS[0]?.id ?? '');
+  const detail = EVIDENCE_ITEMS.find((e) => e.id === selectedId) ?? EVIDENCE_ITEMS[0];
   return (
     <div className="col">
       <PageHead
@@ -304,7 +326,11 @@ export function EvidenceScreen(_: ScreenProps) {
             </thead>
             <tbody>
               {EVIDENCE_ITEMS.map((e) => (
-                <tr key={e.id}>
+                <tr
+                  key={e.id}
+                  onClick={() => setSelectedId(e.id)}
+                  style={{ background: e.id === detail.id ? 'var(--surface-2)' : undefined }}
+                >
                   <td style={{ fontWeight: 700 }}>{e.title}</td>
                   <td className="mono">{e.controlId}</td>
                   <td className="muted">{e.owner}</td>

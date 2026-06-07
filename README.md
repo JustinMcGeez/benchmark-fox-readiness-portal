@@ -222,6 +222,10 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   Settings, Mobile.
 - Computed metrics (readiness %, status counts, by-family, open POA&Ms, blockers,
   missing/weak evidence, open tasks) centralized in `lib/scoring.ts` + `lib/selectors.ts`.
+- Report Preview "Top Findings" are computed (`lib/selectors.ts` `topFindings`)
+  from blocker POA&Ms, not-met/high-risk controls, SSP missing/needs-fix, and
+  missing/weak evidence. SSP / POA&M / Evidence detail panels follow the selected
+  row (no longer hard-pinned to 3.1.1 / first item).
 - Control Matrix: search + filters + inline editable dropdowns persisted to
   `localStorage`; selecting a row opens that control's detail; refresh-safe.
 - Source attribution (`sourceRefs.ts` + `SourceRefs.tsx`) on Control Detail, CMMC
@@ -236,8 +240,9 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   guidance authored for a curated control subset; remaining controls show TODO
   placeholders.
 - Worked client data covers one active engagement (Acme Defense); its Clients-list
-  row computes live (labeled `live`), while the other clients show seed summaries
-  (labeled `seed`) rather than fake computed scores.
+  row computes live (readiness/score from assessments, labeled `live`). Clients
+  without assessments show **"Seed summary only"** / **"Not started"** instead of
+  fake computed scores.
 
 **Placeholder**
 - SPRS deduction values (`scoreValue = null`, `scoreSource = 'placeholder'`) pending

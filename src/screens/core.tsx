@@ -268,13 +268,13 @@ export function DashboardScreen({ go }: ScreenProps) {
 /* ---------- 3. CLIENTS LIST ---------- */
 export function ClientsScreen({ go }: ScreenProps) {
   const { assessments } = useData();
-  // the active client computes live; others show their seed summary
+  // Only the active client has assessment data; its readiness/score compute live.
+  // Other clients have no assessments, so we show an honest placeholder instead of
+  // presenting seed numbers as if they were computed.
   const liveReadiness = readinessPct(assessments);
   const liveScore = formatScore(sprsScore(assessments, CONTROLS_BY_ID));
-  const rowReadiness = (c: (typeof CLIENTS)[number]) =>
-    c.id === CURRENT_CLIENT_ID ? liveReadiness : c.readiness;
-  const rowScore = (c: (typeof CLIENTS)[number]) =>
-    c.id === CURRENT_CLIENT_ID ? liveScore : c.score;
+  const placeholderFor = (c: (typeof CLIENTS)[number]) =>
+    c.phase === 'Intake' || c.cmmcPath === 'Unknown' ? 'Not started' : 'Seed summary only';
   return (
     <div className="col">
       <PageHead
@@ -311,27 +311,30 @@ export function ClientsScreen({ go }: ScreenProps) {
                   {c.cmmcPath}
                 </td>
                 <td>
-                  <div className="center" style={{ gap: 8 }}>
-                    <span className="bar-track" style={{ width: 60 }}>
-                      <span className="bar-fill" style={{ width: rowReadiness(c) + '%' }} />
+                  {live ? (
+                    <div className="center" style={{ gap: 8 }}>
+                      <span className="bar-track" style={{ width: 60 }}>
+                        <span className="bar-fill" style={{ width: liveReadiness + '%' }} />
+                      </span>
+                      <span className="mono" style={{ fontSize: '.85em' }}>
+                        {liveReadiness}%
+                      </span>
+                      <span
+                        className="mono faint"
+                        title="Computed from assessments"
+                        style={{ fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.04em' }}
+                      >
+                        live
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="muted" style={{ fontSize: '.85em' }} title="No assessment data yet">
+                      {placeholderFor(c)}
                     </span>
-                    <span className="mono" style={{ fontSize: '.85em' }}>
-                      {rowReadiness(c)}%
-                    </span>
-                    <span
-                      className="mono faint"
-                      title={live ? 'Computed from assessments' : 'Seed summary only — no assessment data yet'}
-                      style={{ fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.04em' }}
-                    >
-                      {live ? 'live' : 'seed'}
-                    </span>
-                  </div>
+                  )}
                 </td>
-                <td
-                  className="num"
-                  title={live ? 'Computed SPRS-style score (placeholder deductions)' : 'Seed summary only'}
-                >
-                  {rowScore(c)}
+                <td className="num">
+                  {live ? liveScore : <span className="faint">—</span>}
                 </td>
                 <td>
                   <RiskBadge level={c.riskRating} />

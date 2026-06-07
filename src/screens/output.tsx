@@ -24,7 +24,7 @@ import { TASKS } from '../data/tasks';
 import { useData } from '../data/store';
 import { CONTROLS_BY_ID, LIBRARY_COMPLETE } from '../data/controls';
 import { formatScore, readinessPct, scoringFinalized, sprsScore } from '../lib/scoring';
-import { blockerItems, missingEvidenceCount, openTaskCount, topBlockers } from '../lib/selectors';
+import { blockerItems, missingEvidenceCount, openTaskCount, topFindings } from '../lib/selectors';
 import { SourceRefs } from '../components/SourceRefs';
 import { ScoringWarning } from '../components/ScoringWarning';
 
@@ -95,7 +95,7 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
   const readiness = readinessPct(assessments);
   const score = sprsScore(assessments, CONTROLS_BY_ID);
   const risk = readiness >= 80 ? 'Low' : readiness >= 60 ? 'Medium' : 'High';
-  const topFindings = topBlockers(POAM_ITEMS, 3);
+  const findings = topFindings(assessments, POAM_ITEMS, EVIDENCE_ITEMS, CONTROLS_BY_ID, 5);
   return (
     <div className="col">
       <PageHead
@@ -154,9 +154,11 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
             Top Findings
           </h3>
           <ol className="muted" style={{ paddingLeft: 18 }}>
-            {topFindings.map((p) => (
-              <li key={p.id}>{p.weakness}</li>
-            ))}
+            {findings.length ? (
+              findings.map((f) => <li key={f.id}>{f.text}</li>)
+            ) : (
+              <li>No material findings — readiness review in good standing.</li>
+            )}
           </ol>
           <Ph h={120} style={{ marginTop: 16 }}>
             [ readiness-by-family chart ]
