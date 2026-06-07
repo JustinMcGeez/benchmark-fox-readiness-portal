@@ -1,6 +1,6 @@
 -- ============================================================================
 -- Benchmark Fox Readiness Portal — Supabase seed (auto-run by `supabase db reset`)
---
+-- Run that after `supabase db reset`.
 -- Seeds GLOBAL REFERENCE DATA ONLY and installs a small validation helper.
 -- This runs after the migrations in supabase/migrations/.
 --
@@ -22,7 +22,6 @@
 -- generated from TypeScript and seeded separately by the npm script
 -- db:seed:refs (scripts/seed-supabase-reference-data.ts), so they match the
 -- app's library.
--- Run that after `supabase db reset`.
 -- ============================================================================
 
 -- --- Benchmark Fox internal organization (idempotent on slug) ---------------
