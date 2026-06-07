@@ -211,7 +211,9 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   `scoreSource: 'placeholder'`) — readiness % is real; SPRS score is flagged "not finalized".
 - **Intake / Scope editable?** ✅ Yes — localStorage-backed, with auto-save and reset-to-seed.
 - **Type-safe / builds?** ✅ `npm run typecheck` and `npm run build` pass.
-- **Backend?** ❌ None — TypeScript seed + `localStorage` only.
+- **Backend?** 🟡 **Planned, not wired.** Supabase/Postgres schema, RLS draft, and
+  client scaffolding are committed (see **Backend** below); the app still runs on
+  TypeScript seed + `localStorage`.
 
 **Complete**
 - All 110 NIST SP 800-171 Rev. 2 requirements loaded from a local source file via
@@ -265,6 +267,76 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
 2. Import NIST SP 800-171A assessment objectives into the control library.
 3. Introduce Supabase/Postgres behind `data/store.ts` (multi-client, real auth,
    evidence file storage) — the data interfaces are already the seam for this.
+
+## Backend (Supabase / Postgres)
+
+- **Backend target:** **Supabase / Postgres** (managed Postgres + Auth + Row
+  Level Security).
+- **Current status:** **Schema planned; frontend still on `localStorage`.** This
+  phase is **additive and non-breaking** — the schema, RLS draft, env example,
+  Supabase client placeholder, and type stub are committed, but **nothing reads
+  from or writes to Supabase yet**. `src/data/store.ts` remains the seam where
+  the backend will later slot in.
+- **Full architecture:** see
+  [`docs/backend/supabase-architecture.md`](docs/backend/supabase-architecture.md)
+  (why Supabase, what is/ isn't stored, tenancy, roles, RLS, audit, migration
+  plan, limitations).
+
+```
+docs/backend/supabase-architecture.md   # architecture + migration strategy
+supabase/migrations/001_initial_schema.sql  # initial schema (18 tables, enums, RLS enabled)
+supabase/policies/rls_plan.sql           # draft Row Level Security policies
+src/lib/supabaseClient.ts                # typed client placeholder (warns if unconfigured)
+src/lib/database.types.ts                # type STUB (regenerate with Supabase CLI)
+.env.example                             # VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
+```
+
+### Data sensitivity rule (MVP — hard constraint)
+
+> **Do NOT store CUI or real sensitive client evidence files in this app during
+> the MVP.** The database holds **readiness/control/SSP/POA&M/task/report
+> metadata, audit logs, and evidence metadata + approved secure external links
+> only**. `evidence_items` has **no file column by design** — the artifact stays
+> in the client's own secure store and is referenced by `external_link`. See the
+> warning at the top of the migration and the architecture doc §3/§7.
+
+### Set environment variables
+
+```bash
+cp .env.example .env.local        # then fill in real values (never commit them)
+# .env / .env.* are gitignored; only .env.example is tracked.
+```
+
+```
+VITE_SUPABASE_URL=https://<project-ref>.supabase.co
+VITE_SUPABASE_ANON_KEY=<anon public key>     # public; access is enforced by RLS
+```
+
+The anon key is **public** and safe to ship in the browser bundle — Postgres RLS
+is the access boundary. **Never** put the `service_role` key in a `VITE_` var or
+the client bundle. If both vars are unset, the app simply continues on
+`localStorage` (the client warns once and disables backend calls).
+
+### Run migrations later
+
+```bash
+npx supabase login
+npx supabase link --project-ref <your-project-ref>
+npx supabase db push                 # apply supabase/migrations/* to the project
+# then apply the RLS policy draft:
+#   psql "<connection string>" -f supabase/policies/rls_plan.sql
+```
+
+### Generate Supabase types later
+
+`src/lib/database.types.ts` is a hand-written **stub**. Replace it with real
+generated types after any migration:
+
+```bash
+npx supabase gen types typescript --linked > src/lib/database.types.ts
+# or from a local stack:
+npx supabase gen types typescript --local  > src/lib/database.types.ts
+```
 
 ## Disclaimer
 

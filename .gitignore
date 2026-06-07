@@ -12,6 +12,11 @@ dist-ssr
 dev-out.log
 dev-err.log
 
+# Environment / secrets — never commit real values; .env.example is the only one tracked
+.env
+.env.*
+!.env.example
+
 # Editor / OS / local agent state
 .vscode/*
 !.vscode/extensions.json
