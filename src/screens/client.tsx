@@ -21,6 +21,7 @@ import {
   WarnBanner,
 } from '../components/primitives';
 import { useData } from '../data/store';
+import { CURRENT_CLIENT } from '../data/clients';
 import { CONTROLS_BY_ID } from '../data/controls';
 import { POAM_ITEMS } from '../data/poam';
 import { EVIDENCE_ITEMS } from '../data/evidence';
@@ -35,9 +36,13 @@ import {
   statusCounts,
 } from '../lib/scoring';
 import { Sources } from '../components/SourceBadge';
-
-const POAM_OPEN_STATES = new Set(['Not Started', 'Ongoing', 'Blocked']);
-const priorityRank = (p: string) => ({ Critical: 3, High: 2, Medium: 1, Low: 0 })[p] ?? 0;
+import {
+  blockerItems,
+  missingEvidenceCount,
+  nextActions as selNextActions,
+  openPoamItems,
+  topBlockers as selTopBlockers,
+} from '../lib/selectors';
 
 /* ---------- 5. CLIENT DASHBOARD ---------- */
 export function ClientDashboardScreen({ go }: ScreenProps) {
@@ -48,20 +53,11 @@ export function ClientDashboardScreen({ go }: ScreenProps) {
   const score = useMemo(() => sprsScore(assessments, CONTROLS_BY_ID), [assessments]);
   const families = useMemo(() => scoreByFamily(assessments, CONTROLS_BY_ID).slice(0, 5), [assessments]);
 
-  const openPoam = POAM_ITEMS.filter((p) => POAM_OPEN_STATES.has(p.status));
-  const blockers = POAM_ITEMS.filter((p) => p.classification === 'Blocker');
-  const missingEvidence = EVIDENCE_ITEMS.filter(
-    (e) => e.status === 'Missing' || e.status === 'Requested',
-  ).length;
-
-  const topBlockers = [...POAM_ITEMS]
-    .sort((a, b) => Number(b.classification === 'Blocker') - Number(a.classification === 'Blocker'))
-    .slice(0, 4);
-
-  const nextActions = [...TASKS]
-    .filter((t) => t.status !== 'Done')
-    .sort((a, b) => priorityRank(b.priority) - priorityRank(a.priority))
-    .slice(0, 3);
+  const openPoam = openPoamItems(POAM_ITEMS);
+  const blockers = blockerItems(POAM_ITEMS);
+  const missingEvidence = missingEvidenceCount(EVIDENCE_ITEMS);
+  const topBlockers = selTopBlockers(POAM_ITEMS);
+  const nextActions = selNextActions(TASKS);
 
   const notMetTotal = counts.notMet + counts.notReviewed;
   const finalized = scoringFinalized(CONTROLS_BY_ID);
@@ -197,7 +193,7 @@ export function IntakeScreen({ go }: ScreenProps) {
 
         {step === 0 && (
           <div className="grid-2">
-            <Field label="LEGAL COMPANY NAME" value="Acme Defense Systems, LLC" />
+            <Field label="LEGAL COMPANY NAME" value={`${CURRENT_CLIENT.name}, LLC`} />
             <Select label="BUSINESS TYPE" value="Prime Contractor" />
             <Field label="APPROX. COMPANY SIZE" placeholder="e.g. 120 employees" />
             <Field label="PRIMARY LOCATIONS" placeholder="Huntsville, AL · 2 sites" />

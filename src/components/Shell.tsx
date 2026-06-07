@@ -22,6 +22,7 @@ import {
 import type { Go, NavStyle, ScreenKey } from '../types';
 import { RiskBadge } from './primitives';
 import { BrandLockup, BrandMark } from './Brand';
+import { CURRENT_CLIENT } from '../data/clients';
 
 const PRIMARY_NAV: [ScreenKey, string, LucideIcon][] = [
   ['dashboard', 'Dashboard', LayoutGrid],
@@ -347,19 +348,19 @@ export function Shell({
             </a>
             <ChevronRight size={13} strokeWidth={2} className="faint" />
             <span className="w-h2" style={{ fontSize: '1.1rem' }}>
-              Acme Defense Systems
+              {CURRENT_CLIENT.name}
             </span>
           </div>
           <div
             className="center mono"
             style={{ gap: 16, fontSize: '.72rem', color: 'var(--ink-faint)', marginTop: 5 }}
           >
-            <span>LEVEL 2 · C3PAO PATH</span>
-            <span>DEADLINE AUG 15, 2026</span>
-            <span>OWNER: JUSTIN</span>
+            <span>{CURRENT_CLIENT.cmmcPath.toUpperCase()}</span>
+            {CURRENT_CLIENT.deadline && <span>DEADLINE {CURRENT_CLIENT.deadline.toUpperCase()}</span>}
+            <span>OWNER: {CURRENT_CLIENT.owner.toUpperCase()}</span>
           </div>
         </div>
-        <RiskBadge level="High" />
+        <RiskBadge level={CURRENT_CLIENT.riskRating} />
       </div>
       <div className="w-tabs">
         {CLIENT_TAB.map(([k, label]) => {

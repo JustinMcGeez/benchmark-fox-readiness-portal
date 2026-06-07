@@ -197,3 +197,18 @@ export interface AuditEvent {
   action: string;
   details: string;
 }
+
+export interface KnowledgeItem {
+  id: string;
+  title: string;
+  relatedControl: string;
+  type: string;
+}
+
+export interface AppUser {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: 'Active' | 'Invited' | 'Disabled';
+}

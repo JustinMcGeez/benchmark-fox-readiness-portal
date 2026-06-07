@@ -16,13 +16,13 @@ import {
   Toolbar,
 } from '../components/primitives';
 import { BrandLockup, BrandLogo } from '../components/Brand';
-import { AUDIT_EVENTS, CLIENTS } from '../data/clients';
+import { AUDIT_EVENTS, CLIENTS, CURRENT_CLIENT_ID } from '../data/clients';
 import { POAM_ITEMS } from '../data/poam';
 import { useData } from '../data/store';
 import { CONTROLS_BY_ID } from '../data/controls';
 import { formatScore, readinessPct, sprsScore } from '../lib/scoring';
+import { blockerItems, openPoamItems } from '../lib/selectors';
 
-const POAM_OPEN = new Set(['Not Started', 'Ongoing', 'Blocked']);
 const RISK_REASON: Record<string, string> = {
   Intake: 'Intake incomplete',
   Controls: 'Control gaps',
@@ -169,8 +169,8 @@ export function DashboardScreen({ go }: ScreenProps) {
   const avgReadiness = Math.round(
     activeClients.reduce((s, c) => s + clientReadiness(c.id, c.readiness), 0) / activeClients.length,
   );
-  const openPoam = POAM_ITEMS.filter((p) => POAM_OPEN.has(p.status)).length;
-  const blockers = POAM_ITEMS.filter((p) => p.classification === 'Blocker').length;
+  const openPoam = openPoamItems(POAM_ITEMS).length;
+  const blockers = blockerItems(POAM_ITEMS).length;
 
   const readinessByClient = [...activeClients]
     .map((c) => ({ name: c.name, r: clientReadiness(c.id, c.readiness) }))
@@ -267,6 +267,14 @@ export function DashboardScreen({ go }: ScreenProps) {
 
 /* ---------- 3. CLIENTS LIST ---------- */
 export function ClientsScreen({ go }: ScreenProps) {
+  const { assessments } = useData();
+  // the active client computes live; others show their seed summary
+  const liveReadiness = readinessPct(assessments);
+  const liveScore = formatScore(sprsScore(assessments, CONTROLS_BY_ID));
+  const rowReadiness = (c: (typeof CLIENTS)[number]) =>
+    c.id === CURRENT_CLIENT_ID ? liveReadiness : c.readiness;
+  const rowScore = (c: (typeof CLIENTS)[number]) =>
+    c.id === CURRENT_CLIENT_ID ? liveScore : c.score;
   return (
     <div className="col">
       <PageHead
@@ -303,14 +311,14 @@ export function ClientsScreen({ go }: ScreenProps) {
                 <td>
                   <div className="center" style={{ gap: 8 }}>
                     <span className="bar-track" style={{ width: 60 }}>
-                      <span className="bar-fill" style={{ width: c.readiness + '%' }} />
+                      <span className="bar-fill" style={{ width: rowReadiness(c) + '%' }} />
                     </span>
                     <span className="mono" style={{ fontSize: '.85em' }}>
-                      {c.readiness}%
+                      {rowReadiness(c)}%
                     </span>
                   </div>
                 </td>
-                <td className="num">{c.score}</td>
+                <td className="num">{rowScore(c)}</td>
                 <td>
                   <RiskBadge level={c.riskRating} />
                 </td>

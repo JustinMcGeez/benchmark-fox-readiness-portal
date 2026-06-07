@@ -182,10 +182,58 @@ src/
 
 ## Clearing local data
 
-Matrix/detail edits persist in `localStorage`. To reset to seed data, clear the
-`bf_*` keys (`bf_assessments_v1`, `bf_selected_control`, `bf_screen`, `bf_tweaks`)
-in your browser's devtools → Application → Local Storage, or run
-`localStorage.clear()` in the console.
+Matrix/detail edits persist in `localStorage`. To reset to seed data:
+
+- **In-app:** open the **⚙ Tweaks** panel (bottom-right) → **Developer → ↺ Reset
+  demo data**. This clears the `bf_*` keys and reloads.
+- **Manually:** clear the `bf_*` keys (`bf_assessments_v1`, `bf_selected_control`,
+  `bf_screen`, `bf_tweaks`) in devtools → Application → Local Storage, or run
+  `localStorage.clear()` in the console.
+
+## Current MVP status
+
+**Complete**
+- All 110 NIST SP 800-171 Rev. 2 requirements loaded from a local source file via
+  a reproducible generator; official requirement text + family + L1/L2.
+- Every major screen is data-driven (no hard-coded client metrics in components):
+  internal Dashboard, Clients, Client Dashboard, Control Matrix, Control Detail,
+  SSP, POA&M, Evidence, Tasks, Reports, Report Preview, Audit, Knowledge,
+  Settings, Mobile.
+- Computed metrics (readiness %, status counts, by-family, open POA&Ms, blockers,
+  missing/weak evidence, open tasks) centralized in `lib/scoring.ts` + `lib/selectors.ts`.
+- Control Matrix: search + filters + inline editable dropdowns persisted to
+  `localStorage`; selecting a row opens that control's detail; refresh-safe.
+- Source attribution (`sourceRefs.ts` + `Sources`) on Control Detail, SSP, POA&M,
+  Evidence, and CMMC Path; every control carries ≥1 source reference.
+- Disclaimers/warnings: readiness ≠ certification, scoring-not-finalized, CUI
+  handling, POA&M reliance, path-not-legal-advice.
+- Type-safe: `npm run typecheck` and `npm run build` pass (strict TS).
+
+**Partially complete**
+- Benchmark Fox plain-English explanations / evidence examples / SSP & POA&M
+  guidance authored for a curated control subset; remaining controls show TODO
+  placeholders.
+- Worked client data covers one active engagement (Acme Defense); other clients
+  use seed summary rows in the Clients list.
+
+**Placeholder**
+- SPRS deduction values (`scoreValue = null`) pending the DoD Assessment
+  Methodology — the SPRS-style score is flagged "scoring not finalized" everywhere.
+- NIST SP 800-171A assessment objectives (not bundled).
+- Intake / Scope / Path / Settings non-table panels are illustrative mockups.
+
+**Known limitations**
+- No backend; single active client; auth is a prototype shell only.
+- Scope asset table and form option lists remain inline (illustrative, not tracked
+  entities).
+- Scoring model is a readiness heuristic, not the official methodology.
+
+**Next recommended build phase**
+1. Import official DoD Assessment Methodology scoring → flip `scoreValue` to real
+   values and remove the "scoring not finalized" warning.
+2. Import NIST SP 800-171A assessment objectives into the control library.
+3. Introduce Supabase/Postgres behind `data/store.ts` (multi-client, real auth,
+   evidence file storage) — the data interfaces are already the seam for this.
 
 ## Disclaimer
 

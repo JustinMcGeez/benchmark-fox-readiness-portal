@@ -135,6 +135,14 @@ export default function App() {
     window.scrollTo(0, 0);
   };
 
+  /* developer helper — wipe persisted edits and reload to seed data */
+  const resetData = () => {
+    ['bf_assessments_v1', 'bf_selected_control', 'bf_screen', 'bf_tweaks'].forEach((k) =>
+      localStorage.removeItem(k),
+    );
+    window.location.reload();
+  };
+
   useEffect(() => {
     document.documentElement.setAttribute(
       'data-density',
@@ -269,6 +277,24 @@ export default function App() {
           options={DENSITY_OPTIONS}
           onChange={(v) => setTweak('density', v)}
         />
+        <TweakSection label="Developer" />
+        <button
+          onClick={resetData}
+          title="Clear bf_* localStorage keys and reload to seed data"
+          style={{
+            appearance: 'none',
+            height: 28,
+            border: '0',
+            borderRadius: 7,
+            background: 'rgba(0,0,0,.06)',
+            color: 'inherit',
+            font: 'inherit',
+            fontWeight: 600,
+            cursor: 'pointer',
+          }}
+        >
+          ↺ Reset demo data
+        </button>
       </TweaksPanel>
     </>
   );

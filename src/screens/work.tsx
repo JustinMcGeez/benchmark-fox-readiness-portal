@@ -21,6 +21,7 @@ import {
   WarnBanner,
 } from '../components/primitives';
 import { useData } from '../data/store';
+import { CURRENT_CLIENT } from '../data/clients';
 import { EVIDENCE_ITEMS } from '../data/evidence';
 import { POAM_ITEMS } from '../data/poam';
 import { TASKS } from '../data/tasks';
@@ -61,7 +62,7 @@ export function SSPScreen({ go }: ScreenProps) {
   return (
     <div className="col">
       <PageHead
-        title="SSP Workspace — Acme Defense Systems"
+        title={`SSP Workspace — ${CURRENT_CLIENT.name}`}
         sub="Track SSP completeness, accuracy, and implementation statements."
         actions={<Btn onClick={() => go('reports')}>Export SSP</Btn>}
       />
@@ -160,7 +161,7 @@ export function POAMScreen({ go }: ScreenProps) {
   return (
     <div className="col">
       <PageHead
-        title="POA&M Tracker — Acme Defense Systems"
+        title={`POA&M Tracker — ${CURRENT_CLIENT.name}`}
         sub="Manage weaknesses, owners, milestones, and validation status."
         actions={<Btn primary>+ New POA&M Item</Btn>}
       />
@@ -272,7 +273,7 @@ export function EvidenceScreen(_: ScreenProps) {
   return (
     <div className="col">
       <PageHead
-        title="Evidence Hub — Acme Defense Systems"
+        title={`Evidence Hub — ${CURRENT_CLIENT.name}`}
         sub="Request, review, and map evidence to controls."
         actions={<Btn primary>+ Request Evidence</Btn>}
       />
@@ -371,7 +372,7 @@ export function TasksScreen(_: ScreenProps) {
   return (
     <div className="col">
       <PageHead
-        title="Tasks — Acme Defense Systems"
+        title={`Tasks — ${CURRENT_CLIENT.name}`}
         sub="Assign and track remediation, evidence, SSP, and POA&M work."
         actions={<Btn primary>+ New Task</Btn>}
       />

@@ -3,7 +3,7 @@
    The active engagement (Acme) has a full control assessment set in
    controls.ts; other clients carry summary fields for the list view.
    ============================================================ */
-import type { AuditEvent, Client } from './types';
+import type { AppUser, AuditEvent, Client } from './types';
 
 /** The client currently in context throughout the client-scoped screens. */
 export const CURRENT_CLIENT_ID = 'acme';
@@ -92,6 +92,16 @@ export const CLIENTS: Client[] = [
 ];
 
 export const clientById = (id: string): Client | undefined => CLIENTS.find((c) => c.id === id);
+
+/** The active client record (used for client-scoped screen titles/context). */
+export const CURRENT_CLIENT: Client = clientById(CURRENT_CLIENT_ID) ?? CLIENTS[0];
+
+/** Platform users (Settings → Users). */
+export const USERS: AppUser[] = [
+  { id: 'u1', name: 'Justin', email: 'justin@benchmarkfox.com', role: 'Admin', status: 'Active' },
+  { id: 'u2', name: 'Dana', email: 'dana@benchmarkfox.com', role: 'Consultant', status: 'Active' },
+  { id: 'u3', name: 'Client IT', email: 'it@client.com', role: 'Evidence Uploader', status: 'Invited' },
+];
 
 export const AUDIT_EVENTS: AuditEvent[] = [
   {

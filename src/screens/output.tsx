@@ -16,17 +16,22 @@ import {
 } from '../components/primitives';
 import { BrandLockup } from '../components/Brand';
 import { EXPORT_FORMATS, REPORTS } from '../data/reports';
-import { AUDIT_EVENTS } from '../data/clients';
+import { AUDIT_EVENTS, CURRENT_CLIENT, USERS } from '../data/clients';
+import { KNOWLEDGE } from '../data/knowledge';
+import { POAM_ITEMS } from '../data/poam';
+import { EVIDENCE_ITEMS } from '../data/evidence';
+import { TASKS } from '../data/tasks';
 import { useData } from '../data/store';
 import { CONTROLS_BY_ID } from '../data/controls';
 import { formatScore, readinessPct, sprsScore } from '../lib/scoring';
+import { blockerItems, missingEvidenceCount, openTaskCount } from '../lib/selectors';
 
 /* ---------- 16. REPORTS ---------- */
 export function ReportsScreen({ go }: ScreenProps) {
   return (
     <div className="col">
       <PageHead
-        title="Reports — Acme Defense Systems"
+        title={`Reports — ${CURRENT_CLIENT.name}`}
         sub="Generate client-ready Benchmark Fox readiness deliverables."
       />
       <div className="grid-2">
@@ -92,7 +97,7 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
     <div className="col">
       <PageHead
         title="Report Preview: Executive Readiness Summary"
-        sub="Client: Acme Defense Systems · Prepared by Benchmark Fox"
+        sub={`Client: ${CURRENT_CLIENT.name} · Prepared by Benchmark Fox`}
         actions={
           <>
             <Btn onClick={() => go('reports')}>Edit Sections</Btn>
@@ -117,7 +122,7 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
             Executive CMMC Readiness Summary
           </h2>
           <p className="muted" style={{ marginTop: 4 }}>
-            Acme Defense Systems · Level 2 · C3PAO Path
+            {CURRENT_CLIENT.name} · {CURRENT_CLIENT.cmmcPath}
           </p>
           <div className="grid-3 mt">
             <div className="w-box" style={{ padding: 12, textAlign: 'center' }}>
@@ -159,15 +164,6 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
 }
 
 /* ---------- 18. KNOWLEDGE BASE ---------- */
-const KB: [string, string, string][] = [
-  ['MFA Evidence Examples', '3.5.3', 'Evidence'],
-  ['SSP Language for Access Control', '3.1.1–3.1.22', 'SSP'],
-  ['CUI Data Flow Example', 'Scoping', 'Diagram'],
-  ['POA&M Closure Evidence Guide', '3.12.2', 'POA&M'],
-  ['GCC High Migration Checklist', 'SC family', 'Template'],
-  ['Audit Logging Config (Sentinel)', '3.3.1', 'Technical'],
-];
-
 export function KnowledgeScreen(_: ScreenProps) {
   return (
     <div className="col">
@@ -188,12 +184,12 @@ export function KnowledgeScreen(_: ScreenProps) {
             </tr>
           </thead>
           <tbody>
-            {KB.map((k, i) => (
-              <tr key={i}>
-                <td style={{ fontWeight: 700 }}>{k[0]}</td>
-                <td className="mono">{k[1]}</td>
+            {KNOWLEDGE.map((k) => (
+              <tr key={k.id}>
+                <td style={{ fontWeight: 700 }}>{k.title}</td>
+                <td className="mono">{k.relatedControl}</td>
                 <td>
-                  <Badge fill>{k[2]}</Badge>
+                  <Badge fill>{k.type}</Badge>
                 </td>
                 <td>
                   <a className="annot" style={{ cursor: 'pointer' }}>
@@ -262,7 +258,7 @@ export function SettingsScreen(_: ScreenProps) {
         <Card style={{ padding: '6px 6px' }}>
           <div className="between" style={{ padding: '6px 12px' }}>
             <span className="mono faint" style={{ fontSize: '.78em' }}>
-              5 USERS
+              {USERS.length} USERS
             </span>
             <Btn sm primary>
               + Invite User
@@ -279,51 +275,25 @@ export function SettingsScreen(_: ScreenProps) {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>Justin</td>
-                <td className="mono" style={{ fontSize: '.85em' }}>
-                  justin@benchmarkfox.com
-                </td>
-                <td>Admin</td>
-                <td>
-                  <Badge tone="ok">Active</Badge>
-                </td>
-                <td>
-                  <a className="annot" style={{ cursor: 'pointer' }}>
-                    Edit
-                  </a>
-                </td>
-              </tr>
-              <tr>
-                <td>Dana</td>
-                <td className="mono" style={{ fontSize: '.85em' }}>
-                  dana@benchmarkfox.com
-                </td>
-                <td>Consultant</td>
-                <td>
-                  <Badge tone="ok">Active</Badge>
-                </td>
-                <td>
-                  <a className="annot" style={{ cursor: 'pointer' }}>
-                    Edit
-                  </a>
-                </td>
-              </tr>
-              <tr>
-                <td>Client IT</td>
-                <td className="mono" style={{ fontSize: '.85em' }}>
-                  it@client.com
-                </td>
-                <td>Evidence Uploader</td>
-                <td>
-                  <Badge tone="warn">Invited</Badge>
-                </td>
-                <td>
-                  <a className="annot" style={{ cursor: 'pointer' }}>
-                    Edit
-                  </a>
-                </td>
-              </tr>
+              {USERS.map((u) => (
+                <tr key={u.id}>
+                  <td>{u.name}</td>
+                  <td className="mono" style={{ fontSize: '.85em' }}>
+                    {u.email}
+                  </td>
+                  <td>{u.role}</td>
+                  <td>
+                    <Badge tone={u.status === 'Active' ? 'ok' : u.status === 'Invited' ? 'warn' : 'none'}>
+                      {u.status}
+                    </Badge>
+                  </td>
+                  <td>
+                    <a className="annot" style={{ cursor: 'pointer' }}>
+                      Edit
+                    </a>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </Card>
@@ -342,6 +312,12 @@ export function SettingsScreen(_: ScreenProps) {
 
 /* ---------- 21. MOBILE DIRECTION ---------- */
 export function MobileScreen(_: ScreenProps) {
+  const { assessments } = useData();
+  const readiness = readinessPct(assessments);
+  const score = sprsScore(assessments, CONTROLS_BY_ID);
+  const blockers = blockerItems(POAM_ITEMS).length;
+  const missingEvidence = missingEvidenceCount(EVIDENCE_ITEMS);
+  const openTasks = openTaskCount(TASKS);
   const mobileSupports: [string, Tone][] = [
     ['Dashboard viewing', 'ok'],
     ['Task review', 'ok'],
@@ -375,33 +351,33 @@ export function MobileScreen(_: ScreenProps) {
                 <div className="muted" style={{ fontSize: '.8em' }}>
                   Client
                 </div>
-                <strong>Acme Defense</strong>
+                <strong>{CURRENT_CLIENT.name}</strong>
               </div>
               <div className="grid-2" style={{ gap: 8 }}>
                 <div className="w-box" style={{ padding: 10, textAlign: 'center' }}>
                   <div className="mono faint" style={{ fontSize: '.6em' }}>
                     READY
                   </div>
-                  <div className="w-h2">62%</div>
+                  <div className="w-h2">{readiness}%</div>
                 </div>
                 <div className="w-box" style={{ padding: 10, textAlign: 'center' }}>
                   <div className="mono faint" style={{ fontSize: '.6em' }}>
                     SCORE
                   </div>
-                  <div className="w-h2">−38</div>
+                  <div className="w-h2">{formatScore(score)}</div>
                 </div>
               </div>
               <div className="w-box between" style={{ padding: '8px 10px' }}>
                 <span>Critical Blockers</span>
-                <Badge tone="crit">5</Badge>
+                <Badge tone="crit">{blockers}</Badge>
               </div>
               <div className="w-box between" style={{ padding: '8px 10px' }}>
                 <span>Missing Evidence</span>
-                <Badge tone="bad">18</Badge>
+                <Badge tone="bad">{missingEvidence}</Badge>
               </div>
               <div className="w-box between" style={{ padding: '8px 10px' }}>
                 <span>Open Tasks</span>
-                <Badge tone="warn">12</Badge>
+                <Badge tone="warn">{openTasks}</Badge>
               </div>
               <Btn primary style={{ width: '100%' }}>
                 Continue Review

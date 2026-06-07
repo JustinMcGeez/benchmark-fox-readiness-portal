@@ -19,6 +19,7 @@ import {
 } from '../components/primitives';
 import { Sources } from '../components/SourceBadge';
 import { useData } from '../data/store';
+import { CURRENT_CLIENT } from '../data/clients';
 import { CONTROLS_BY_ID, CONTROL_LIBRARY, FAMILIES } from '../data/controls';
 import { evidenceForControl } from '../data/evidence';
 import { poamForControl } from '../data/poam';
@@ -154,7 +155,7 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
   return (
     <div className="col">
       <PageHead
-        title="Controls — Acme Defense Systems"
+        title={`Controls — ${CURRENT_CLIENT.name}`}
         sub="Track readiness, SSP, evidence, POA&M, score impact, and ownership."
       />
 
