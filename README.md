@@ -346,6 +346,14 @@ npx supabase gen types typescript --local  > src/lib/database.types.ts
 This validates that the migration runs and the global **reference data** loads.
 It does **not** touch the frontend — the app stays on `localStorage`.
 
+> **Runtime requirement.** `db:seed:refs` runs a **TypeScript** file with bare
+> `node` (no ts-node / no build step), relying on Node's native type stripping.
+> It needs **Node ≥ 22.6 (with `--experimental-strip-types`) or Node ≥ 23/24**
+> (stripping on by default) — same requirement as the existing `import:sources`
+> / `build:data` scripts. `db:validate` is plain `.mjs` and runs on any current
+> Node. Check with `node -v`; if you're on an older Node, upgrade rather than
+> adding a TypeScript-runner dependency.
+
 ```bash
 # 1. Install the Supabase CLI (any one):
 npm install -D supabase            # project-local, run via `npx supabase ...`

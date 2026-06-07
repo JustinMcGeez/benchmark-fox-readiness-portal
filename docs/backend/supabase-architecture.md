@@ -199,6 +199,12 @@ npm run db:seed:refs        # scripts/seed-supabase-reference-data.ts (idempoten
 npm run db:validate         # scripts/validate-supabase-schema.mjs
 ```
 
+> **Runtime.** `db:seed:refs` is a **TypeScript** script executed by bare `node`
+> via native type stripping — it requires **Node ≥ 22.6** (with
+> `--experimental-strip-types`) or **Node ≥ 23/24** (on by default), the same
+> assumption as `import:sources` / `build:data`. No `ts-node` or extra
+> dependency is used. `db:validate` is plain `.mjs` and runs on any current Node.
+
 **Seeding is idempotent** — every write is an upsert on a stable unique key:
 `organizations.slug`, `control_families.code`, `controls.natural_id`,
 `source_references.source_id`, and `(control_id, source_id)`. Re-running never
