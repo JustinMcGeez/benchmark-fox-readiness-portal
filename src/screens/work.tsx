@@ -57,11 +57,10 @@ export function SSPScreen({ go }: ScreenProps) {
   const rows = assessments
     .filter((a) => filter === 'All' || a.sspStatus === filter)
     .slice(0, 14);
-  // editable side panel follows the selected row (defaults to the first row)
-  const [editorId, setEditorId] = useState<string>(
-    () => assessments.find((a) => a.controlId === '3.1.1')?.controlId ?? assessments[0]?.controlId ?? '',
-  );
-  const editor = assessments.find((a) => a.controlId === editorId) ?? rows[0] ?? assessments[0];
+  // editable side panel follows the selected row; with no selection it defaults
+  // to the first filtered row (no hard-coded control).
+  const [editorId, setEditorId] = useState<string | null>(null);
+  const editor = (editorId && assessments.find((a) => a.controlId === editorId)) || rows[0] || assessments[0];
 
   return (
     <div className="col">
@@ -167,8 +166,10 @@ export function SSPScreen({ go }: ScreenProps) {
 /* ---------- 13. POA&M TRACKER ---------- */
 export function POAMScreen({ go }: ScreenProps) {
   const { selectControl } = useData();
-  const [selectedId, setSelectedId] = useState<string>(POAM_ITEMS[0]?.id ?? '');
-  const detail = POAM_ITEMS.find((p) => p.id === selectedId) ?? POAM_ITEMS[0];
+  // default to the first blocker, otherwise the first POA&M item
+  const defaultPoam = POAM_ITEMS.find((p) => p.classification === 'Blocker') ?? POAM_ITEMS[0];
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const detail = (selectedId && POAM_ITEMS.find((p) => p.id === selectedId)) || defaultPoam;
 
   return (
     <div className="col">
@@ -298,8 +299,11 @@ export function POAMScreen({ go }: ScreenProps) {
 
 /* ---------- 14. EVIDENCE HUB ---------- */
 export function EvidenceScreen(_: ScreenProps) {
-  const [selectedId, setSelectedId] = useState<string>(EVIDENCE_ITEMS[0]?.id ?? '');
-  const detail = EVIDENCE_ITEMS.find((e) => e.id === selectedId) ?? EVIDENCE_ITEMS[0];
+  // default to the first missing/needs-revision item, otherwise the first item
+  const defaultEvidence =
+    EVIDENCE_ITEMS.find((e) => e.status === 'Missing' || e.status === 'Needs Revision') ?? EVIDENCE_ITEMS[0];
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const detail = (selectedId && EVIDENCE_ITEMS.find((e) => e.id === selectedId)) || defaultEvidence;
   return (
     <div className="col">
       <PageHead
@@ -401,8 +405,14 @@ export function EvidenceScreen(_: ScreenProps) {
 }
 
 /* ---------- 15. TASKS ---------- */
+const HIGH_PRIORITY = new Set(['Critical', 'High']);
 export function TasksScreen(_: ScreenProps) {
-  const detail = TASKS.find((t) => t.status === 'Blocked') ?? TASKS[0];
+  // default to the first blocked task, otherwise the first high/critical task,
+  // otherwise the first task
+  const defaultTask =
+    TASKS.find((t) => t.status === 'Blocked') ?? TASKS.find((t) => HIGH_PRIORITY.has(t.priority)) ?? TASKS[0];
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const detail = (selectedId && TASKS.find((t) => t.id === selectedId)) || defaultTask;
   return (
     <div className="col">
       <PageHead
@@ -425,7 +435,11 @@ export function TasksScreen(_: ScreenProps) {
             </thead>
             <tbody>
               {TASKS.map((t) => (
-                <tr key={t.id}>
+                <tr
+                  key={t.id}
+                  onClick={() => setSelectedId(t.id)}
+                  style={{ background: t.id === detail.id ? 'var(--surface-2)' : undefined }}
+                >
                   <td style={{ fontWeight: 700 }}>{t.title}</td>
                   <td className="muted">{t.owner}</td>
                   <td>
