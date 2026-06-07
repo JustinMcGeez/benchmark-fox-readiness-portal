@@ -603,7 +603,7 @@ export function ControlDetailScreen({ go }: ScreenProps) {
           </div>
         </Card>
       </div>
-      <SourceRefs title="Sources" ids={control.sourceRefs} />
+      <SourceRefs ids={control.sourceRefs} />
     </div>
   );
 }

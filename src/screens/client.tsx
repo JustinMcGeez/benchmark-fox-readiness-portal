@@ -369,17 +369,7 @@ export function PathScreen({ go }: ScreenProps) {
         This recommendation supports readiness planning only and does not replace legal, contracting,
         government, or C3PAO determination. CMMC path determination is not legal or contracting advice.
       </WarnBanner>
-      <SourceRefs
-        title="Sources"
-        ids={[
-          'cfr-32-170',
-          'far-52-204-21',
-          'dfars-252-204-7012',
-          'dfars-252-204-7019',
-          'dfars-252-204-7020',
-          'dfars-252-204-7021',
-        ]}
-      />
+      <SourceRefs ids={['cfr-32-170', 'far-52-204-21', 'dfars-252-204-7012', 'dfars-252-204-7019', 'dfars-252-204-7020', 'dfars-252-204-7021']} />
     </div>
   );
 }
