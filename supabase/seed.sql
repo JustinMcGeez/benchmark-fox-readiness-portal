@@ -20,8 +20,8 @@
 --
 -- The 110 controls, the source registry, and the control->source mapping are
 -- generated from TypeScript and seeded separately by the npm script
--- `db:seed:refs` (scripts/seed-supabase-reference-data.ts) AFTER a
--- `supabase db reset`, so they always match the app's library.
+-- db:seed:refs (scripts/seed-supabase-reference-data.ts), run after the
+-- database has been reset and migrated, so they match the app's library.
 -- ============================================================================
 
 -- --- Benchmark Fox internal organization (idempotent on slug) ---------------
