@@ -165,7 +165,7 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
           </Ph>
         </div>
       </div>
-      <SourceRefs ids={['nist-sp-800-171r2', 'dod-assessment-methodology', 'cfr-32-170', 'bf-internal']} />
+      <SourceRefs ids={['nist-sp-800-171r2', 'dod-assessment-methodology', '32-cfr-part-170', 'bf-internal']} />
     </div>
   );
 }

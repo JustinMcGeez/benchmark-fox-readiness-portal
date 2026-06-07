@@ -292,7 +292,7 @@ export function POAMScreen({ go }: ScreenProps) {
           <Btn primary>Save POA&M Item</Btn>
         </div>
       </Card>
-      <SourceRefs ids={['dod-assessment-methodology', 'bf-poam-template', 'cui-poam-template']} />
+      <SourceRefs ids={['dod-assessment-methodology', 'bf-poam-template']} />
     </div>
   );
 }
@@ -399,7 +399,7 @@ export function EvidenceScreen(_: ScreenProps) {
           </div>
         </Card>
       </div>
-      <SourceRefs ids={['nist-sp-800-171a', 'bf-evidence-guidance', 'cmmc-l2-assessment']} />
+      <SourceRefs ids={['nist-sp-800-171a', 'bf-evidence-guidance']} />
     </div>
   );
 }
