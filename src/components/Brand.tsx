@@ -6,11 +6,15 @@ import type { CSSProperties } from 'react';
 
 type Variant = 'navy' | 'white';
 
+// Resolve against Vite's base URL so assets work when hosted under a sub-path
+// (e.g. GitHub Pages /benchmark-fox-readiness-portal/).
+const asset = (p: string) => `${import.meta.env.BASE_URL}${p}`;
+
 /** Just the BF fox monogram. */
 export function BrandMark({ variant = 'navy', size = 28 }: { variant?: Variant; size?: number }) {
   return (
     <img
-      src={`/brand/mark-${variant}.png`}
+      src={asset(`brand/mark-${variant}.png`)}
       alt="Benchmark Fox"
       style={{ height: size, width: 'auto', display: 'block' }}
     />
@@ -76,7 +80,7 @@ export function BrandLogo({
 }) {
   return (
     <img
-      src={`/brand/logo-${variant}.png`}
+      src={asset(`brand/logo-${variant}.png`)}
       alt="Benchmark Fox"
       style={{ width, height: 'auto', display: 'block', ...style }}
     />
