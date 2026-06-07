@@ -85,6 +85,13 @@ export const SOURCE_REFS: SourceRef[] = [
     documentType: 'DFARS Clause',
   },
   {
+    sourceId: 'dfars-252-204-7021',
+    sourceName: 'DFARS 252.204-7021 — Cybersecurity Maturity Model Certification (CMMC) Requirements',
+    publisher: 'DoD',
+    documentType: 'DFARS Clause',
+    notes: 'Contractual CMMC level requirement clause.',
+  },
+  {
     sourceId: 'cfr-32-170',
     sourceName: '32 CFR Part 170 — Cybersecurity Maturity Model Certification (CMMC) Program',
     publisher: 'DoD',
@@ -131,6 +138,27 @@ export const SOURCE_REFS: SourceRef[] = [
     publisher: 'Benchmark Fox',
     documentType: 'Benchmark Fox Internal',
     notes: 'Plain-English explanations, evidence examples, and guidance are Benchmark Fox-authored, not official.',
+  },
+  {
+    sourceId: 'bf-ssp-template',
+    sourceName: 'Benchmark Fox SSP Template & Language Guide',
+    publisher: 'Benchmark Fox',
+    documentType: 'Benchmark Fox Internal',
+    notes: 'Reusable SSP implementation-statement language — Benchmark Fox-authored, not official.',
+  },
+  {
+    sourceId: 'bf-poam-template',
+    sourceName: 'Benchmark Fox POA&M Template',
+    publisher: 'Benchmark Fox',
+    documentType: 'Benchmark Fox Internal',
+    notes: 'POA&M structure aligned to the CUI Plan of Action template — Benchmark Fox-authored.',
+  },
+  {
+    sourceId: 'bf-evidence-guidance',
+    sourceName: 'Benchmark Fox Evidence Collection Guidance',
+    publisher: 'Benchmark Fox',
+    documentType: 'Benchmark Fox Internal',
+    notes: 'Evidence examples and quality criteria — Benchmark Fox-authored, not official.',
   },
 ];
 
