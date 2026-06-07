@@ -286,6 +286,9 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
 docs/backend/supabase-architecture.md   # architecture + migration strategy
 supabase/migrations/001_initial_schema.sql  # initial schema (18 tables, enums, RLS enabled)
 supabase/policies/rls_plan.sql           # draft Row Level Security policies
+supabase/seed.sql                        # auto-seed: org + 14 families + RLS-status helper
+scripts/seed-supabase-reference-data.ts  # idempotent reference-data seeder (db:seed:refs)
+scripts/validate-supabase-schema.mjs     # reference-data validator (db:validate)
 src/lib/supabaseClient.ts                # typed client placeholder (warns if unconfigured)
 src/lib/database.types.ts                # type STUB (regenerate with Supabase CLI)
 .env.example                             # VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
@@ -337,6 +340,47 @@ npx supabase gen types typescript --linked > src/lib/database.types.ts
 # or from a local stack:
 npx supabase gen types typescript --local  > src/lib/database.types.ts
 ```
+
+### Local Supabase development (validate + seed reference data)
+
+This validates that the migration runs and the global **reference data** loads.
+It does **not** touch the frontend — the app stays on `localStorage`.
+
+```bash
+# 1. Install the Supabase CLI (any one):
+npm install -D supabase            # project-local, run via `npx supabase ...`
+#   or: scoop install supabase  /  brew install supabase/tap/supabase
+#   Local stack needs Docker Desktop running.
+
+# 2. Start the local stack (Postgres + Studio + Auth) and apply migrations:
+npx supabase start                 # first run pulls images; prints local URL + keys
+
+# 3. Apply migrations + run supabase/seed.sql (org, 14 families, RLS helper):
+npx supabase db reset              # re-runs ALL migrations then seed.sql (destructive: local only)
+
+# 4. Seed the remaining global reference data (110 controls, sources, mapping).
+#    Use the LOCAL service_role key printed by `supabase start` / `supabase status`:
+#    PowerShell:
+$env:SUPABASE_URL = "http://127.0.0.1:54321"
+$env:SUPABASE_SERVICE_ROLE_KEY = "<local service_role key>"
+npm run db:seed:refs               # idempotent — safe to re-run
+
+# 5. Validate the reference data (14 families, 110 controls, sources, RLS, …):
+npm run db:validate
+
+# 6. (Re)generate types from the local schema:
+npx supabase gen types typescript --local > src/lib/database.types.ts
+```
+
+- **Reference data only.** `db:seed:refs` seeds the Benchmark Fox org, the 14
+  families, all 110 controls, the source registry, and the control→source
+  mapping — read straight from the app's TypeScript library so they always
+  match. It never seeds clients, evidence, CUI, or sensitive data.
+- **Idempotent.** Every write is an upsert on a stable key (org `slug`, family
+  `code`, control `natural_id`, `source_id`, `control_id+source_id`).
+- **`service_role` is server-only.** `db:seed:refs` / `db:validate` read
+  `SUPABASE_SERVICE_ROLE_KEY` from the environment to bypass RLS. **Never**
+  commit it, put it in a `VITE_` var, or ship it to the browser.
 
 ## Disclaimer
 

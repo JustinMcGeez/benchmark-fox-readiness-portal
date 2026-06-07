@@ -12,7 +12,9 @@
     "import:sources": "node scripts/import-sp800-171.ts",
     "validate:controls": "node scripts/validate-controls.mjs",
     "check:sourcerefs": "node scripts/check-sourcerefs.mjs",
-    "build:data": "npm run import:sources && npm run validate:controls && npm run check:sourcerefs"
+    "build:data": "npm run import:sources && npm run validate:controls && npm run check:sourcerefs",
+    "db:seed:refs": "node scripts/seed-supabase-reference-data.ts",
+    "db:validate": "node scripts/validate-supabase-schema.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.107.0",

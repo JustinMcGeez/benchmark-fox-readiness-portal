@@ -167,6 +167,63 @@ The migration is **incremental and reversible**, behind the existing
 Because `useData()` is the only thing screens depend on, each phase swaps the
 implementation, not the screens.
 
+## 8a. Local development, seeding & validation
+
+This proves the migration runs and loads **global reference data only** — it
+does not wire the frontend, add auth, or store any client/CUI data.
+
+**Install the Supabase CLI** (any one): `npm install -D supabase` (then
+`npx supabase …`), `scoop install supabase`, or `brew install supabase/tap/supabase`.
+The local stack requires **Docker Desktop** running.
+
+**Run a local stack, apply migrations, reset:**
+
+```bash
+npx supabase start          # Postgres + Studio + Auth; prints local URL + keys
+npx supabase db reset       # re-runs ALL migrations, then supabase/seed.sql
+                            # (destructive — LOCAL ONLY; never against production)
+```
+
+`supabase/seed.sql` runs automatically on `db reset` and seeds the small, stable
+pieces (the Benchmark Fox org + the 14 families) plus the `tenant_rls_status()`
+helper used by validation.
+
+**Seed the remaining reference data** (110 controls, source registry, mapping),
+which is generated from the app's TypeScript so it always matches the library:
+
+```bash
+# Use the LOCAL service_role key from `supabase status` (server-only secret):
+export SUPABASE_URL=http://127.0.0.1:54321
+export SUPABASE_SERVICE_ROLE_KEY=<local service_role key>
+npm run db:seed:refs        # scripts/seed-supabase-reference-data.ts (idempotent)
+npm run db:validate         # scripts/validate-supabase-schema.mjs
+```
+
+**Seeding is idempotent** — every write is an upsert on a stable unique key:
+`organizations.slug`, `control_families.code`, `controls.natural_id`,
+`source_references.source_id`, and `(control_id, source_id)`. Re-running never
+duplicates rows.
+
+**`db:validate` checks:** 14 families, 110 controls, no duplicate `natural_id`,
+every control has ≥1 source reference, every control has `score_source` set,
+`score_value` is null only when `score_source = 'placeholder'`, source
+references exist, and (best-effort) RLS is enabled on every tenant table.
+
+**Generate types from the live local schema** after any migration:
+
+```bash
+npx supabase gen types typescript --local > src/lib/database.types.ts
+```
+
+**Secrets.** The `service_role` key bypasses RLS and is **server-only** — it is
+read from the environment by the seed/validate scripts and must **never** be
+committed, placed in a `VITE_` var, or shipped to the browser. Only
+`.env.example` is tracked; real values live in gitignored `.env*` files.
+
+> Reference data only: `db:seed:refs` never inserts clients, evidence, POA&Ms,
+> tasks, reports, or any CUI. `evidence_items` / `reports` remain metadata +
+> external links only (§3, §7).
+
 ## 9. Table overview
 
 | Table | Purpose | Soft delete |
