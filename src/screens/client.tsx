@@ -23,6 +23,8 @@ import {
 import { useData } from '../data/store';
 import { CURRENT_CLIENT } from '../data/clients';
 import { CONTROLS_BY_ID } from '../data/controls';
+import { INTAKE_SUMMARY, PATH_RECOMMENDATION } from '../data/intake';
+import { SCOPE_ASSETS, SCOPE_SUMMARY } from '../data/scope';
 import { POAM_ITEMS } from '../data/poam';
 import { EVIDENCE_ITEMS } from '../data/evidence';
 import { TASKS } from '../data/tasks';
@@ -263,23 +265,14 @@ export function IntakeScreen({ go }: ScreenProps) {
           <div className="w-box fill" style={{ padding: 18 }}>
             <span className="w-eyebrow">Internal summary — auto-drafted</span>
             <div className="grid-2 mt" style={{ gap: 10 }}>
-              {(
-                [
-                  ['Likely CMMC Path', 'Level 2 · C3PAO'],
-                  ['Estimated Scope', 'CUI enclave'],
-                  ['Likely Data Type', 'CUI / CTI'],
-                  ['Initial Risk Rating', 'High'],
-                  ['Recommended Next Step', 'Scoping Workshop'],
-                  ['Proposed Engagement', 'CMMC Readiness Program'],
-                ] as [string, string][]
-              ).map(([k, v]) => (
+              {INTAKE_SUMMARY.map((it) => (
                 <div
-                  key={k}
+                  key={it.label}
                   className="between w-box"
                   style={{ padding: '8px 12px', background: 'var(--white)' }}
                 >
-                  <span className="muted">{k}</span>
-                  <strong>{v}</strong>
+                  <span className="muted">{it.label}</span>
+                  <strong>{it.value}</strong>
                 </div>
               ))}
             </div>
@@ -319,25 +312,16 @@ export function PathScreen({ go }: ScreenProps) {
       <div className="grid-2">
         <Card title="Contract Clauses">
           <div className="col" style={{ gap: 11 }}>
-            {[
-              'FAR 52.204-21',
-              'DFARS 252.204-7012',
-              'DFARS 252.204-7019',
-              'DFARS 252.204-7020',
-              'DFARS 252.204-7021',
-              'Unknown / Needs contract review',
-            ].map((c, i) => (
-              <Check key={c} label={c} on={i === 1} />
+            {PATH_RECOMMENDATION.contractClauses.map((c) => (
+              <Check key={c.label} label={c.label} on={c.selected} />
             ))}
           </div>
         </Card>
         <Card title="Data Handling">
           <div className="col" style={{ gap: 11 }}>
-            {['FCI only', 'CUI', 'CDI / CTI', 'ITAR / Export-Controlled', 'Engineering drawings / CAD'].map(
-              (c, i) => (
-                <Check key={c} label={c} on={i === 1} />
-              ),
-            )}
+            {PATH_RECOMMENDATION.dataHandling.map((c) => (
+              <Check key={c.label} label={c.label} on={c.selected} />
+            ))}
           </div>
         </Card>
       </div>
@@ -346,14 +330,14 @@ export function PathScreen({ go }: ScreenProps) {
         <div className="between mt" style={{ alignItems: 'flex-end' }}>
           <div>
             <div className="w-h2" style={{ fontSize: '1.5em' }}>
-              Level 2 · C3PAO Certification
+              {PATH_RECOMMENDATION.path}
             </div>
             <p className="muted" style={{ margin: '6px 0 0' }}>
-              CUI selected and DFARS 252.204-7012 identified.
+              {PATH_RECOMMENDATION.reason}
             </p>
           </div>
           <Badge tone="warn" fill>
-            Confidence: Medium
+            Confidence: {PATH_RECOMMENDATION.confidence}
           </Badge>
         </div>
       </div>
@@ -387,18 +371,14 @@ export function ScopeScreen({ go }: ScreenProps) {
       {tab === 'Scope Summary' ? (
         <Card>
           <div className="grid-2">
-            <Select label="ASSESSMENT BOUNDARY" value="CUI Enclave" />
-            <Select label="CUI STRATEGY" value="CUI Enclave" />
-            <Select label="MSP / ESP INVOLVED" value="Yes" />
-            <Select label="CLOUD SERVICES" value="M365 GCC High + Azure" />
+            <Select label="ASSESSMENT BOUNDARY" value={SCOPE_SUMMARY.assessmentBoundary} />
+            <Select label="CUI STRATEGY" value={SCOPE_SUMMARY.cuiStrategy} />
+            <Select label="MSP / ESP INVOLVED" value={SCOPE_SUMMARY.mspInvolved} />
+            <Select label="CLOUD SERVICES" value={SCOPE_SUMMARY.cloudServices} />
           </div>
           <div className="w-field mt">
             <span className="w-label">SCOPE NOTES</span>
-            <textarea
-              className="w-input"
-              rows={3}
-              defaultValue="Enclave approach scopes CUI to a dedicated GCC High tenant. Engineering CAD workstations to be isolated. MSP manages endpoints — confirm SPA classification."
-            />
+            <textarea className="w-input" rows={3} defaultValue={SCOPE_SUMMARY.notes} />
           </div>
           <div className="row gap-sm wrap mt">
             <Btn>+ Add Asset</Btn>
@@ -420,54 +400,16 @@ export function ScopeScreen({ go }: ScreenProps) {
               </tr>
             </thead>
             <tbody>
-              <tr>
-                <td>GCC High Tenant</td>
-                <td>Cloud</td>
-                <td>CUI Asset</td>
-                <td>
-                  <Status s="Yes" />
-                </td>
-                <td>MSP</td>
-                <td>
-                  <Status s="Yes" />
-                </td>
-              </tr>
-              <tr>
-                <td>CAD Workstations</td>
-                <td>Endpoint</td>
-                <td>CUI Asset</td>
-                <td>
-                  <Status s="Yes" />
-                </td>
-                <td>IT Lead</td>
-                <td>
-                  <Status s="Yes" />
-                </td>
-              </tr>
-              <tr>
-                <td>Firewall (HQ)</td>
-                <td>Network</td>
-                <td>Security Protection</td>
-                <td>
-                  <Badge tone="none">No</Badge>
-                </td>
-                <td>MSP</td>
-                <td>
-                  <Status s="Yes" />
-                </td>
-              </tr>
-              <tr>
-                <td>Marketing Laptops</td>
-                <td>Endpoint</td>
-                <td>Out-of-Scope</td>
-                <td>
-                  <Badge tone="none">No</Badge>
-                </td>
-                <td>IT Lead</td>
-                <td>
-                  <Badge tone="none">No</Badge>
-                </td>
-              </tr>
+              {SCOPE_ASSETS.map((a) => (
+                <tr key={a.id}>
+                  <td>{a.name}</td>
+                  <td>{a.type}</td>
+                  <td>{a.category}</td>
+                  <td>{a.handlesCui ? <Status s="Yes" /> : <Badge tone="none">No</Badge>}</td>
+                  <td>{a.owner}</td>
+                  <td>{a.inScope ? <Status s="Yes" /> : <Badge tone="none">No</Badge>}</td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </Card>

@@ -20,7 +20,13 @@ import {
 import { Sources } from '../components/SourceBadge';
 import { useData } from '../data/store';
 import { CURRENT_CLIENT } from '../data/clients';
-import { CONTROLS_BY_ID, CONTROL_LIBRARY, FAMILIES } from '../data/controls';
+import {
+  CONTROLS_BY_ID,
+  CONTROL_LIBRARY,
+  EXPECTED_CONTROL_COUNT,
+  FAMILIES,
+  LIBRARY_COMPLETE,
+} from '../data/controls';
 import { evidenceForControl } from '../data/evidence';
 import { poamForControl } from '../data/poam';
 import { tasksForControl } from '../data/tasks';
@@ -46,6 +52,12 @@ export function ControlLibraryScreen({ go }: ScreenProps) {
         title="Control Library"
         sub="Browse CMMC / NIST SP 800-171 controls and Benchmark Fox guidance."
       />
+      {!LIBRARY_COMPLETE && (
+        <WarnBanner tone="bad">
+          Control library is incomplete until all {EXPECTED_CONTROL_COUNT} NIST SP 800-171 Rev. 2
+          requirements are imported ({CONTROL_LIBRARY.length} loaded).
+        </WarnBanner>
+      )}
       <Card style={{ padding: '6px 6px' }}>
         <table className="w-table">
           <thead>
@@ -158,6 +170,12 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
         title={`Controls — ${CURRENT_CLIENT.name}`}
         sub="Track readiness, SSP, evidence, POA&M, score impact, and ownership."
       />
+      {!LIBRARY_COMPLETE && (
+        <WarnBanner tone="bad">
+          Control library is incomplete until all {EXPECTED_CONTROL_COUNT} NIST SP 800-171 Rev. 2
+          requirements are imported ({CONTROL_LIBRARY.length} loaded).
+        </WarnBanner>
+      )}
 
       {/* filter bar */}
       <div className="w-card row wrap" style={{ alignItems: 'center', padding: '10px 12px', gap: 10 }}>

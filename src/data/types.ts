@@ -89,6 +89,8 @@ export interface Control {
    * not available from a bundled local source, so it must not be guessed.
    */
   scoreValue: number | null;
+  /** whether scoreValue is an official methodology value or a placeholder */
+  scoreSource: 'placeholder' | 'official';
   title: string; // short display label (derived from requirement)
   summary: string; // requirement summary for tables
   requirement: string; // official NIST SP 800-171 Rev. 2 requirement text
@@ -100,8 +102,12 @@ export interface Control {
   poamGuidance?: string | null; // BF POA&M guidance (null = TODO)
   /** NIST SP 800-171A assessment objectives (null = TODO, not bundled locally) */
   assessmentObjectives?: string[] | null;
-  /** sourceId references into SOURCE_REFS */
+  /** all sourceId references into SOURCE_REFS (official + Benchmark Fox) */
   sourceRefs: string[];
+  /** official document sourceIds (NIST/FAR/DFARS/CMMC/CFR) */
+  officialSourceRefs?: string[];
+  /** Benchmark Fox internal sourceIds */
+  benchmarkFoxSourceRefs?: string[];
 }
 
 /** Per-client assessment of a control — the editable, persisted record. */

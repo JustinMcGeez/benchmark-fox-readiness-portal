@@ -22,7 +22,7 @@ import type {
 } from './types';
 import { CURRENT_CLIENT_ID } from './clients';
 import { CONTROL_FAMILIES } from './controlFamilies';
-import { GENERATED_CONTROLS } from './controls.generated';
+import { GENERATED_CONTROLS } from './generated/controls.generated';
 
 /* ---- Benchmark Fox authored overlay (placeholders elsewhere) ---- */
 type Overlay = Partial<
@@ -99,6 +99,11 @@ export const CONTROL_LIBRARY: Control[] = GENERATED_CONTROLS.map((c) => {
 export const CONTROLS_BY_ID: Record<string, Control> = Object.fromEntries(
   CONTROL_LIBRARY.map((c) => [c.id, c]),
 );
+
+/** NIST SP 800-171 Rev. 2 has 110 security requirements. */
+export const EXPECTED_CONTROL_COUNT = 110;
+/** False until the full 110-requirement library is loaded (drives the incomplete-library banner). */
+export const LIBRARY_COMPLETE = CONTROL_LIBRARY.length >= EXPECTED_CONTROL_COUNT;
 
 /* ---- family summary for the Control Library screen ---- */
 export interface FamilySummary {

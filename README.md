@@ -94,24 +94,28 @@ Every major screen is **computed from a structured data layer**, not hard-coded 
 ```
 src/
   data/
-    types.ts             # domain interfaces (Client, Control, ClientControlAssessment,
-                         #   EvidenceItem, PoamItem, TaskItem, ReportItem, AuditEvent) + enums
-    controlFamilies.ts   # the 14 NIST 800-171 families
-    controls.generated.ts# AUTO-GENERATED — all 110 NIST SP 800-171 Rev. 2 requirements
-    controls.ts          # generated library + Benchmark Fox overlay + seed assessments
-    clients.ts           # clients + audit log + CURRENT_CLIENT_ID
-    evidence.ts          # evidence items (mapped to control/objective/SSP/POA&M/task)
-    poam.ts              # POA&M items (weakness, milestones, relationships)
-    tasks.ts             # remediation tasks
-    reports.ts           # report deliverables + what data feeds each
-    sourceRefs.ts        # official source-document registry (cited across the app)
-    store.ts             # <DataProvider> — seed merged with localStorage edits
+    types.ts                       # domain interfaces + enums (Client, Control,
+                                   #   ClientControlAssessment, EvidenceItem, PoamItem, …)
+    controlFamilies.ts             # the 14 NIST 800-171 families
+    generated/controls.generated.ts# AUTO-GENERATED — all 110 NIST SP 800-171 Rev. 2 requirements
+    controls.ts                    # generated library + Benchmark Fox overlay + seed assessments
+    clients.ts                     # clients + audit log + users + CURRENT_CLIENT
+    evidence.ts                    # evidence items (mapped to control/objective/SSP/POA&M/task)
+    poam.ts                        # POA&M items (weakness, milestones, relationships)
+    tasks.ts                       # remediation tasks
+    reports.ts                     # report deliverables + what data feeds each
+    knowledge.ts                   # knowledge-base articles
+    intake.ts                      # guided-intake summary + CMMC path recommendation
+    scope.ts                       # scoping summary + asset inventory
+    sourceRefs.ts                  # official source-document registry (cited across the app)
+    store.ts                       # <DataProvider> — seed merged with localStorage edits
   lib/
-    scoring.ts           # isolated scoring engine (readiness %, SPRS score, by-family)
+    scoring.ts                     # isolated scoring engine (readiness %, SPRS score, by-family)
+    selectors.ts                   # shared derived counts (open POA&Ms, blockers, evidence, …)
 data-sources/
-    sp800-171r2.json     # LOCAL SOURCE — 110 official Rev. 2 requirement statements
+    sp800-171r2.json               # LOCAL SOURCE — 110 official Rev. 2 requirement statements
 scripts/
-    build-controls.mjs   # regenerates controls.generated.ts from the local source
+    import-sp800-171.ts            # regenerates generated/controls.generated.ts (run with: node scripts/import-sp800-171.ts)
 ```
 
 - **Full 110-requirement library.** All NIST SP 800-171 Rev. 2 requirements are
@@ -139,23 +143,24 @@ Registry, and Benchmark Fox internal templates. Requirement text in
 ### Local source file process
 
 `data-sources/sp800-171r2.json` is the source of truth for the control library.
-`scripts/build-controls.mjs` parses it into `src/data/controls.generated.ts`:
+`scripts/import-sp800-171.ts` parses it into `src/data/generated/controls.generated.ts`:
 
 ```bash
-node scripts/build-controls.mjs   # regenerate after editing the source file
+node scripts/import-sp800-171.ts   # regenerate after editing the source file (Node 22.6+/24)
 ```
 
 To import official data we don't bundle yet (e.g. a NIST CSV/XLSX or the DoD
-Assessment Methodology scoring), drop the file in `data-sources/` and extend the
-script — no screen changes required.
+Assessment Methodology scoring), drop the file in `data-sources/`, extend
+`loadRequirements()`, and re-run — no screen changes required.
 
 ### What is data-driven vs. placeholder
 
 | Area | State |
 | --- | --- |
 | 110 requirement texts, numbers, families, L1/L2 applicability | ✅ official (NIST 800-171 Rev. 2) |
-| Readiness %, status counts, dashboards, matrix, detail, SSP/POA&M/Evidence/Tasks/Reports | ✅ computed from data |
-| SPRS deduction values (`scoreValue`) | ⚠️ **placeholder (`null`)** — DoD Assessment Methodology not bundled; UI shows a "scoring not finalized" warning |
+| Readiness %, status counts, dashboards, matrix, detail, SSP/POA&M/Evidence/Tasks/Reports/Mobile | ✅ computed from data |
+| Intake summary, CMMC path recommendation, scope summary + assets | ✅ data-driven (`intake.ts` / `scope.ts`) — prototype values |
+| SPRS deduction values (`scoreValue`, `scoreSource`) | ⚠️ **placeholder** (`scoreValue: null`, `scoreSource: 'placeholder'`) — DoD Assessment Methodology not bundled; UI shows a "scoring not finalized" warning |
 | Assessment objectives (800-171A) | ⚠️ placeholder (not bundled) |
 | Plain-English explanations / evidence examples / SSP & POA&M guidance | ✏️ Benchmark Fox-authored for a curated subset; the rest show TODO placeholders |
 
@@ -192,6 +197,14 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
 
 ## Current MVP status
 
+**At a glance**
+- **All 110 controls loaded?** ✅ Yes — full NIST SP 800-171 Rev. 2 set.
+- **All 14 families present?** ✅ Yes (AC, AT, AU, CM, IA, IR, MA, MP, PS, PE, RA, CA, SC, SI).
+- **Scoring values official or placeholder?** ⚠️ Placeholder (`scoreValue: null`,
+  `scoreSource: 'placeholder'`) — readiness % is real; SPRS score is flagged "not finalized".
+- **Type-safe / builds?** ✅ `npm run typecheck` and `npm run build` pass.
+- **Backend?** ❌ None — TypeScript seed + `localStorage` only.
+
 **Complete**
 - All 110 NIST SP 800-171 Rev. 2 requirements loaded from a local source file via
   a reproducible generator; official requirement text + family + L1/L2.
@@ -217,15 +230,16 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   use seed summary rows in the Clients list.
 
 **Placeholder**
-- SPRS deduction values (`scoreValue = null`) pending the DoD Assessment
-  Methodology — the SPRS-style score is flagged "scoring not finalized" everywhere.
+- SPRS deduction values (`scoreValue = null`, `scoreSource = 'placeholder'`) pending
+  the DoD Assessment Methodology — the SPRS-style score is flagged "scoring not
+  finalized" everywhere.
 - NIST SP 800-171A assessment objectives (not bundled).
-- Intake / Scope / Path / Settings non-table panels are illustrative mockups.
+- Intake / Path / Scope use prototype values from `intake.ts` / `scope.ts` — read
+  from the data layer, but not yet editable or persisted.
 
 **Known limitations**
 - No backend; single active client; auth is a prototype shell only.
-- Scope asset table and form option lists remain inline (illustrative, not tracked
-  entities).
+- Intake/Path form option lists and Settings non-table panels remain inline mockups.
 - Scoring model is a readiness heuristic, not the official methodology.
 
 **Next recommended build phase**

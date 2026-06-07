@@ -56,3 +56,7 @@ export function Sources({ ids, title = 'Sources' }: { ids: string[]; title?: str
     </div>
   );
 }
+
+/** Aliases — reusable source list component. */
+export const SourceList = Sources;
+export const SourceBadges = Sources;

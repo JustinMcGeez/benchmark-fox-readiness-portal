@@ -24,7 +24,7 @@ import { TASKS } from '../data/tasks';
 import { useData } from '../data/store';
 import { CONTROLS_BY_ID } from '../data/controls';
 import { formatScore, readinessPct, sprsScore } from '../lib/scoring';
-import { blockerItems, missingEvidenceCount, openTaskCount } from '../lib/selectors';
+import { blockerItems, missingEvidenceCount, openTaskCount, topBlockers } from '../lib/selectors';
 
 /* ---------- 16. REPORTS ---------- */
 export function ReportsScreen({ go }: ScreenProps) {
@@ -93,6 +93,7 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
   const readiness = readinessPct(assessments);
   const score = sprsScore(assessments, CONTROLS_BY_ID);
   const risk = readiness >= 80 ? 'Low' : readiness >= 60 ? 'Medium' : 'High';
+  const topFindings = topBlockers(POAM_ITEMS, 3);
   return (
     <div className="col">
       <PageHead
@@ -150,9 +151,9 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
             Top Findings
           </h3>
           <ol className="muted" style={{ paddingLeft: 18 }}>
-            <li>CUI scoping requires validation</li>
-            <li>SSP implementation details are incomplete</li>
-            <li>MFA evidence requires update</li>
+            {topFindings.map((p) => (
+              <li key={p.id}>{p.weakness}</li>
+            ))}
           </ol>
           <Ph h={120} style={{ marginTop: 16 }}>
             [ readiness-by-family chart ]
