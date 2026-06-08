@@ -271,9 +271,10 @@ export function SettingsScreen(_: ScreenProps) {
   const [tab, setTab] = useState('Users');
   return (
     <div className="col">
-      <PageHead title="Settings" sub="Manage platform configuration." />
-      {/* Backend Status — always visible, regardless of the selected tab below. */}
+      {/* Backend Status — first element after the return, before any tab/panel,
+          so it is visible regardless of the selected Settings tab below. */}
       <BackendStatusCard />
+      <PageHead title="Settings" sub="Manage platform configuration." />
       <Card title="Current MVP status">
         <div className="grid-2" style={{ gap: '0 var(--gap)' }}>
           <StatusRow label="Full 110 controls loaded" value={LIBRARY_COMPLETE} />
