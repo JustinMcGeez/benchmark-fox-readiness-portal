@@ -196,13 +196,17 @@ The migration is **incremental and reversible**, behind the existing
 6. **Phase 5 — client portal (FUTURE).** Extend RLS + assignments for external
    client roles (executive / IT owner / evidence uploader / read-only viewer).
 
-Because `useData()` is the only thing screens depend on, each phase swaps the
-implementation, not the screens.
+Screens now use two seams: `useReference()`/`ReferenceDataProvider` for global
+reference data, and `useData()`/`store.ts` for client-specific workflow data.
+Future backend phases should preserve those seams so screens do not call Supabase
+directly.
 
 ## 8a. Local development, seeding & validation
 
-This proves the migration runs and loads **global reference data only** — it
-does not wire the frontend, add auth, or store any client/CUI data.
+This local database flow proves migrations and reference-data seeding. The
+frontend uses that seeded data only when `VITE_SUPABASE_URL` and
+`VITE_SUPABASE_ANON_KEY` are configured; client-specific data still stays in
+localStorage.
 
 **Install the Supabase CLI** (any one): `npm install -D supabase` (then
 `npx supabase …`), `scoop install supabase`, or `brew install supabase/tap/supabase`.

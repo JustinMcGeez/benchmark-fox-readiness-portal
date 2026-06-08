@@ -261,7 +261,11 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   workflows, not yet backed by a database.
 
 **Known limitations**
-- No backend; single active client; auth is a prototype shell only.
+- No client-data backend yet; Supabase Reference Read is implemented for global
+  reference data only.
+- Single active demo client.
+- Auth is still a prototype shell.
+- Client-specific data still uses localStorage this phase.
 - Intake/Path form option lists and Settings non-table panels remain inline mockups.
 - Scoring model is a readiness heuristic, not the official methodology.
 
@@ -270,7 +274,8 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
    values and remove the "scoring not finalized" warning.
 2. Import NIST SP 800-171A assessment objectives into the control library.
 3. Introduce Supabase/Postgres behind `data/store.ts` (multi-client, real auth,
-   evidence file storage) — the data interfaces are already the seam for this.
+   evidence metadata + approved secure external links) — the data interfaces are
+   already the seam for this. (No CUI or real evidence files are stored.)
 
 ## Backend (Supabase / Postgres)
 
