@@ -272,6 +272,8 @@ export function SettingsScreen(_: ScreenProps) {
   return (
     <div className="col">
       <PageHead title="Settings" sub="Manage platform configuration." />
+      {/* Backend Status — always visible, regardless of the selected tab below. */}
+      <BackendStatusCard />
       <Card title="Current MVP status">
         <div className="grid-2" style={{ gap: '0 var(--gap)' }}>
           <StatusRow label="Full 110 controls loaded" value={LIBRARY_COMPLETE} />
@@ -285,7 +287,6 @@ export function SettingsScreen(_: ScreenProps) {
           <StatusRow label="Data persistence" value="localStorage only" />
         </div>
       </Card>
-      <BackendStatusCard />
       <Tabs
         items={['Users', 'Roles', 'Branding', 'Report Templates', 'Control Library', 'Security']}
         active={tab}
