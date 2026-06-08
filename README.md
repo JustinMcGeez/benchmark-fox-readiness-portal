@@ -358,8 +358,12 @@ npx supabase gen types typescript --local  > src/lib/database.types.ts
 
 ### Local Supabase development (validate + seed reference data)
 
-This validates that the migration runs and the global **reference data** loads.
-It does **not** touch the frontend — the app stays on `localStorage`.
+This is the **server-side** path for proving the migration runs and seeding the
+global **reference data** into Postgres (it uses the `service_role` key and is
+unrelated to how the frontend reads). Once the data is seeded and the frontend's
+`VITE_` env vars are set, the app's **Supabase Reference Read** mode reads that
+global reference data; **client-specific edits still use `localStorage`** this
+phase. See *Read-only Supabase reference data mode* below.
 
 > **Runtime requirement.** `db:seed:refs` runs a **TypeScript** file with bare
 > `node` (no ts-node / no build step), relying on Node's native type stripping.

@@ -1,9 +1,15 @@
 /* ============================================================
    check-supabase-readonly-integration.mjs
 
-   Enforces the read-only Supabase integration boundary across the app runtime
-   (everything under src/). Prints a clear pass/fail summary with file paths and
-   line numbers.
+   Validates the APP RUNTIME (everything under src/) read-only Supabase boundary.
+   Prints a clear pass/fail summary with file paths and line numbers.
+
+   Why src/ only: the seeding/validation scripts under scripts/ ARE allowed to
+   write to Supabase (e.g. seed-supabase-reference-data.ts) — they are server-side
+   maintenance scripts that run with the service_role key, never shipped to the
+   browser. App runtime under src/ must stay read-only (reference data only):
+   no inserts/updates/upserts/deletes, and screens must never import Supabase
+   directly. This script therefore scans src/ and intentionally ignores scripts/.
 
    Rules:
    A. SCREENS: no file under src/screens may import the Supabase client/SDK or
@@ -110,13 +116,19 @@ for (const file of files) {
     }
   }
 
-  // D. No writes in any src file that touches Supabase.
-  const touchesSupabase =
-    SDK_IMPORT_RE.test(src) || ANY_CLIENT_IMPORT_RE.test(src) || DOT_FROM_RE.test(src) || GET_SUPABASE_RE.test(src);
-  if (touchesSupabase) {
+  // D. No writes in any src file that looks Supabase-adjacent. Coarse on purpose:
+  //    flag a write method in any file that also mentions supabase / getSupabase
+  //    or a `.from(` query builder, so an accidental direct write is hard to miss.
+  const supabaseAdjacent =
+    /supabase/i.test(src) || GET_SUPABASE_RE.test(src) || /\.from\s*\(/.test(src);
+  if (supabaseAdjacent) {
     const w = src.match(WRITE_RE);
     if (w) {
-      violations.push({ path, line: lineOf(w), msg: `Supabase write op .${w[1]}(...) — forbidden in the read-only phase` });
+      violations.push({
+        path,
+        line: lineOf(w),
+        msg: `Supabase write op .${w[1]}(...) in a Supabase-adjacent file — forbidden in the read-only phase`,
+      });
     }
   }
 }
@@ -138,5 +150,6 @@ console.log(
   `✓ check:supabase-readonly PASSED — scanned ${files.length} src file(s) ` +
     `(${screenCount} screens). No Supabase access in screens; SDK imported only in ${SDK_ALLOWED}; ` +
     `client accessed only in ${runtimeAccessFiles} approved runtime file(s); no Supabase writes in src/. ` +
-    'Reads flow through the service/hook/provider layer.',
+    'Reads flow through the service/hook/provider layer. ' +
+    '(Server-side seeding/validation scripts under scripts/ may write via service_role and are not scanned.)',
 );

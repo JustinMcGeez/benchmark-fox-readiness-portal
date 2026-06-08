@@ -160,6 +160,15 @@ real file storage is introduced, it will go through a **dedicated, scoped, and
 explicitly CUI-authorized** Supabase Storage bucket — a separate decision with
 its own security review, **not** this MVP table.
 
+> **Current phase (read-only):** `evidence_items` and its metadata/secure-link
+> approach are part of the **client-data schema for a later phase**. They are
+> **not written at app runtime today** — evidence metadata still lives in
+> `localStorage`. Writing evidence metadata/links to Supabase is Phase 3
+> (client data). What is OK to store in Supabase **now**: global **reference**
+> tables (families/controls/source refs/mappings). What is **never** stored:
+> CUI, real evidence files, screenshots, configs, logs, SSP/POA&M files, and
+> rendered client report artifacts.
+
 ## 8. Migration strategy from localStorage to Supabase
 
 The migration is **incremental and reversible**, behind the existing
@@ -177,12 +186,15 @@ The migration is **incremental and reversible**, behind the existing
    `ReferenceDataProvider` (`useReference()`), env-gated and with automatic local
    fallback. Screens consume the provider, not the static `CONTROL_LIBRARY`.
    Reads only — **client edits still use `localStorage`** (`store.ts`).
-4. **Phase 3 — write path + auth (FUTURE).** Turn on Supabase Auth (internal users),
-   move assessment/intake/scope/evidence/POA&M/task writes to the database, and
-   start emitting `audit_events`.
-5. **Phase 4 — retire localStorage** for shared data (keep it only for UI
-   preferences like tweaks). Provide a one-time importer for any local edits.
-6. **Phase 5 — client portal.** Extend RLS + assignments for external roles.
+4. **Phase 3 — auth + client data (FUTURE).** Turn on Supabase Auth (internal
+   users) and move client-specific reads/writes (assessments, intake, scope,
+   evidence metadata, POA&M, tasks, reports) off `localStorage` into the
+   database, RLS-enforced.
+5. **Phase 4 — audit logging + shared multi-client workflows (FUTURE).** Emit
+   `audit_events` for mutations and enable Benchmark Fox consultants to work
+   across multiple client engagements with assignment-based access.
+6. **Phase 5 — client portal (FUTURE).** Extend RLS + assignments for external
+   client roles (executive / IT owner / evidence uploader / read-only viewer).
 
 Because `useData()` is the only thing screens depend on, each phase swaps the
 implementation, not the screens.
