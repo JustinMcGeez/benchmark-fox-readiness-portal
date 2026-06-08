@@ -397,6 +397,59 @@ npx supabase gen types typescript --local > src/lib/database.types.ts
   - **`evidence_items` are metadata + external links only** (no file column by
     design); `reports` likewise hold metadata + external links only.
 
+### Read-only Supabase reference data mode
+
+The app runs in **two modes**, decided purely by whether the Supabase env vars
+are set — **local mode is the default**:
+
+| Mode | When | Behavior |
+| --- | --- | --- |
+| **Local Prototype** | env vars unset | Uses the generated TypeScript data + `localStorage`. No network. |
+| **Supabase Reference Read** | `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` set | **Reads global reference data** (control families, controls, source references, control/source mappings) from Supabase, with **automatic fallback to local generated data** if a read fails. Shows a **Backend Status** card in Settings. |
+
+This phase is **reads-only and reference-data-only**:
+
+- **No client writes yet.** Intake, scope, control assessments, evidence
+  metadata, POA&M, tasks, and reports **still use `localStorage`** — Supabase is
+  never written to in this phase (enforced by `src/services/supabaseReadOnlyGuard.ts`).
+- **No CUI and no evidence files** are stored, in either mode.
+- **No auth / no client portal** yet (planned for the next backend phase, which
+  adds RLS-enforced sessions).
+- **Fallback is automatic and silent to the user** — if Supabase is unreachable
+  or a query errors, the service returns the local generated data and the
+  Backend Status card shows `Local fallback` plus the error.
+
+**Architecture (screens never call Supabase directly):**
+
+```
+src/lib/backendConfig.ts                 # mode: 'local' | 'supabase-reference-read'
+src/services/supabaseReadOnlyGuard.ts    # read-only policy (throws on writes)
+src/services/referenceDataService.ts     # Supabase reads + local fallback (the ONLY data path)
+src/hooks/useReferenceData.ts            # React hook: data/loading/error/source/refresh
+src/components/BackendStatusCard.tsx     # Settings card: mode, source, counts, errors
+```
+
+A guard script (`npm run check:supabase-readonly`) fails the build if any
+`src/screens/*` file imports the Supabase client/SDK or calls `supabase.from(...)`
+— all reads must go through the service/hook layer.
+
+**Enable it locally:** set the env vars (see *Set environment variables* above),
+seed reference data (`npm run db:seed:refs`), then open **Settings → Backend
+Status**. With the vars unset you'll see: *"Running in local prototype mode. Set
+VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to enable read-only Supabase
+reference data."*
+
+**Commands to run:**
+
+```bash
+npm run build:data
+npm run validate:controls
+npm run check:sourcerefs
+npm run check:supabase-readonly
+npm run typecheck
+npm run build
+```
+
 ## Disclaimer
 
 This is a **readiness-support tool, not an official CMMC assessment platform**.

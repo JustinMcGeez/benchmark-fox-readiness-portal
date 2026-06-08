@@ -15,6 +15,7 @@ import {
   Toolbar,
 } from '../components/primitives';
 import { BrandLockup } from '../components/Brand';
+import { BackendStatusCard } from '../components/BackendStatusCard';
 import { EXPORT_FORMATS, REPORTS } from '../data/reports';
 import { AUDIT_EVENTS, CURRENT_CLIENT, USERS } from '../data/clients';
 import { KNOWLEDGE } from '../data/knowledge';
@@ -284,6 +285,7 @@ export function SettingsScreen(_: ScreenProps) {
           <StatusRow label="Data persistence" value="localStorage only" />
         </div>
       </Card>
+      <BackendStatusCard />
       <Tabs
         items={['Users', 'Roles', 'Branding', 'Report Templates', 'Control Library', 'Security']}
         active={tab}

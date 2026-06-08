@@ -21,6 +21,7 @@ import {
 import { SourceRefs } from '../components/SourceRefs';
 import { ScoringWarning } from '../components/ScoringWarning';
 import { useData } from '../data/store';
+import { useReferenceData } from '../hooks/useReferenceData';
 import { CURRENT_CLIENT } from '../data/clients';
 import {
   CONTROLS_BY_ID,
@@ -44,8 +45,22 @@ import { controlScoreDisplay, statusCounts } from '../lib/scoring';
 /* ---------- 9. CONTROL LIBRARY ---------- */
 export function ControlLibraryScreen({ go }: ScreenProps) {
   const { selectControl } = useData();
+  // Reference data comes from the hook: Supabase when configured, else the local
+  // generated data (with automatic fallback), so the screen always renders.
+  const { data } = useReferenceData();
   const [q, setQ] = useState('');
-  const acControls = CONTROL_LIBRARY.filter((c) => c.familyCode === 'AC');
+  const controls = data.controls;
+  const families = data.families.map((f) => {
+    const inFam = controls.filter((c) => c.familyCode === f.code);
+    return {
+      code: f.code,
+      name: f.name,
+      count: inFam.length,
+      l1Count: inFam.filter((c) => c.level === 'L1').length,
+    };
+  });
+  const libraryComplete = controls.length >= EXPECTED_CONTROL_COUNT;
+  const acControls = controls.filter((c) => c.familyCode === 'AC');
   const matches = (s: string) => s.toLowerCase().includes(q.toLowerCase());
 
   return (
@@ -54,10 +69,10 @@ export function ControlLibraryScreen({ go }: ScreenProps) {
         title="Control Library"
         sub="Browse CMMC / NIST SP 800-171 controls and Benchmark Fox guidance."
       />
-      {!LIBRARY_COMPLETE && (
+      {!libraryComplete && (
         <WarnBanner tone="bad">
           Control library is incomplete until all {EXPECTED_CONTROL_COUNT} NIST SP 800-171 Rev. 2
-          requirements are imported ({CONTROL_LIBRARY.length} loaded).
+          requirements are imported ({controls.length} loaded).
         </WarnBanner>
       )}
       <Card style={{ padding: '6px 6px' }}>
@@ -72,7 +87,7 @@ export function ControlLibraryScreen({ go }: ScreenProps) {
             </tr>
           </thead>
           <tbody>
-            {FAMILIES.map((f) => (
+            {families.map((f) => (
               <tr key={f.code} onClick={() => go('controls')}>
                 <td style={{ fontWeight: 700 }}>{f.name}</td>
                 <td className="mono">{f.code}</td>
