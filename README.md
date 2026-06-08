@@ -211,9 +211,13 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   `scoreSource: 'placeholder'`) — readiness % is real; SPRS score is flagged "not finalized".
 - **Intake / Scope editable?** ✅ Yes — localStorage-backed, with auto-save and reset-to-seed.
 - **Type-safe / builds?** ✅ `npm run typecheck` and `npm run build` pass.
-- **Backend?** 🟡 **Planned, not wired.** Supabase/Postgres schema, RLS draft, and
-  client scaffolding are committed (see **Backend** below); the app still runs on
-  TypeScript seed + `localStorage`.
+- **Backend?** 🟢 **Supabase Reference Read (read-only).** When
+  `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` are set, the app **reads global
+  reference data** (control families, controls, source references, control/source
+  mappings) from Supabase via the service/hook/provider layer, with automatic
+  local fallback; otherwise it runs in **Local Prototype** mode. **Client edits
+  still use `localStorage`** this phase (no writes, no auth, no CUI). See
+  **Backend** below.
 
 **Complete**
 - All 110 NIST SP 800-171 Rev. 2 requirements loaded from a local source file via
@@ -272,11 +276,22 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
 
 - **Backend target:** **Supabase / Postgres** (managed Postgres + Auth + Row
   Level Security).
-- **Current status:** **Schema planned; frontend still on `localStorage`.** This
-  phase is **additive and non-breaking** — the schema, RLS draft, env example,
-  Supabase client placeholder, and type stub are committed, but **nothing reads
-  from or writes to Supabase yet**. `src/data/store.ts` remains the seam where
-  the backend will later slot in.
+- **Current status:** **Supabase Reference Read (read-only) is implemented.** The
+  app runs in two modes:
+  - **Local Prototype** — when the Supabase env vars are missing (default). Uses
+    the generated TypeScript data + `localStorage`.
+  - **Supabase Reference Read** — when `VITE_SUPABASE_URL` +
+    `VITE_SUPABASE_ANON_KEY` are set. The app may **read global reference data**
+    (control families, controls, source references, control/source mappings) from
+    Supabase through the service → hook → provider layer, with **automatic
+    fallback to the local generated data** if a read fails.
+- **Client-specific data still lives in `localStorage` this phase**
+  (`src/data/store.ts`): assessments, intake, scope, evidence metadata, POA&M,
+  tasks, reports. **No Supabase writes, no auth, no client portal yet** — those
+  are **Phase 3**.
+- **Never stored in Supabase:** CUI, real evidence files, SSP files, POA&M files,
+  screenshots, configs, logs, or rendered client report artifacts. Reference data
+  and metadata + secure external links only.
 - **Full architecture:** see
   [`docs/backend/supabase-architecture.md`](docs/backend/supabase-architecture.md)
   (why Supabase, what is/ isn't stored, tenancy, roles, RLS, audit, migration
@@ -289,7 +304,7 @@ supabase/policies/rls_plan.sql           # draft Row Level Security policies
 supabase/seed.sql                        # auto-seed: org + 14 families + RLS-status helper
 scripts/seed-supabase-reference-data.ts  # idempotent reference-data seeder (db:seed:refs)
 scripts/validate-supabase-schema.mjs     # reference-data validator (db:validate)
-src/lib/supabaseClient.ts                # typed client placeholder (warns if unconfigured)
+src/lib/supabaseClient.ts                # typed, config-gated client (read-only reads; warns if unconfigured)
 src/lib/database.types.ts                # type STUB (regenerate with Supabase CLI)
 .env.example                             # VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY
 ```

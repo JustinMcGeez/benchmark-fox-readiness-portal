@@ -1,19 +1,25 @@
 /* ============================================================================
-   Supabase client — PLACEHOLDER (not yet wired into the app).
+   Supabase client — typed, configuration-gated, READ-ONLY reference data.
 
-   This exports a typed Supabase client for the FUTURE backend integration. The
-   running app still uses the TypeScript seed data + localStorage via
-   src/data/store.ts — importing this module does NOT change any app behavior,
-   and nothing reads from Supabase yet.
+   In the current phase this client is used ONLY to READ global reference data
+   (control families, controls, source references, control/source mappings) via
+   the service/hook/provider layer:
+       referenceDataService → useReferenceData → ReferenceDataProvider
+   That layer is the ONLY approved app path for reading Supabase data — screens
+   and other components must not import or query this client directly (enforced
+   by scripts/check-supabase-readonly-integration.mjs).
 
-   Configuration (see .env.example):
+   Configuration-gated (see .env.example):
      VITE_SUPABASE_URL       — your Supabase project URL
      VITE_SUPABASE_ANON_KEY  — your Supabase anon (public) key
+   If either var is missing the app stays in LOCAL mode: this module warns once
+   and leaves the client `null`, and the reference-data layer falls back to the
+   local generated data. Nothing throws at import time.
 
-   If either var is missing we DO NOT throw at import time — we warn once and
-   leave the client null, so the app keeps working on localStorage. Code that
-   actually needs the backend should call `getSupabase()`, which fails loudly
-   with a helpful message only at the point of use.
+   NOT implemented in this phase: client-specific WRITES of any kind. Assessments,
+   intake, scope, evidence metadata, POA&M, tasks, and reports remain in
+   localStorage (src/data/store.ts). No CUI and no evidence/SSP/POA&M/report
+   files are stored in Supabase. Auth + client writes are a later phase.
    ============================================================================ */
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from './database.types';

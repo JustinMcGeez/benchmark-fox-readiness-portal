@@ -21,6 +21,7 @@ import {
   WarnBanner,
 } from '../components/primitives';
 import { useData } from '../data/store';
+import { useReference } from '../data/referenceStore';
 import { CURRENT_CLIENT } from '../data/clients';
 import { EVIDENCE_ITEMS } from '../data/evidence';
 import { POAM_ITEMS } from '../data/poam';
@@ -45,6 +46,8 @@ const evSupports = (a: ClientControlAssessment) =>
 /* ---------- 12. SSP WORKSPACE ---------- */
 export function SSPScreen({ go }: ScreenProps) {
   const { assessments, selectControl } = useData();
+  // Control definitions (titles/families) from the reference-data provider.
+  const { controlsById } = useReference();
   const [tab, setTab] = useState('Control Statements');
   const [filter, setFilter] = useState<SspStatus | 'All'>('All');
 
@@ -100,13 +103,23 @@ export function SSPScreen({ go }: ScreenProps) {
               </tr>
             </thead>
             <tbody>
-              {rows.map((a) => (
+              {rows.map((a) => {
+                const c = controlsById[a.controlId];
+                return (
                 <tr
                   key={a.controlId}
                   onClick={() => setEditorId(a.controlId)}
                   style={{ background: a.controlId === editor.controlId ? 'var(--surface-2)' : undefined }}
                 >
-                  <td className="mono">{a.controlId}</td>
+                  <td className="mono">
+                    {a.controlId}
+                    {/* Title + family from reference data; falls back to ID only. */}
+                    {c && (
+                      <div className="muted" style={{ fontSize: '.78em', fontWeight: 400 }}>
+                        {c.title} · {c.familyCode}
+                      </div>
+                    )}
+                  </td>
                   <td>
                     <Status s={a.sspStatus} />
                   </td>
@@ -129,11 +142,21 @@ export function SSPScreen({ go }: ScreenProps) {
                     </a>
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </Card>
         <Card title={`SSP Statement Editor — ${editor.controlId}`}>
+          {/* Control context from reference data (title · family · summary). */}
+          {controlsById[editor.controlId] && (
+            <p className="muted" style={{ margin: '0 0 12px', fontSize: '.88em' }}>
+              <strong>{controlsById[editor.controlId].title}</strong>{' '}
+              · {controlsById[editor.controlId].familyName} ({controlsById[editor.controlId].familyCode})
+              <br />
+              {controlsById[editor.controlId].summary}
+            </p>
+          )}
           <Field
             label="Current SSP Statement"
             area
@@ -166,10 +189,13 @@ export function SSPScreen({ go }: ScreenProps) {
 /* ---------- 13. POA&M TRACKER ---------- */
 export function POAMScreen({ go }: ScreenProps) {
   const { selectControl } = useData();
+  const { controlsById } = useReference();
   // default to the first blocker, otherwise the first POA&M item
   const defaultPoam = POAM_ITEMS.find((p) => p.classification === 'Blocker') ?? POAM_ITEMS[0];
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const detail = (selectedId && POAM_ITEMS.find((p) => p.id === selectedId)) || defaultPoam;
+  // Linked control definition from reference data (graceful fallback to ID only).
+  const detailControl = controlsById[detail.controlId];
 
   return (
     <div className="col">
@@ -249,6 +275,16 @@ export function POAMScreen({ go }: ScreenProps) {
         </table>
       </Card>
       <Card title={`POA&M Detail — ${detail.id} · ${detail.controlId}`}>
+        {/* Linked control title/summary from reference data when available. */}
+        {detailControl && (
+          <p className="muted" style={{ margin: '0 0 12px', fontSize: '.88em' }}>
+            <strong>Control {detail.controlId}</strong> — {detailControl.title}
+            {' · '}
+            {detailControl.familyName}
+            <br />
+            {detailControl.summary}
+          </p>
+        )}
         <div className="grid-2">
           <Field label="WEAKNESS" value={detail.weakness} area />
           <Field label="REMEDIATION PLAN" value={detail.remediationPlan ?? ''} area />
@@ -299,11 +335,14 @@ export function POAMScreen({ go }: ScreenProps) {
 
 /* ---------- 14. EVIDENCE HUB ---------- */
 export function EvidenceScreen(_: ScreenProps) {
+  const { controlsById } = useReference();
   // default to the first missing/needs-revision item, otherwise the first item
   const defaultEvidence =
     EVIDENCE_ITEMS.find((e) => e.status === 'Missing' || e.status === 'Needs Revision') ?? EVIDENCE_ITEMS[0];
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const detail = (selectedId && EVIDENCE_ITEMS.find((e) => e.id === selectedId)) || defaultEvidence;
+  // Related control definition from reference data (graceful fallback to ID only).
+  const detailControl = controlsById[detail.controlId];
   return (
     <div className="col">
       <PageHead
@@ -357,7 +396,14 @@ export function EvidenceScreen(_: ScreenProps) {
             </div>
             <div className="between">
               <span className="w-label">RELATED CONTROL</span>
-              <span className="mono">{detail.controlId}</span>
+              <span className="mono" style={{ textAlign: 'right' }}>
+                {detail.controlId}
+                {detailControl && (
+                  <span className="muted" style={{ display: 'block', fontSize: '.82em' }}>
+                    {detailControl.title} · {detailControl.familyCode}
+                  </span>
+                )}
+              </span>
             </div>
             <div className="between">
               <span className="w-label">ASSESSMENT OBJECTIVE</span>
@@ -407,12 +453,15 @@ export function EvidenceScreen(_: ScreenProps) {
 /* ---------- 15. TASKS ---------- */
 const HIGH_PRIORITY = new Set(['Critical', 'High']);
 export function TasksScreen(_: ScreenProps) {
+  const { controlsById } = useReference();
   // default to the first blocked task, otherwise the first high/critical task,
   // otherwise the first task
   const defaultTask =
     TASKS.find((t) => t.status === 'Blocked') ?? TASKS.find((t) => HIGH_PRIORITY.has(t.priority)) ?? TASKS[0];
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const detail = (selectedId && TASKS.find((t) => t.id === selectedId)) || defaultTask;
+  // Related control definition from reference data (graceful fallback to ID only).
+  const relatedControl = detail.relatedControlId ? controlsById[detail.relatedControlId] : undefined;
   return (
     <div className="col">
       <PageHead
@@ -460,7 +509,14 @@ export function TasksScreen(_: ScreenProps) {
             <div className="grid-2">
               <div className="between">
                 <span className="w-label">RELATED CONTROL</span>
-                <span className="mono">{detail.relatedControlId ?? '—'}</span>
+                <span className="mono" style={{ textAlign: 'right' }}>
+                  {detail.relatedControlId ?? '—'}
+                  {relatedControl && (
+                    <span className="muted" style={{ display: 'block', fontSize: '.82em' }}>
+                      {relatedControl.title} · {relatedControl.familyCode}
+                    </span>
+                  )}
+                </span>
               </div>
               <div className="between">
                 <span className="w-label">RELATED POA&M</span>
