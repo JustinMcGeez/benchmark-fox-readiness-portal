@@ -5,12 +5,13 @@
    ============================================================ */
 import { WarnBanner } from './primitives';
 import { scoringFinalized } from '../lib/scoring';
-import { CONTROLS_BY_ID } from '../data/controls';
+import { useReference } from '../data/referenceStore';
 
 export const SCORING_WARNING_TEXT =
   'Scoring values are placeholders until official DoD Assessment Methodology deductions are loaded. Readiness percentage is usable; SPRS-style score is not final.';
 
 export function ScoringWarning() {
-  if (scoringFinalized(CONTROLS_BY_ID)) return null;
+  const { controlsById } = useReference();
+  if (scoringFinalized(controlsById)) return null;
   return <WarnBanner tone="warn">{SCORING_WARNING_TEXT}</WarnBanner>;
 }

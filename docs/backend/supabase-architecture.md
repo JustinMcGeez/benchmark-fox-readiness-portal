@@ -1,10 +1,27 @@
 # Benchmark Fox Readiness Portal — Supabase / Postgres Backend Architecture
 
-> **Status:** Schema planned and committed. The frontend still runs entirely on
-> the TypeScript seed data + `localStorage` (see `src/data/store.ts`). This phase
-> is **additive and non-breaking** — nothing here is wired into the running app
-> yet. It establishes the backend foundation that will later replace
-> `localStorage` and seed data.
+> **Status (phased):**
+> - **Phase 0 — schema/scaffold: DONE.** Migration, RLS draft, seed, env example,
+>   typed client, and config are committed.
+> - **Phase 1 — reference-data seeding: DONE.** `supabase/seed.sql` +
+>   `scripts/seed-supabase-reference-data.ts` load global reference data; validated
+>   by `scripts/validate-supabase-schema.mjs`.
+> - **Phase 2 — read-only reference-data mode: IMPLEMENTED (being finalized).** The
+>   app reads global reference data (control families, controls, source references,
+>   control/source mappings) through a service → hook → provider layer
+>   (`ReferenceDataProvider` / `useReference()`), with **automatic fallback to local
+>   generated data**. When `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY` are set the
+>   reads target Supabase; otherwise the app runs purely local. Status is visible in
+>   **Settings → Backend Status**.
+> - **Phase 3 — auth + client data writes: FUTURE.** RLS-enforced sessions and
+>   moving client-specific data off `localStorage` come later.
+>
+> **Client-specific data still uses `localStorage` this phase** (see
+> `src/data/store.ts`): assessments, intake, scope, evidence metadata, POA&M, tasks,
+> reports. No client writes, no auth, no client portal yet.
+>
+> **MVP rule (unchanged, prominent):** no CUI and no real evidence/SSP/POA&M/report
+> files are stored — reference data and metadata + secure external links only.
 
 ---
 
@@ -148,16 +165,19 @@ its own security review, **not** this MVP table.
 The migration is **incremental and reversible**, behind the existing
 `src/data/store.ts` seam:
 
-1. **Phase 0 (this phase).** Schema, RLS plan, env example, Supabase client
-   placeholder, and types stub land in the repo. **No runtime behavior changes** —
-   `store.ts` still reads/writes `localStorage`.
-2. **Phase 1 — seed the database.** Push migrations to a Supabase project and
-   load the global reference data (control families, 110 controls, source refs)
-   from the same generator that produces `controls.generated.ts`.
-3. **Phase 2 — read path.** Add a Supabase-backed implementation behind the
-   `useData()` interface. Gate it with an env flag so the app can run on either
-   `localStorage` or Supabase. Reads first, writes still local.
-4. **Phase 3 — write path + auth.** Turn on Supabase Auth (internal users),
+1. **Phase 0 — schema/scaffold (DONE).** Schema, RLS plan, env example, Supabase
+   client, and types stub are in the repo.
+2. **Phase 1 — seed the database (DONE).** `supabase/seed.sql` +
+   `scripts/seed-supabase-reference-data.ts` load the global reference data
+   (control families, 110 controls, source refs, control/source mappings) from
+   the same generator that produces `controls.generated.ts`;
+   `scripts/validate-supabase-schema.mjs` validates it.
+3. **Phase 2 — read path (IMPLEMENTED, being finalized).** Global **reference**
+   data is read through `referenceDataService` → `useReferenceData` →
+   `ReferenceDataProvider` (`useReference()`), env-gated and with automatic local
+   fallback. Screens consume the provider, not the static `CONTROL_LIBRARY`.
+   Reads only — **client edits still use `localStorage`** (`store.ts`).
+4. **Phase 3 — write path + auth (FUTURE).** Turn on Supabase Auth (internal users),
    move assessment/intake/scope/evidence/POA&M/task writes to the database, and
    start emitting `audit_events`.
 5. **Phase 4 — retire localStorage** for shared data (keep it only for UI
@@ -316,8 +336,11 @@ production policy set.
 
 ## 13. Known limitations
 
-- **Not wired in.** This phase ships schema + scaffolding only; the running app
-  still uses `localStorage`. No data is read from or written to Supabase yet.
+- **Reads only, reference data only.** The app reads global **reference** data
+  from Supabase (Phase 2) via the service/hook/provider layer, with local
+  fallback. **No writes** occur, and all **client-specific** data
+  (assessments/intake/scope/evidence/POA&M/tasks/reports) still lives in
+  `localStorage`. Auth and client writes are Phase 3.
 - **RLS is a draft.** Policies are realistic but unhardened and untested against
   a live project; they need review and integration tests before production.
 - **Types are a stub.** `src/lib/database.types.ts` is a hand-written placeholder

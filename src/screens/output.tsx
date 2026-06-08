@@ -23,7 +23,8 @@ import { POAM_ITEMS } from '../data/poam';
 import { EVIDENCE_ITEMS } from '../data/evidence';
 import { TASKS } from '../data/tasks';
 import { useData } from '../data/store';
-import { CONTROLS_BY_ID, LIBRARY_COMPLETE } from '../data/controls';
+import { EXPECTED_CONTROL_COUNT } from '../data/controls';
+import { useReference } from '../data/referenceStore';
 import { formatScore, readinessPct, scoringFinalized, sprsScore } from '../lib/scoring';
 import { blockerItems, missingEvidenceCount, openTaskCount, topFindings } from '../lib/selectors';
 import { SourceRefs } from '../components/SourceRefs';
@@ -93,10 +94,11 @@ export function ReportsScreen({ go }: ScreenProps) {
 /* ---------- 17. REPORT PREVIEW ---------- */
 export function ReportPreviewScreen({ go }: ScreenProps) {
   const { assessments } = useData();
+  const { controlsById } = useReference();
   const readiness = readinessPct(assessments);
-  const score = sprsScore(assessments, CONTROLS_BY_ID);
+  const score = sprsScore(assessments, controlsById);
   const risk = readiness >= 80 ? 'Low' : readiness >= 60 ? 'Medium' : 'High';
-  const findings = topFindings(assessments, POAM_ITEMS, EVIDENCE_ITEMS, CONTROLS_BY_ID, 5);
+  const findings = topFindings(assessments, POAM_ITEMS, EVIDENCE_ITEMS, controlsById, 5);
   return (
     <div className="col">
       <PageHead
@@ -269,6 +271,8 @@ function StatusRow({ label, value }: { label: string; value: boolean | string })
 
 export function SettingsScreen(_: ScreenProps) {
   const [tab, setTab] = useState('Users');
+  const { controls, controlsById } = useReference();
+  const libraryComplete = controls.length >= EXPECTED_CONTROL_COUNT;
   return (
     <div className="col">
       {/* Backend Status — first element after the return, before any tab/panel,
@@ -277,8 +281,8 @@ export function SettingsScreen(_: ScreenProps) {
       <PageHead title="Settings" sub="Manage platform configuration." />
       <Card title="Current MVP status">
         <div className="grid-2" style={{ gap: '0 var(--gap)' }}>
-          <StatusRow label="Full 110 controls loaded" value={LIBRARY_COMPLETE} />
-          <StatusRow label="Official scoring values loaded" value={scoringFinalized(CONTROLS_BY_ID)} />
+          <StatusRow label="Full 110 controls loaded" value={libraryComplete} />
+          <StatusRow label="Official scoring values loaded" value={scoringFinalized(controlsById)} />
           <StatusRow label="Assessment objectives loaded" value={false} />
           <StatusRow label="Backend connected" value={false} />
           <StatusRow label="Client portal enabled" value={false} />
@@ -352,8 +356,9 @@ export function SettingsScreen(_: ScreenProps) {
 /* ---------- 21. MOBILE DIRECTION ---------- */
 export function MobileScreen(_: ScreenProps) {
   const { assessments } = useData();
+  const { controlsById } = useReference();
   const readiness = readinessPct(assessments);
-  const score = sprsScore(assessments, CONTROLS_BY_ID);
+  const score = sprsScore(assessments, controlsById);
   const blockers = blockerItems(POAM_ITEMS).length;
   const missingEvidence = missingEvidenceCount(EVIDENCE_ITEMS);
   const openTasks = openTaskCount(TASKS);

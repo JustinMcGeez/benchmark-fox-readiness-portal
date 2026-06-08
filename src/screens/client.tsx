@@ -22,7 +22,7 @@ import {
 } from '../components/primitives';
 import { useData } from '../data/store';
 import { CURRENT_CLIENT } from '../data/clients';
-import { CONTROLS_BY_ID } from '../data/controls';
+import { useReference } from '../data/referenceStore';
 import { INTAKE_SUMMARY_FIELDS, PATH_RECOMMENDATION } from '../data/intake';
 import { ASSET_CATEGORIES } from '../data/scope';
 import { POAM_ITEMS } from '../data/poam';
@@ -50,11 +50,16 @@ import {
 /* ---------- 5. CLIENT DASHBOARD ---------- */
 export function ClientDashboardScreen({ go }: ScreenProps) {
   const { assessments } = useData();
+  // Control definitions for scoring come from the reference-data provider.
+  const { controlsById } = useReference();
 
   const counts = useMemo(() => statusCounts(assessments), [assessments]);
   const readiness = useMemo(() => readinessPct(assessments), [assessments]);
-  const score = useMemo(() => sprsScore(assessments, CONTROLS_BY_ID), [assessments]);
-  const families = useMemo(() => scoreByFamily(assessments, CONTROLS_BY_ID).slice(0, 5), [assessments]);
+  const score = useMemo(() => sprsScore(assessments, controlsById), [assessments, controlsById]);
+  const families = useMemo(
+    () => scoreByFamily(assessments, controlsById).slice(0, 5),
+    [assessments, controlsById],
+  );
 
   const openPoam = openPoamItems(POAM_ITEMS);
   const blockers = blockerItems(POAM_ITEMS);
@@ -63,7 +68,7 @@ export function ClientDashboardScreen({ go }: ScreenProps) {
   const nextActions = selNextActions(TASKS);
 
   const notMetTotal = counts.notMet + counts.notReviewed;
-  const finalized = scoringFinalized(CONTROLS_BY_ID);
+  const finalized = scoringFinalized(controlsById);
 
   return (
     <div className="col">

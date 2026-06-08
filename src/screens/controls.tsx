@@ -21,15 +21,9 @@ import {
 import { SourceRefs } from '../components/SourceRefs';
 import { ScoringWarning } from '../components/ScoringWarning';
 import { useData } from '../data/store';
-import { useReferenceData } from '../hooks/useReferenceData';
+import { useReference } from '../data/referenceStore';
 import { CURRENT_CLIENT } from '../data/clients';
-import {
-  CONTROLS_BY_ID,
-  CONTROL_LIBRARY,
-  EXPECTED_CONTROL_COUNT,
-  FAMILIES,
-  LIBRARY_COMPLETE,
-} from '../data/controls';
+import { CONTROLS_BY_ID, EXPECTED_CONTROL_COUNT } from '../data/controls';
 import { evidenceForControl } from '../data/evidence';
 import { poamForControl } from '../data/poam';
 import { tasksForControl } from '../data/tasks';
@@ -45,12 +39,11 @@ import { controlScoreDisplay, statusCounts } from '../lib/scoring';
 /* ---------- 9. CONTROL LIBRARY ---------- */
 export function ControlLibraryScreen({ go }: ScreenProps) {
   const { selectControl } = useData();
-  // Reference data comes from the hook: Supabase when configured, else the local
-  // generated data (with automatic fallback), so the screen always renders.
-  const { data } = useReferenceData();
+  // Reference data comes from the provider: Supabase when configured, else the
+  // local generated data (with automatic fallback), so the screen always renders.
+  const { controls, controlFamilies } = useReference();
   const [q, setQ] = useState('');
-  const controls = data.controls;
-  const families = data.families.map((f) => {
+  const families = controlFamilies.map((f) => {
     const inFam = controls.filter((c) => c.familyCode === f.code);
     return {
       code: f.code,
@@ -156,6 +149,8 @@ const ALL = 'All';
 
 export function ControlMatrixScreen({ go }: ScreenProps) {
   const { assessments, updateAssessment, selectControl } = useData();
+  // Control definitions from the reference-data provider (Supabase or local).
+  const { controls, controlsById, controlFamilies } = useReference();
   const [q, setQ] = useState('');
   const [fam, setFam] = useState(ALL);
   const [status, setStatus] = useState(ALL);
@@ -167,7 +162,7 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
   const rows = useMemo(() => {
     const term = q.toLowerCase();
     return assessments
-      .map((a) => ({ a, c: CONTROLS_BY_ID[a.controlId] }))
+      .map((a) => ({ a, c: controlsById[a.controlId] }))
       .filter(({ a, c }) => {
         if (!c) return false;
         if (fam !== ALL && c.familyCode !== fam) return false;
@@ -177,9 +172,10 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
         if (term && !(`${c.id} ${c.title} ${c.familyName}`.toLowerCase().includes(term))) return false;
         return true;
       });
-  }, [assessments, q, fam, status, ssp, evidence]);
+  }, [assessments, q, fam, status, ssp, evidence, controlsById]);
 
-  const famOptions = [ALL, ...FAMILIES.map((f) => f.code)];
+  const famOptions = [ALL, ...controlFamilies.map((f) => f.code)];
+  const libraryComplete = controls.length >= EXPECTED_CONTROL_COUNT;
 
   return (
     <div className="col">
@@ -187,10 +183,10 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
         title={`Controls — ${CURRENT_CLIENT.name}`}
         sub="Track readiness, SSP, evidence, POA&M, score impact, and ownership."
       />
-      {!LIBRARY_COMPLETE && (
+      {!libraryComplete && (
         <WarnBanner tone="bad">
           Control library is incomplete until all {EXPECTED_CONTROL_COUNT} NIST SP 800-171 Rev. 2
-          requirements are imported ({CONTROL_LIBRARY.length} loaded).
+          requirements are imported ({controls.length} loaded).
         </WarnBanner>
       )}
       <ScoringWarning />
@@ -342,10 +338,13 @@ function FilterSelect({
 /* ---------- 11. CONTROL DETAIL ---------- */
 export function ControlDetailScreen({ go }: ScreenProps) {
   const { selectedControlId, assessmentFor, updateAssessment } = useData();
+  const { controlsById } = useReference();
   const [tab, setTab] = useState('Overview');
   const tabs = ['Overview', 'Assessment', 'SSP', 'Evidence', 'POA&M', 'Tasks', 'Guidance'];
 
-  const control = CONTROLS_BY_ID[selectedControlId];
+  // Prefer the reference-data control (Supabase or local); fall back to the
+  // local generated definition if a reference control is missing.
+  const control = controlsById[selectedControlId] ?? CONTROLS_BY_ID[selectedControlId];
   const a = assessmentFor(selectedControlId);
   const evidence = evidenceForControl(selectedControlId);
   const poam = poamForControl(selectedControlId);

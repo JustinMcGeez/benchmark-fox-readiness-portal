@@ -10,7 +10,7 @@
 import type { ReactNode } from 'react';
 import { Badge, Card } from './primitives';
 import { getBackendStatus } from '../lib/backendConfig';
-import { useReferenceData } from '../hooks/useReferenceData';
+import { useReference } from '../data/referenceStore';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -28,13 +28,22 @@ function Row({ label, children }: { label: string; children: ReactNode }) {
 
 export function BackendStatusCard() {
   const status = getBackendStatus();
-  const { data, loading, error, source, health } = useReferenceData();
+  const {
+    controlFamilies,
+    controls,
+    sourceReferences,
+    controlSourceReferences,
+    loading,
+    error,
+    source,
+    health,
+  } = useReference();
 
   const counts = health?.counts ?? {
-    families: data.families.length,
-    controls: data.controls.length,
-    sourceReferences: data.sourceReferences.length,
-    controlSourceReferences: data.controlSourceReferences.length,
+    families: controlFamilies.length,
+    controls: controls.length,
+    sourceReferences: sourceReferences.length,
+    controlSourceReferences: controlSourceReferences.length,
   };
   const lastChecked = health?.lastChecked
     ? new Date(health.lastChecked).toLocaleString()
@@ -95,7 +104,8 @@ export function BackendStatusCard() {
 
       <p className="annot" style={{ marginTop: 12 }}>
         Read-only reference data this phase — no client writes, no CUI, no evidence
-        files stored in Supabase. Client edits remain in localStorage.
+        files stored in Supabase. <strong>Client edits still use localStorage in this
+        phase.</strong>
       </p>
     </Card>
   );

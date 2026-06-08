@@ -19,7 +19,7 @@ import { BrandLockup, BrandLogo } from '../components/Brand';
 import { AUDIT_EVENTS, CLIENTS, CURRENT_CLIENT_ID } from '../data/clients';
 import { POAM_ITEMS } from '../data/poam';
 import { useData } from '../data/store';
-import { CONTROLS_BY_ID } from '../data/controls';
+import { useReference } from '../data/referenceStore';
 import { formatScore, readinessPct, sprsScore } from '../lib/scoring';
 import { blockerItems, openPoamItems } from '../lib/selectors';
 
@@ -158,10 +158,11 @@ export function LoginScreen({ go }: ScreenProps) {
 /* ---------- 2. INTERNAL DASHBOARD ---------- */
 export function DashboardScreen({ go }: ScreenProps) {
   const { assessments } = useData();
+  const { controlsById } = useReference();
 
   // active client computes live; others use their seed summary
   const activeReadiness = readinessPct(assessments);
-  const activeScore = sprsScore(assessments, CONTROLS_BY_ID);
+  const activeScore = sprsScore(assessments, controlsById);
   const clientReadiness = (id: string, fallback: number) =>
     id === 'acme' ? activeReadiness : fallback;
 
@@ -268,11 +269,12 @@ export function DashboardScreen({ go }: ScreenProps) {
 /* ---------- 3. CLIENTS LIST ---------- */
 export function ClientsScreen({ go }: ScreenProps) {
   const { assessments } = useData();
+  const { controlsById } = useReference();
   // Only the active client has assessment data; its readiness/score compute live.
   // Other clients have no assessments, so we show an honest placeholder instead of
   // presenting seed numbers as if they were computed.
   const liveReadiness = readinessPct(assessments);
-  const liveScore = formatScore(sprsScore(assessments, CONTROLS_BY_ID));
+  const liveScore = formatScore(sprsScore(assessments, controlsById));
   const placeholderFor = (c: (typeof CLIENTS)[number]) =>
     c.phase === 'Intake' || c.cmmcPath === 'Unknown' ? 'Not started' : 'Seed summary only';
   return (

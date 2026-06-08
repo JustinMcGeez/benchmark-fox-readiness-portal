@@ -429,15 +429,43 @@ src/hooks/useReferenceData.ts            # React hook: data/loading/error/source
 src/components/BackendStatusCard.tsx     # Settings card: mode, source, counts, errors
 ```
 
-A guard script (`npm run check:supabase-readonly`) fails the build if any
-`src/screens/*` file imports the Supabase client/SDK or calls `supabase.from(...)`
-— all reads must go through the service/hook layer.
+A guard script (`npm run check:supabase-readonly`) scans **all of `src/`** and
+fails if a `src/screens/*` file imports the Supabase client/SDK or calls
+`supabase.from(...)`, if anything imports `@supabase/supabase-js` outside
+`src/lib/supabaseClient.ts`, or if any `src/` file performs a Supabase write
+(`.insert/.update/.upsert/.delete`). All reads flow through
+`referenceDataService` → `useReferenceData` → `ReferenceDataProvider`
+(`useReference()`).
 
-**Enable it locally:** set the env vars (see *Set environment variables* above),
-seed reference data (`npm run db:seed:refs`), then open **Settings → Backend
-Status**. With the vars unset you'll see: *"Running in local prototype mode. Set
-VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to enable read-only Supabase
-reference data."*
+**End-to-end validation flow (Supabase reference read):**
+
+```bash
+# 1. Start a local Supabase stack + apply migrations + seed.sql:
+npx supabase start
+npx supabase db reset
+
+# 2. Seed + validate reference data (service_role key is server-only):
+export SUPABASE_URL=http://127.0.0.1:54321
+export SUPABASE_SERVICE_ROLE_KEY=<local service_role key>
+npm run db:seed:refs
+npm run db:validate
+
+# 3. Point the FRONTEND at Supabase (anon key) via .env.local, then run the app:
+#    .env.local:
+#      VITE_SUPABASE_URL=http://127.0.0.1:54321
+#      VITE_SUPABASE_ANON_KEY=<local anon key>
+npm run dev
+
+# 4. Open Settings → Backend Status. It should show:
+#      Backend mode: Supabase Reference Read · Supabase configured: Yes
+#      Reference data source: Supabase · counts for families/controls/sources/links
+```
+
+With the `VITE_` vars unset, the app stays in local prototype mode and Backend
+Status shows: *"Running in local prototype mode. Set VITE_SUPABASE_URL and
+VITE_SUPABASE_ANON_KEY to enable read-only Supabase reference data."* If a
+Supabase read fails, the card shows **Local fallback** plus the error — the app
+keeps working. **Client edits still use localStorage in this phase.**
 
 **Commands to run:**
 
