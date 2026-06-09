@@ -180,8 +180,12 @@ export function getControls(): Promise<ServiceResult<Control[]>> {
         familyName: fam?.name ?? '',
         level: r.level === 'L1' ? 'L1' : 'L2',
         scoreValue: r.score_value,
-        // Derive the signed SPRS deduction from the stored magnitude (0/NA → 0).
-        sprsDeductionValue: r.score_value == null ? 0 : -Math.abs(r.score_value),
+        // Compatibility mapping for the current reference-read schema: the
+        // controls table has score_value/score_source but no sprs_deduction_value
+        // column yet, so derive the signed deduction from the magnitude
+        // (null/NA → 0). Cast is safe — magnitudes are 5/3/1 or null.
+        sprsDeductionValue: (r.score_value == null ? 0 : -Math.abs(r.score_value)) as Control['sprsDeductionValue'],
+        // Preserve the actual source string from Supabase when present.
         scoreSource: r.score_source || 'placeholder',
         title: r.title,
         summary: r.summary,

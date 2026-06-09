@@ -26,26 +26,25 @@ export interface StatusCounts {
   applicable: number;
 }
 
-/** Whether a status counts as a full point deduction in the SPRS-style score. */
-function isDeducted(status: ReadinessStatus): boolean {
-  return status !== 'Met' && status !== 'Not Applicable';
-}
-
-export function deductionFor(a: ClientControlAssessment, control?: Control): number {
-  // scoreValue null = official deduction not finalized → contributes 0 (and the
-  // UI surfaces a "scoring not finalized" warning via scoringFinalized()).
-  if (!control || control.scoreValue == null) return 0;
-  return isDeducted(a.status) ? control.scoreValue : 0;
-}
+const ALLOWED_DEDUCTIONS = new Set([-5, -3, -1, 0]);
 
 /**
- * True when every control's scoring value comes from the official DoD Assessment
- * Methodology (not a placeholder). Note: 3.12.4 is "NA" (no point value) by
- * design, so we check the source provenance, not a non-null magnitude.
+ * True when official scoring is fully loaded: every control has a non-placeholder
+ * scoreSource, a defined sprsDeductionValue, and an allowed value (-5/-3/-1, or 0
+ * for the documented NA control 3.12.4). We check provenance + the deduction
+ * value, not a non-null magnitude (3.12.4 is "NA" with a null magnitude by design).
  */
 export function scoringFinalized(controlsById: Record<string, Control>): boolean {
   const list = Object.values(controlsById);
-  return list.length > 0 && list.every((c) => c.scoreSource !== 'placeholder' && c.scoreSource !== '');
+  if (list.length === 0) return false;
+  return list.every(
+    (c) =>
+      c.scoreSource !== 'placeholder' &&
+      c.scoreSource !== '' &&
+      c.sprsDeductionValue !== undefined &&
+      c.sprsDeductionValue !== null &&
+      ALLOWED_DEDUCTIONS.has(c.sprsDeductionValue),
+  );
 }
 
 export function statusCounts(assessments: ClientControlAssessment[]): StatusCounts {
@@ -81,13 +80,16 @@ export function statusCounts(assessments: ClientControlAssessment[]): StatusCoun
   return c;
 }
 
-/** SPRS-style score: 110 minus the sum of deductions. Can go negative. */
+/**
+ * Legacy wrapper — returns only the estimated SPRS score. Prefer `estimateSprs()`
+ * for the full breakdown. Delegates so all callers share one conservative model
+ * (Partial counted as a full deduction). Can go negative.
+ */
 export function sprsScore(
   assessments: ClientControlAssessment[],
   controlsById: Record<string, Control>,
 ): number {
-  const deductions = assessments.reduce((sum, a) => sum + deductionFor(a, controlsById[a.controlId]), 0);
-  return Math.round(SPRS_MAX - deductions);
+  return estimateSprs(assessments, controlsById).estimatedSprsScore;
 }
 
 /** Formatted with an explicit sign, e.g. "−38" / "+6". */
@@ -230,7 +232,8 @@ export function scoreByFamily(
   const rows: FamilyScore[] = [];
   for (const [code, list] of byFam) {
     const name = controlsById[list[0].controlId]?.familyName ?? code;
-    const deduction = list.reduce((s, a) => s + deductionFor(a, controlsById[a.controlId]), 0);
+    // Same conservative model as estimateSprs (Partial = full deduction).
+    const deduction = list.reduce((s, a) => s + deductionImpact(a, controlsById[a.controlId]), 0);
     rows.push({ code, name, deduction, readiness: readinessPct(list) });
   }
   // worst (highest deduction) first

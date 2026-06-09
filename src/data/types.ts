@@ -74,6 +74,12 @@ export interface Client {
   active: boolean;
 }
 
+/**
+ * Official SPRS deduction values (DoD Assessment Methodology, Annex A):
+ * -5 / -3 / -1, plus 0 for the single documented "NA" control (3.12.4).
+ */
+export type SprsDeduction = -5 | -3 | -1 | 0;
+
 /** Library-level control definition (client-independent). */
 export interface Control {
   id: string; // e.g. '3.1.1' (same as number)
@@ -84,26 +90,31 @@ export interface Control {
   /** lowest CMMC level at which the requirement applies */
   level: 'L1' | 'L2';
   /**
-   * SPRS point weight (positive magnitude, 5/3/1) deducted when the control is
-   * NOT implemented, per the official DoD Assessment Methodology.
-   * `null` ONLY for 3.12.4, whose Annex A value is "NA" (System Security Plan —
-   * not point-scored; see scoreNotes). Never guessed.
+   * Display magnitude (positive, 5/3/1) of the SPRS deduction — used by the UI.
+   * `null` ONLY for the official "NA" control (3.12.4), whose Annex A value is
+   * "NA" (System Security Plan — not point-scored; see scoreNotes). Never guessed.
    */
   scoreValue: number | null;
   /**
-   * Signed SPRS deduction applied when not implemented: -5 | -3 | -1, or 0 for
-   * the single "NA" control (3.12.4). Source of truth for scoring math.
+   * Official signed SPRS deduction (DoD Assessment Methodology) applied when the
+   * control is not implemented: -5 | -3 | -1, or 0 for the single documented "NA"
+   * control (3.12.4). Source of truth for scoring math.
    */
-  sprsDeductionValue: number;
+  sprsDeductionValue: SprsDeduction;
   /**
-   * Provenance of the scoring value. 'nist-sp-800-171-dod-assessment-methodology'
-   * once official values are loaded; 'placeholder' before that. (Kept as a
-   * string so the official source id is explicit.)
+   * Identifies the source of the scoring value. The literal
+   * 'nist-sp-800-171-dod-assessment-methodology' once official values are loaded
+   * (current state); 'placeholder' only before they are. String (not a fixed
+   * union) so the official source id is explicit.
    */
   scoreSource: string;
   /** Official scoring document version, e.g. 'Version 1.2.1 (June 24, 2020)'. */
   scoreSourceVersion?: string;
-  /** Notes on the scoring value (special cases like 3.5.3 / 3.13.11 / NA 3.12.4). */
+  /**
+   * Notes on the scoring value — special cases (3.5.3 / 3.13.11 are "3 to 5",
+   * base -5) and the NA control (3.12.4). NOTE: "Partial" is not an official
+   * final SPRS status; the app counts it conservatively as a full deduction.
+   */
   scoreNotes?: string;
   title: string; // short display label (derived from requirement)
   summary: string; // requirement summary for tables

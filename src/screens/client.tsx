@@ -95,10 +95,13 @@ export function ClientDashboardScreen({ go }: ScreenProps) {
           <StatCard k="Controls Deducting" v={sprs.deductionCount} d={`${sprs.partialCount} partial (counted as not met)`} />
           <StatCard k="High-Impact Gaps" v={sprs.highImpactGapCount} d="−5 controls" tone="crit" />
         </div>
-        <p className="annot" style={{ marginTop: 10 }}>
-          Estimate based on current readiness inputs; not an official assessment result. Partial is
-          not an official SPRS status and is counted conservatively as Not Met.
-        </p>
+        <div className="col" style={{ gap: 2, marginTop: 10 }}>
+          {sprs.warnings.map((w) => (
+            <p key={w} className="annot" style={{ margin: 0 }}>
+              {w}
+            </p>
+          ))}
+        </div>
       </Card>
       <div className="grid-2">
         <Card title="Overall Readiness">
