@@ -25,7 +25,14 @@ import { TASKS } from '../data/tasks';
 import { useData } from '../data/store';
 import { EXPECTED_CONTROL_COUNT } from '../data/controls';
 import { useReference } from '../data/referenceStore';
-import { formatScore, readinessPct, scoringFinalized, sprsScore } from '../lib/scoring';
+import {
+  estimateSprs,
+  formatScore,
+  readinessPct,
+  scoringFinalized,
+  sprsScore,
+  topDeductionDrivers,
+} from '../lib/scoring';
 import { blockerItems, missingEvidenceCount, openTaskCount, topFindings } from '../lib/selectors';
 import { SourceRefs } from '../components/SourceRefs';
 import { ScoringWarning } from '../components/ScoringWarning';
@@ -96,7 +103,8 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
   const { assessments } = useData();
   const { controlsById } = useReference();
   const readiness = readinessPct(assessments);
-  const score = sprsScore(assessments, controlsById);
+  const sprs = estimateSprs(assessments, controlsById);
+  const drivers = topDeductionDrivers(assessments, controlsById, 5);
   const risk = readiness >= 80 ? 'Low' : readiness >= 60 ? 'Medium' : 'High';
   const findings = topFindings(assessments, POAM_ITEMS, EVIDENCE_ITEMS, controlsById, 5);
   return (
@@ -140,9 +148,10 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
             </div>
             <div className="w-box" style={{ padding: 12, textAlign: 'center' }}>
               <div className="mono faint" style={{ fontSize: '.7em' }}>
-                SCORE
+                EST. SPRS
               </div>
-              <div className="w-h1">{formatScore(score)}</div>
+              <div className="w-h1">{formatScore(sprs.estimatedSprsScore)}</div>
+              <div className="mono faint" style={{ fontSize: '.62em' }}>−{sprs.totalDeductions} ded.</div>
             </div>
             <div className="w-box" style={{ padding: 12, textAlign: 'center' }}>
               <div className="mono faint" style={{ fontSize: '.7em' }}>
@@ -154,6 +163,30 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
             </div>
           </div>
           <h3 className="w-h2" style={{ marginTop: 24, fontSize: '1.15em' }}>
+            Estimated SPRS Score
+          </h3>
+          <p className="muted" style={{ margin: '2px 0 0', fontSize: '.92em' }}>
+            {formatScore(sprs.estimatedSprsScore)} of 110 · −{sprs.totalDeductions} total deductions
+            across {sprs.deductionCount} unmet control(s), incl. {sprs.highImpactGapCount} high-impact
+            (−5) gap(s). Based on the DoD Assessment Methodology; Partial counted conservatively as Not
+            Met.
+          </p>
+          <h3 className="w-h2" style={{ marginTop: 18, fontSize: '1.15em' }}>
+            Top SPRS Deduction Drivers
+          </h3>
+          <ol className="muted" style={{ paddingLeft: 18 }}>
+            {drivers.length ? (
+              drivers.map((d) => (
+                <li key={d.control.id}>
+                  <span className="mono">{d.control.id}</span> {d.control.title} —{' '}
+                  <strong>−{d.impact}</strong> ({d.status})
+                </li>
+              ))
+            ) : (
+              <li>No deductions — all scored controls are Met or Not Applicable.</li>
+            )}
+          </ol>
+          <h3 className="w-h2" style={{ marginTop: 18, fontSize: '1.15em' }}>
             Top Findings
           </h3>
           <ol className="muted" style={{ paddingLeft: 18 }}>
@@ -166,6 +199,11 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
           <Ph h={120} style={{ marginTop: 16 }}>
             [ readiness-by-family chart ]
           </Ph>
+          <p className="annot" style={{ marginTop: 16, fontSize: '.78em' }}>
+            This report is for readiness support only and does not represent an official CMMC
+            assessment, C3PAO result, legal opinion, certification guarantee, or contract award
+            guarantee.
+          </p>
         </div>
       </div>
       <SourceRefs ids={['nist-sp-800-171r2', 'dod-assessment-methodology', 'cfr-32-170', 'bf-internal']} />

@@ -38,10 +38,14 @@ export function deductionFor(a: ClientControlAssessment, control?: Control): num
   return isDeducted(a.status) ? control.scoreValue : 0;
 }
 
-/** True only when every control carries an official (non-null) deduction value. */
+/**
+ * True when every control's scoring value comes from the official DoD Assessment
+ * Methodology (not a placeholder). Note: 3.12.4 is "NA" (no point value) by
+ * design, so we check the source provenance, not a non-null magnitude.
+ */
 export function scoringFinalized(controlsById: Record<string, Control>): boolean {
   const list = Object.values(controlsById);
-  return list.length > 0 && list.every((c) => c.scoreValue != null);
+  return list.length > 0 && list.every((c) => c.scoreSource !== 'placeholder' && c.scoreSource !== '');
 }
 
 export function statusCounts(assessments: ClientControlAssessment[]): StatusCounts {
@@ -113,6 +117,105 @@ export interface FamilyScore {
   name: string;
   deduction: number;
   readiness: number; // %
+}
+
+/* ============================================================
+   Official SPRS estimate (DoD Assessment Methodology v1.2.1).
+
+   Baseline 110. A control deducts its official point value when it is NOT
+   implemented. Status handling (conservative, readiness-support estimate):
+     - Met            → no deduction.
+     - Not Applicable → no deduction (excluded from the assessment).
+     - Not Met        → full deduction.
+     - Not Reviewed   → treated as not implemented → full deduction (you only
+                        earn points for implemented requirements).
+     - Partial        → NOT an official SPRS status. Treated CONSERVATIVELY as
+                        Not Met (full deduction), counted + surfaced in warnings.
+   3.12.4 ("NA") carries no point value and never deducts.
+   The estimate can go below zero. It is NOT an official assessment result.
+   ============================================================ */
+const isNotImplemented = (status: ReadinessStatus): boolean =>
+  status === 'Not Met' || status === 'Not Reviewed' || status === 'Partial';
+
+export interface SprsEstimate {
+  estimatedSprsScore: number;
+  totalDeductions: number;
+  deductionCount: number;
+  highImpactGapCount: number; // unmet controls worth -5
+  partialCount: number;
+  missingScoringCount: number; // controls without an official value (should be 0)
+  scoringComplete: boolean;
+  warnings: string[];
+}
+
+/** Per-control deduction contribution given the current status (positive magnitude). */
+export function deductionImpact(a: ClientControlAssessment, control?: Control): number {
+  if (!control || control.scoreValue == null) return 0; // NA / unknown → no deduction
+  return isNotImplemented(a.status) ? control.scoreValue : 0;
+}
+
+export function estimateSprs(
+  assessments: ClientControlAssessment[],
+  controlsById: Record<string, Control>,
+): SprsEstimate {
+  let totalDeductions = 0;
+  let deductionCount = 0;
+  let highImpactGapCount = 0;
+  let partialCount = 0;
+  let missingScoringCount = 0;
+
+  for (const a of assessments) {
+    const control = controlsById[a.controlId];
+    if (a.status === 'Partial') partialCount++;
+    if (!control || control.scoreSource === 'placeholder' || control.scoreSource === '') {
+      missingScoringCount++;
+      continue;
+    }
+    const impact = deductionImpact(a, control);
+    if (impact > 0) {
+      totalDeductions += impact;
+      deductionCount++;
+      if (impact === 5) highImpactGapCount++;
+    }
+  }
+
+  const warnings: string[] = [];
+  if (partialCount > 0) {
+    warnings.push(
+      `${partialCount} control(s) marked Partial are not an official SPRS status — counted conservatively as Not Met (full deduction).`,
+    );
+  }
+  if (missingScoringCount > 0) {
+    warnings.push(`${missingScoringCount} control(s) have no official scoring value loaded.`);
+  }
+  warnings.push('Estimate based on current readiness inputs; not an official assessment result.');
+
+  return {
+    estimatedSprsScore: Math.round(SPRS_MAX - totalDeductions),
+    totalDeductions,
+    deductionCount,
+    highImpactGapCount,
+    partialCount,
+    missingScoringCount,
+    scoringComplete: missingScoringCount === 0,
+    warnings,
+  };
+}
+
+/** Unmet controls sorted by deduction impact (desc) — drives "top gaps" displays. */
+export function topDeductionDrivers(
+  assessments: ClientControlAssessment[],
+  controlsById: Record<string, Control>,
+  limit = 5,
+): { control: Control; impact: number; status: ReadinessStatus }[] {
+  return assessments
+    .map((a) => {
+      const control = controlsById[a.controlId];
+      return control ? { control, impact: deductionImpact(a, control), status: a.status } : null;
+    })
+    .filter((x): x is { control: Control; impact: number; status: ReadinessStatus } => !!x && x.impact > 0)
+    .sort((a, b) => b.impact - a.impact)
+    .slice(0, limit);
 }
 
 export function scoreByFamily(

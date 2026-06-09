@@ -8,7 +8,9 @@
    - SEED_ASSESSMENTS: a default (Not Reviewed) assessment for every control,
      overlaid with a realistic worked subset for the active client.
 
-   scoreValue stays null (placeholder) — see scoring.ts / "scoring not finalized".
+   Official SPRS deduction values (DoD Assessment Methodology v1.2.1, Annex A)
+   are loaded per control via the generator — see scoring.ts. 3.12.4 is "NA"
+   (System Security Plan; not point-scored), so its scoreValue is null by design.
    ============================================================ */
 import type {
   ClientControlAssessment,

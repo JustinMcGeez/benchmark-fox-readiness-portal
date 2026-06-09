@@ -180,7 +180,9 @@ export function getControls(): Promise<ServiceResult<Control[]>> {
         familyName: fam?.name ?? '',
         level: r.level === 'L1' ? 'L1' : 'L2',
         scoreValue: r.score_value,
-        scoreSource: r.score_source === 'official' ? 'official' : 'placeholder',
+        // Derive the signed SPRS deduction from the stored magnitude (0/NA → 0).
+        sprsDeductionValue: r.score_value == null ? 0 : -Math.abs(r.score_value),
+        scoreSource: r.score_source || 'placeholder',
         title: r.title,
         summary: r.summary,
         requirement: r.requirement,

@@ -29,11 +29,11 @@ import { POAM_ITEMS } from '../data/poam';
 import { EVIDENCE_ITEMS } from '../data/evidence';
 import { TASKS } from '../data/tasks';
 import {
+  estimateSprs,
   formatScore,
   readinessPct,
   scoreByFamily,
   scoringFinalized,
-  sprsScore,
   SPRS_MAX,
   statusCounts,
 } from '../lib/scoring';
@@ -55,7 +55,7 @@ export function ClientDashboardScreen({ go }: ScreenProps) {
 
   const counts = useMemo(() => statusCounts(assessments), [assessments]);
   const readiness = useMemo(() => readinessPct(assessments), [assessments]);
-  const score = useMemo(() => sprsScore(assessments, controlsById), [assessments, controlsById]);
+  const sprs = useMemo(() => estimateSprs(assessments, controlsById), [assessments, controlsById]);
   const families = useMemo(
     () => scoreByFamily(assessments, controlsById).slice(0, 5),
     [assessments, controlsById],
@@ -79,10 +79,27 @@ export function ClientDashboardScreen({ go }: ScreenProps) {
       <ScoringWarning />
       <div className="grid-4">
         <StatCard k="Readiness" v={`${readiness}%`} />
-        <StatCard k="Current Score" v={formatScore(score)} d={`Target: ${SPRS_MAX}`} tone="warn" />
+        <StatCard
+          k="Est. SPRS Score"
+          v={formatScore(sprs.estimatedSprsScore)}
+          d={`of ${SPRS_MAX} · −${sprs.totalDeductions} deductions`}
+          tone="warn"
+        />
         <StatCard k="Open POA&Ms" v={openPoam.length} />
         <StatCard k="Critical Blockers" v={blockers.length} d="High" tone="crit" />
       </div>
+      <Card title="Estimated SPRS Score (DoD Assessment Methodology)">
+        <div className="grid-4">
+          <StatCard k="Est. SPRS Score" v={formatScore(sprs.estimatedSprsScore)} d={`of ${SPRS_MAX}`} tone="warn" />
+          <StatCard k="Total Deductions" v={`−${sprs.totalDeductions}`} tone="bad" />
+          <StatCard k="Controls Deducting" v={sprs.deductionCount} d={`${sprs.partialCount} partial (counted as not met)`} />
+          <StatCard k="High-Impact Gaps" v={sprs.highImpactGapCount} d="−5 controls" tone="crit" />
+        </div>
+        <p className="annot" style={{ marginTop: 10 }}>
+          Estimate based on current readiness inputs; not an official assessment result. Partial is
+          not an official SPRS status and is counted conservatively as Not Met.
+        </p>
+      </Card>
       <div className="grid-2">
         <Card title="Overall Readiness">
           <div className="row" style={{ alignItems: 'center', gap: 24 }}>

@@ -84,13 +84,27 @@ export interface Control {
   /** lowest CMMC level at which the requirement applies */
   level: 'L1' | 'L2';
   /**
-   * SPRS point weight deducted when the control is not implemented.
-   * `null` = NOT FINALIZED — the official DoD Assessment Methodology value is
-   * not available from a bundled local source, so it must not be guessed.
+   * SPRS point weight (positive magnitude, 5/3/1) deducted when the control is
+   * NOT implemented, per the official DoD Assessment Methodology.
+   * `null` ONLY for 3.12.4, whose Annex A value is "NA" (System Security Plan —
+   * not point-scored; see scoreNotes). Never guessed.
    */
   scoreValue: number | null;
-  /** whether scoreValue is an official methodology value or a placeholder */
-  scoreSource: 'placeholder' | 'official';
+  /**
+   * Signed SPRS deduction applied when not implemented: -5 | -3 | -1, or 0 for
+   * the single "NA" control (3.12.4). Source of truth for scoring math.
+   */
+  sprsDeductionValue: number;
+  /**
+   * Provenance of the scoring value. 'nist-sp-800-171-dod-assessment-methodology'
+   * once official values are loaded; 'placeholder' before that. (Kept as a
+   * string so the official source id is explicit.)
+   */
+  scoreSource: string;
+  /** Official scoring document version, e.g. 'Version 1.2.1 (June 24, 2020)'. */
+  scoreSourceVersion?: string;
+  /** Notes on the scoring value (special cases like 3.5.3 / 3.13.11 / NA 3.12.4). */
+  scoreNotes?: string;
   title: string; // short display label (derived from requirement)
   summary: string; // requirement summary for tables
   requirement: string; // official NIST SP 800-171 Rev. 2 requirement text

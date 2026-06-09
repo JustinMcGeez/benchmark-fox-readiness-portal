@@ -78,15 +78,24 @@ for (const c of controls) {
     const empty = v === undefined || v === null || v === '' || (Array.isArray(v) && v.length === 0);
     if (empty) fail(`Control ${c.number ?? '(unknown)'} is missing required field "${f}".`);
   }
-  // 4. scoreSource present
-  if (c.scoreSource !== 'placeholder' && c.scoreSource !== 'official') {
-    fail(`Control ${c.number} has invalid scoreSource "${c.scoreSource}" (must be 'placeholder' or 'official').`);
+  // 4. official scoring loaded (no placeholders)
+  if (!c.scoreSource || c.scoreSource === 'placeholder') {
+    fail(`Control ${c.number} still has placeholder/empty scoreSource — official scoring not loaded.`);
   }
-  // 5. null scoreValue must be a placeholder
-  if (c.scoreValue === null && c.scoreSource !== 'placeholder') {
-    fail(`Control ${c.number} has scoreValue=null but scoreSource is not "placeholder".`);
+  // 5. sprsDeductionValue present and allowed (-5/-3/-1, or 0 for the NA control)
+  if (c.sprsDeductionValue === undefined || c.sprsDeductionValue === null) {
+    fail(`Control ${c.number} is missing sprsDeductionValue.`);
   }
-  // 6. must cite NIST SP 800-171 Rev. 2
+  if (![-5, -3, -1, 0].includes(c.sprsDeductionValue)) {
+    fail(`Control ${c.number} has invalid sprsDeductionValue ${c.sprsDeductionValue} (allowed: -5/-3/-1, or 0 for NA).`);
+  }
+  // 6. scoreValue (magnitude) consistent with the deduction; null only for NA (0)
+  if (c.sprsDeductionValue === 0) {
+    if (c.scoreValue !== null) fail(`Control ${c.number} is NA (0 deduction) but scoreValue is not null.`);
+  } else if (c.scoreValue !== Math.abs(c.sprsDeductionValue)) {
+    fail(`Control ${c.number} scoreValue ${c.scoreValue} != magnitude of sprsDeductionValue ${c.sprsDeductionValue}.`);
+  }
+  // 7. must cite NIST SP 800-171 Rev. 2
   if (!Array.isArray(c.sourceRefs) || !c.sourceRefs.includes('nist-sp-800-171r2')) {
     fail(`Control ${c.number} does not include "nist-sp-800-171r2" in sourceRefs.`);
   }
@@ -100,9 +109,11 @@ if (families.size !== EXPECTED_FAMILIES.length) {
   fail(`Expected ${EXPECTED_FAMILIES.length} families, found ${families.size}: ${[...families].join(', ')}`);
 }
 
-const placeholders = controls.filter((c) => c.scoreSource === 'placeholder').length;
+const placeholders = controls.filter((c) => !c.scoreSource || c.scoreSource === 'placeholder').length;
+const dist = controls.reduce((a, c) => ((a[c.sprsDeductionValue] = (a[c.sprsDeductionValue] || 0) + 1), a), {});
 console.log(
   `✓ Control validation passed — ${controls.length} controls, ${families.size} families, ` +
     `no duplicates, all required fields present.\n` +
-    `  Scoring: ${placeholders}/${controls.length} placeholder (official DoD Assessment Methodology values not loaded).`,
+    `  Scoring: ${controls.length - placeholders}/${controls.length} official (DoD Assessment Methodology). ` +
+    `Distribution −5:${dist['-5'] || 0} −3:${dist['-3'] || 0} −1:${dist['-1'] || 0} NA:${dist['0'] || 0}.`,
 );

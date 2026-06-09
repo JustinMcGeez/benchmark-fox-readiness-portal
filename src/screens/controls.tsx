@@ -34,7 +34,7 @@ import {
   READINESS_OPTIONS,
   SSP_OPTIONS,
 } from '../data/types';
-import { controlScoreDisplay, statusCounts } from '../lib/scoring';
+import { controlScoreDisplay, deductionImpact, statusCounts } from '../lib/scoring';
 
 /* ---------- 9. CONTROL LIBRARY ---------- */
 export function ControlLibraryScreen({ go }: ScreenProps) {
@@ -156,6 +156,7 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
   const [status, setStatus] = useState(ALL);
   const [ssp, setSsp] = useState(ALL);
   const [evidence, setEvidence] = useState(ALL);
+  const [highImpactOnly, setHighImpactOnly] = useState(false);
 
   const counts = useMemo(() => statusCounts(assessments), [assessments]);
 
@@ -169,10 +170,11 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
         if (status !== ALL && a.status !== status) return false;
         if (ssp !== ALL && a.sspStatus !== ssp) return false;
         if (evidence !== ALL && a.evidenceStatus !== evidence) return false;
+        if (highImpactOnly && c.sprsDeductionValue !== -5) return false;
         if (term && !(`${c.id} ${c.title} ${c.familyName}`.toLowerCase().includes(term))) return false;
         return true;
       });
-  }, [assessments, q, fam, status, ssp, evidence, controlsById]);
+  }, [assessments, q, fam, status, ssp, evidence, highImpactOnly, controlsById]);
 
   const famOptions = [ALL, ...controlFamilies.map((f) => f.code)];
   const libraryComplete = controls.length >= EXPECTED_CONTROL_COUNT;
@@ -207,6 +209,13 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
         <FilterSelect label="Status" value={status} options={[ALL, ...READINESS_OPTIONS]} onChange={setStatus} />
         <FilterSelect label="SSP" value={ssp} options={[ALL, ...SSP_OPTIONS]} onChange={setSsp} />
         <FilterSelect label="Evidence" value={evidence} options={[ALL, ...EVIDENCE_OPTIONS]} onChange={setEvidence} />
+        <button
+          className={'w-btn sm' + (highImpactOnly ? ' primary' : ' ghost')}
+          onClick={() => setHighImpactOnly((v) => !v)}
+          title="Show only high-impact SPRS controls (−5 deduction)"
+        >
+          High SPRS Impact (−5)
+        </button>
       </div>
 
       <Card style={{ padding: '6px 6px' }}>
@@ -227,8 +236,9 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
             <tr>
               <th>Control</th>
               <th>Fam</th>
+              <th title="Official SPRS deduction if not implemented (DoD Assessment Methodology)">SPRS</th>
               <th>Status</th>
-              <th>Score</th>
+              <th>At-Risk</th>
               <th>SSP</th>
               <th>Evidence</th>
               <th>POA&M</th>
@@ -247,6 +257,16 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
               >
                 <td className="mono" style={{ fontWeight: 700 }}>{a.controlId}</td>
                 <td className="mono faint">{c.familyCode}</td>
+                <td className="num">
+                  {/* Official SPRS weight; −5 high-impact emphasized. */}
+                  {c.sprsDeductionValue === 0 ? (
+                    <span className="faint" title={c.scoreNotes}>NA</span>
+                  ) : c.sprsDeductionValue === -5 ? (
+                    <strong style={{ color: 'var(--bad, #b4232a)' }}>−5</strong>
+                  ) : (
+                    <span>−{Math.abs(c.sprsDeductionValue)}</span>
+                  )}
+                </td>
                 <td>
                   <InlineSelect
                     ariaLabel="Readiness status"
@@ -295,7 +315,7 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={9} className="muted" style={{ textAlign: 'center', padding: 24 }}>
+                <td colSpan={10} className="muted" style={{ textAlign: 'center', padding: 24 }}>
                   No controls match these filters.
                 </td>
               </tr>
@@ -374,17 +394,59 @@ export function ControlDetailScreen({ go }: ScreenProps) {
             {control.id} — {control.title}
           </h1>
           <p className="w-sub mono" style={{ fontSize: '.8em' }}>
-            {control.familyName.toUpperCase()} · LEVEL {control.level.slice(1)} · SCORE VALUE −
-            {control.scoreValue}
+            {control.familyName.toUpperCase()} · LEVEL {control.level.slice(1)} · SPRS{' '}
+            {control.sprsDeductionValue === 0 ? 'NA' : `−${Math.abs(control.sprsDeductionValue)}`}
           </p>
         </div>
         <RiskBadge level={a.risk} />
       </div>
-      {control.scoreValue == null && (
+      {control.scoreSource === 'placeholder' && (
         <WarnBanner tone="warn">
           Scoring not finalized — the official DoD Assessment Methodology deduction value for this
-          control has not been imported. Score impact is a placeholder.
+          control has not been loaded.
         </WarnBanner>
+      )}
+      {control.sprsDeductionValue === 0 && (
+        <WarnBanner tone="none">
+          SPRS value: <strong>NA</strong>. {control.scoreNotes}
+        </WarnBanner>
+      )}
+      {control.sprsDeductionValue !== 0 && (
+        <Card title="SPRS Scoring (DoD Assessment Methodology)">
+          <div className="grid-3">
+            <div className="between">
+              <span className="w-label">Official deduction</span>
+              <span className="mono">
+                {control.sprsDeductionValue === -5 ? (
+                  <strong style={{ color: 'var(--bad, #b4232a)' }}>−5</strong>
+                ) : (
+                  `−${Math.abs(control.sprsDeductionValue)}`
+                )}
+              </span>
+            </div>
+            <div className="between">
+              <span className="w-label">Current status</span>
+              <Status s={a.status} />
+            </div>
+            <div className="between">
+              <span className="w-label">Impact on estimate</span>
+              <span className="mono">
+                {deductionImpact(a, control) > 0 ? `−${deductionImpact(a, control)}` : '0'}
+              </span>
+            </div>
+          </div>
+          {a.status === 'Partial' && (
+            <p className="annot" style={{ marginTop: 8 }}>
+              Partial is not an official SPRS status. For the estimated score it is treated
+              conservatively as Not Met (full −{Math.abs(control.sprsDeductionValue)} deduction); the
+              readiness % gives Partial half credit as an internal readiness estimate only.
+            </p>
+          )}
+          <p className="annot" style={{ marginTop: 8 }}>
+            {control.scoreSourceVersion ? `${control.scoreSourceVersion} · ` : ''}Estimate only — not an
+            official assessment result.
+          </p>
+        </Card>
       )}
       <Tabs items={tabs} active={tab} onPick={setTab} />
       <div className="grid-2" style={{ alignItems: 'start' }}>
@@ -585,9 +647,9 @@ export function ControlDetailScreen({ go }: ScreenProps) {
             <div className="between">
               <span className="w-label">Score Impact</span>
               <span className="mono">
-                {control.scoreValue == null
-                  ? 'Not finalized'
-                  : `${controlScoreDisplay(a, control)} / −${control.scoreValue}`}
+                {control.sprsDeductionValue === 0
+                  ? 'NA (not point-scored)'
+                  : `${controlScoreDisplay(a, control)} / −${Math.abs(control.sprsDeductionValue)}`}
               </span>
             </div>
             <div className="between">

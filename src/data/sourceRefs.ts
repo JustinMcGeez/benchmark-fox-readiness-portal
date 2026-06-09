@@ -55,7 +55,7 @@ export const SOURCE_REFS: SourceRef[] = [
     documentType: 'DoD Guidance',
     version: 'v1.2.1',
     reference: 'Annex A — scoring values',
-    notes: 'Official SPRS deduction values (5/3/1) come from here. Not bundled — scoreValue is a placeholder until imported.',
+    notes: 'Official SPRS deduction values (5/3/1, plus NA) come from here (Annex A). Loaded from data-sources/dod-assessment-methodology-scoring.json.',
   },
   {
     sourceId: 'far-52-204-21',

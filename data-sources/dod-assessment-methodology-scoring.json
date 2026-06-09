@@ -1,0 +1,882 @@
+[
+  {
+    "requirementId": "3.1.1",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.2",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.3",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.4",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.5",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.6",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.7",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.8",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.9",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.10",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.11",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.12",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.13",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.14",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.15",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.16",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.17",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.18",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.19",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.20",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.21",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.1.22",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.2.1",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.2.2",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.2.3",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.3.1",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.3.2",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.3.3",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.3.4",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.3.5",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.3.6",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.3.7",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.3.8",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.3.9",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.4.1",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.4.2",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.4.3",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.4.4",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.4.5",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.4.6",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.4.7",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.4.8",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.4.9",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.5.1",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.5.2",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.5.3",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": "Special case: Annex A value '3 to 5'. Subtract 5 if MFA not implemented for any users (base, used here); 3 if implemented only for remote and privileged users."
+  },
+  {
+    "requirementId": "3.5.4",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.5.5",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.5.6",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.5.7",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.5.8",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.5.9",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.5.10",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.5.11",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.6.1",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.6.2",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.6.3",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.7.1",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.7.2",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.7.3",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.7.4",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.7.5",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.7.6",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.8.1",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.8.2",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.8.3",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.8.4",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.8.5",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.8.6",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.8.7",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.8.8",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.8.9",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.9.1",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.9.2",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.10.1",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.10.2",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.10.3",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.10.4",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.10.5",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.10.6",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.11.1",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.11.2",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.11.3",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.12.1",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.12.2",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.12.3",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.12.4",
+    "sprsDeductionValue": 0,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": "Annex A value 'NA'. System Security Plan requirement: the absence of an SSP prevents the assessment (DFARS 252.204-7012 noncompliance) rather than incurring a point deduction. Not point-scored — 0 deduction."
+  },
+  {
+    "requirementId": "3.13.1",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.2",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.3",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.4",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.5",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.6",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.7",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.8",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.9",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.10",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.11",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": "Special case: Annex A value '3 to 5'. Subtract 5 if no cryptography employed (base, used here); 3 if encryption employed but not FIPS-validated."
+  },
+  {
+    "requirementId": "3.13.12",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.13",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.14",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.15",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.13.16",
+    "sprsDeductionValue": -1,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.14.1",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.14.2",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.14.3",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.14.4",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.14.5",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.14.6",
+    "sprsDeductionValue": -5,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  },
+  {
+    "requirementId": "3.14.7",
+    "sprsDeductionValue": -3,
+    "scoreSource": "nist-sp-800-171-dod-assessment-methodology",
+    "sourceVersion": "Version 1.2.1 (June 24, 2020)",
+    "sourceReference": "Annex A — NIST SP 800-171 DoD Assessment Scoring Template",
+    "notes": ""
+  }
+]

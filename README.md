@@ -147,18 +147,27 @@ Registry, and Benchmark Fox internal templates. Requirement text in
 
 ### Local source file process
 
-`data-sources/sp800-171r2.json` is the source of truth for the control library.
-`scripts/import-sp800-171.ts` parses it into `src/data/generated/controls.generated.ts`,
-and `scripts/validate-controls.mjs` checks the result (count = 110, 14 families, no
-duplicates, required fields, `nist-sp-800-171r2` cited, `scoreSource` valid):
+Two local source files are the source of truth for the control library:
+- `data-sources/sp800-171r2.json` — the 110 official requirement statements.
+- `data-sources/dod-assessment-methodology-scoring.json` — the official SPRS
+  deduction value (−5/−3/−1, or NA) for each requirement, from the DoD Assessment
+  Methodology v1.2.1 (Annex A).
+
+`scripts/import-sp800-171.ts` merges them into
+`src/data/generated/controls.generated.ts` (and **fails** if a scoring id does
+not match a control, or a control has no scoring record — values are never
+guessed). `scripts/validate-controls.mjs` and `scripts/validate-scoring.mjs`
+check the result (count = 110, 14 families, no duplicates, `nist-sp-800-171r2`
+cited, every control officially scored with an allowed −5/−3/−1/NA value):
 
 ```bash
-npm run build:data   # import:sources + validate:controls (Node 22.6+/24)
+npm run build:data       # import:sources + validate:controls + validate:scoring + check:sourcerefs
+npm run validate:scoring # scoring data <-> control library cross-check
 ```
 
-To import official data we don't bundle yet (e.g. a NIST CSV/XLSX or the DoD
-Assessment Methodology scoring), drop the file in `data-sources/`, extend
-`loadRequirements()`, and re-run — no screen changes required.
+To import other official data we don't bundle yet (e.g. NIST SP 800-171A
+objectives), drop the file in `data-sources/`, extend the importer, and re-run —
+no screen changes required.
 
 ### What is data-driven vs. placeholder
 
@@ -167,13 +176,33 @@ Assessment Methodology scoring), drop the file in `data-sources/`, extend
 | 110 requirement texts, numbers, families, L1/L2 applicability | ✅ official (NIST 800-171 Rev. 2) |
 | Readiness %, status counts, dashboards, matrix, detail, SSP/POA&M/Evidence/Tasks/Reports/Mobile | ✅ computed from data |
 | Intake summary, CMMC path recommendation, scope summary + assets | ✅ data-driven **and editable** (`intake.ts` / `scope.ts`, persisted to localStorage) |
-| SPRS deduction values (`scoreValue`, `scoreSource`) | ⚠️ **placeholder** (`scoreValue: null`, `scoreSource: 'placeholder'`) — DoD Assessment Methodology not bundled; UI shows a "scoring not finalized" warning |
+| SPRS deduction values (`sprsDeductionValue`, `scoreValue`, `scoreSource`) | ✅ **official** — all 110 from the DoD Assessment Methodology v1.2.1, Annex A (`data-sources/dod-assessment-methodology-scoring.json`). Distribution −5:44 · −3:14 · −1:51 · NA:1 (3.12.4) |
 | Assessment objectives (800-171A) | ⚠️ placeholder (not bundled) |
 | Plain-English explanations / evidence examples / SSP & POA&M guidance | ✏️ Benchmark Fox-authored for a curated subset; the rest show TODO placeholders |
 
-Scoring is isolated in `lib/scoring.ts` so the placeholder model (Met = 0
-deduction, otherwise full; readiness gives Partial half credit) can be replaced
-with official rules without touching any screen.
+### SPRS scoring (official, estimated)
+
+The app computes an **estimated SPRS score** from the official DoD Assessment
+Methodology point values (start at 110; subtract each control's −5/−3/−1 value
+when not implemented). It is a **readiness estimate from the current app inputs,
+not an official assessment result**. Key handling, isolated in `lib/scoring.ts`:
+
+- **Met / Not Applicable** → no deduction. **Not Met / Not Reviewed** → full
+  deduction (you only earn points for implemented requirements).
+- **Partial** is **not** an official SPRS status. It is treated **conservatively
+  as Not Met** (full deduction) for the estimate, and clearly labeled in the UI;
+  the readiness % gives Partial half credit as an internal readiness estimate only.
+- **3.12.4** (System Security Plan) is **NA** in Annex A — not point-scored; its
+  absence blocks an assessment rather than deducting points. Represented as a 0
+  deduction with a documented note, never a guessed value.
+- The estimate can go **below zero** if deductions exceed 110.
+
+**Source of truth:** NIST SP 800-171 DoD Assessment Methodology, **Version 1.2.1
+(June 24, 2020)**, Annex A scoring template. Values were extracted from the
+official document and cross-checked against its Section 5 narrative lists (the 42
+five-point requirements + the two "3 to 5" special cases 3.5.3 / 3.13.11, base
+−5). They are **not** sourced from blogs or guesses; see
+`data-sources/dod-assessment-methodology-scoring.json` and `npm run validate:scoring`.
 
 ## App structure
 
@@ -207,8 +236,9 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
 **At a glance**
 - **All 110 controls loaded?** ✅ Yes — full NIST SP 800-171 Rev. 2 set.
 - **All 14 families present?** ✅ Yes (AC, AT, AU, CM, IA, IR, MA, MP, PS, PE, RA, CA, SC, SI).
-- **Scoring values official or placeholder?** ⚠️ Placeholder (`scoreValue: null`,
-  `scoreSource: 'placeholder'`) — readiness % is real; SPRS score is flagged "not finalized".
+- **Scoring values official or placeholder?** ✅ Official — all 110 SPRS deduction
+  values from the DoD Assessment Methodology v1.2.1 (Annex A). The app shows an
+  **estimated** SPRS score (not an official assessment result).
 - **Intake / Scope editable?** ✅ Yes — localStorage-backed, with auto-save and reset-to-seed.
 - **Type-safe / builds?** ✅ `npm run typecheck` and `npm run build` pass.
 - **Backend?** 🟢 **Supabase Reference Read (read-only).** When
@@ -222,6 +252,11 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
 **Complete**
 - All 110 NIST SP 800-171 Rev. 2 requirements loaded from a local source file via
   a reproducible generator; official requirement text + family + L1/L2.
+- **Official SPRS scoring for all 110 controls** from the DoD Assessment
+  Methodology v1.2.1 (Annex A): every control carries its −5/−3/−1 deduction
+  (3.12.4 = NA). The app computes an **estimated** SPRS score (110 minus
+  deductions for unmet controls; Partial counted conservatively as Not Met).
+  Validated by `npm run validate:scoring`.
 - Every major screen is data-driven (no hard-coded client metrics in components):
   internal Dashboard, Clients, Client Dashboard, Control Matrix, Control Detail,
   SSP, POA&M, Evidence, Tasks, Reports, Report Preview, Audit, Knowledge,
@@ -251,9 +286,6 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   fake computed scores.
 
 **Placeholder**
-- SPRS deduction values (`scoreValue = null`, `scoreSource = 'placeholder'`) pending
-  the DoD Assessment Methodology — the SPRS-style score is flagged "scoring not
-  finalized" everywhere.
 - NIST SP 800-171A assessment objectives (not bundled).
 - Intake / Path / Scope are seeded from `intake.ts` / `scope.ts` and are
   **editable with localStorage persistence** (summary fields, contract/data
@@ -267,12 +299,12 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
 - Auth is still a prototype shell.
 - Client-specific data still uses localStorage this phase.
 - Intake/Path form option lists and Settings non-table panels remain inline mockups.
-- Scoring model is a readiness heuristic, not the official methodology.
+- SPRS scoring uses the official DoD Assessment Methodology point values, but the
+  **score is an estimate** from the app's current readiness inputs — not an
+  official assessment result (Partial counted conservatively as Not Met).
 
 **Next recommended build phase**
-1. Import official DoD Assessment Methodology scoring → flip `scoreValue` to real
-   values and remove the "scoring not finalized" warning.
-2. Import NIST SP 800-171A assessment objectives into the control library.
+1. Import NIST SP 800-171A assessment objectives into the control library.
 3. Introduce Supabase/Postgres behind `data/store.ts` (multi-client, real auth,
    evidence metadata + approved secure external links) — the data interfaces are
    already the seam for this. (No CUI or real evidence files are stored.)
@@ -506,6 +538,8 @@ npm run build
 
 This is a **readiness-support tool, not an official CMMC assessment platform**.
 Nothing here constitutes a certification result, an official SPRS score, or legal,
-contracting, or C3PAO determination. SPRS scoring values are placeholders pending
-import of the official DoD Assessment Methodology. Always validate against the
-official source documents and qualified assessors.
+contracting, or C3PAO determination. The SPRS deduction values are the official
+DoD Assessment Methodology weights, but the score the app shows is an **estimate**
+computed from the current readiness inputs — not an official assessment, C3PAO
+result, certification guarantee, or contract award guarantee. Always validate
+against the official source documents and qualified assessors.
