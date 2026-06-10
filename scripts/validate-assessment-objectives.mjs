@@ -89,6 +89,11 @@ for (const g of groups) {
 const genIds = new Set();
 let genTotal = 0;
 for (const c of controls) {
+  // Explicit guard: assessmentObjectives must never be null/undefined (the type
+  // is AssessmentObjective[]). Catches a regressed importer that emits null.
+  if (c.assessmentObjectives === null || c.assessmentObjectives === undefined) {
+    fail(`Control ${c.id} has assessmentObjectives === ${c.assessmentObjectives} (must be an array).`);
+  }
   if (!Array.isArray(c.assessmentObjectives) || c.assessmentObjectives.length === 0) {
     fail(`Control ${c.id} has no assessment objectives in the generated library.`);
   }

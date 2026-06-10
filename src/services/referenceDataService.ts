@@ -193,8 +193,11 @@ export function getControls(): Promise<ServiceResult<Control[]>> {
         explanation: r.explanation ?? '',
         sspGuidance: r.ssp_guidance ?? null,
         poamGuidance: r.poam_guidance ?? null,
-        // Objectives are not in the reference-read schema; the provider merges
-        // them from local generated data (data-sources/sp800-171a-...json).
+        // Assessment objectives are bundled in generated local reference data
+        // during this phase. Supabase currently stores core control rows only, so
+        // the provider (referenceStore) merges local objective metadata onto these
+        // Supabase-loaded controls (matched by id) until reference objective tables
+        // are added. Safe fallback is [] (never null).
         assessmentObjectives: [],
         // The control<->source mapping is loaded separately; left empty here.
         sourceRefs: [],

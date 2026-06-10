@@ -8,14 +8,18 @@
    Run (Node 22.6+/24 runs .ts directly via type stripping):
      node scripts/import-sp800-171.ts
 
-   SOURCE NOTE: this reads the bundled requirement JSON (all 110 statements) and
-   the official scoring JSON (DoD Assessment Methodology v1.2.1, Annex A). Every
-   generated control receives its official SPRS deduction value. If a scoring id
-   does not match a known control, or a control has no scoring record, generation
-   FAILS — values are never guessed.
-
-   assessmentObjectives and the Benchmark Fox guidance fields remain null/empty
-   placeholders on purpose (authored elsewhere).
+   SOURCE NOTE: this reads three bundled official sources:
+     - data-sources/sp800-171r2.json — the 110 requirement statements.
+     - data-sources/dod-assessment-methodology-scoring.json — official SPRS values.
+     - data-sources/sp800-171a-assessment-objectives.json — official NIST SP
+       800-171A assessment objectives.
+   Every generated control receives its official SPRS deduction value AND its
+   official assessment objectives (never null). Generation FAILS if a scoring or
+   objective id does not match a known control, a control has no scoring record or
+   no objectives, an objectiveId is duplicated, or a method is not
+   examine/interview/test — values are never guessed. Re-running preserves the
+   official objectives. Only the Benchmark Fox guidance fields
+   (explanation/sspGuidance/poamGuidance) remain '' / null placeholders.
    ============================================================ */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';

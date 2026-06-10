@@ -75,8 +75,14 @@ export function ReferenceDataProvider({ children }: { children: ReactNode }) {
         poamGuidance: c.poamGuidance ?? local?.poamGuidance ?? null,
         officialSourceRefs: c.officialSourceRefs ?? local?.officialSourceRefs,
         benchmarkFoxSourceRefs: c.benchmarkFoxSourceRefs ?? local?.benchmarkFoxSourceRefs,
-        // Official 800-171A objectives aren't in the reference-read schema yet;
-        // keep them from the local generated data when the source omits them.
+        // Scoring provenance columns aren't in the reference-read schema yet.
+        scoreSourceVersion: c.scoreSourceVersion ?? local?.scoreSourceVersion,
+        scoreNotes: c.scoreNotes ?? local?.scoreNotes,
+        // Assessment objectives are bundled in generated local reference data during
+        // this phase. Supabase currently stores core control rows only, so we merge
+        // local objective metadata (matched by control id) onto Supabase-loaded
+        // controls until reference objective tables are added. Never null; falls
+        // back to [] when no local control is found.
         assessmentObjectives: c.assessmentObjectives?.length
           ? c.assessmentObjectives
           : (local?.assessmentObjectives ?? []),
