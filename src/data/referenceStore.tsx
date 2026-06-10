@@ -75,6 +75,11 @@ export function ReferenceDataProvider({ children }: { children: ReactNode }) {
         poamGuidance: c.poamGuidance ?? local?.poamGuidance ?? null,
         officialSourceRefs: c.officialSourceRefs ?? local?.officialSourceRefs,
         benchmarkFoxSourceRefs: c.benchmarkFoxSourceRefs ?? local?.benchmarkFoxSourceRefs,
+        // Official 800-171A objectives aren't in the reference-read schema yet;
+        // keep them from the local generated data when the source omits them.
+        assessmentObjectives: c.assessmentObjectives?.length
+          ? c.assessmentObjectives
+          : (local?.assessmentObjectives ?? []),
         sourceRefs,
       };
     });

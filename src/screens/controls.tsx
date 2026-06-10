@@ -472,19 +472,30 @@ export function ControlDetailScreen({ go }: ScreenProps) {
                   </ul>
                 </Card>
               )}
-              <Card title="Assessment Objectives">
-                {control.assessmentObjectives && control.assessmentObjectives.length ? (
-                  <ul className="muted" style={{ margin: 0, paddingLeft: 18 }}>
-                    {control.assessmentObjectives.map((o) => (
-                      <li key={o}>{o}</li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="faint" style={{ margin: 0 }}>
-                    Assessment objectives are defined in NIST SP 800-171A and have not been imported
-                    yet (placeholder).
-                  </p>
-                )}
+              <Card title="Assessment Objectives (NIST SP 800-171A)">
+                <p className="annot" style={{ marginTop: 0 }}>
+                  Assessment objectives describe what an assessor may examine, interview, or test.
+                  Benchmark Fox uses these for readiness support only.
+                </p>
+                <div className="col" style={{ gap: 8 }}>
+                  {control.assessmentObjectives.map((o) => (
+                    <div key={o.objectiveId} className="w-box" style={{ padding: '8px 12px' }}>
+                      <div className="row gap-sm" style={{ alignItems: 'baseline', flexWrap: 'wrap' }}>
+                        <span className="mono" style={{ fontWeight: 700 }}>
+                          {o.objectiveId}
+                        </span>
+                        <span style={{ flex: 1, minWidth: 200 }}>{o.objectiveText}</span>
+                      </div>
+                      <div className="row gap-sm" style={{ marginTop: 5 }}>
+                        {o.assessmentMethods.map((mth) => (
+                          <Badge key={mth} tone="none">
+                            {mth.charAt(0).toUpperCase() + mth.slice(1)}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </Card>
             </>
           )}

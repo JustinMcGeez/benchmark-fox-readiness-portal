@@ -193,7 +193,9 @@ export function getControls(): Promise<ServiceResult<Control[]>> {
         explanation: r.explanation ?? '',
         sspGuidance: r.ssp_guidance ?? null,
         poamGuidance: r.poam_guidance ?? null,
-        assessmentObjectives: null,
+        // Objectives are not in the reference-read schema; the provider merges
+        // them from local generated data (data-sources/sp800-171a-...json).
+        assessmentObjectives: [],
         // The control<->source mapping is loaded separately; left empty here.
         sourceRefs: [],
       };

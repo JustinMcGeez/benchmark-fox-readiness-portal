@@ -33,6 +33,7 @@ import {
   topDeductionDrivers,
 } from '../lib/scoring';
 import { blockerItems, missingEvidenceCount, openTaskCount, topFindings } from '../lib/selectors';
+import { objectiveCoverageSummary } from '../lib/objectives';
 import { SourceRefs } from '../components/SourceRefs';
 import { ScoringWarning } from '../components/ScoringWarning';
 
@@ -100,10 +101,11 @@ export function ReportsScreen({ go }: ScreenProps) {
 /* ---------- 17. REPORT PREVIEW ---------- */
 export function ReportPreviewScreen({ go }: ScreenProps) {
   const { assessments } = useData();
-  const { controlsById } = useReference();
+  const { controlsById, controls } = useReference();
   const readiness = readinessPct(assessments);
   const sprs = estimateSprs(assessments, controlsById);
   const drivers = topDeductionDrivers(assessments, controlsById, 5);
+  const objCoverage = objectiveCoverageSummary(controls, EVIDENCE_ITEMS, 5);
   const risk = readiness >= 80 ? 'Low' : readiness >= 60 ? 'Medium' : 'High';
   const findings = topFindings(assessments, POAM_ITEMS, EVIDENCE_ITEMS, controlsById, 5);
   return (
@@ -185,6 +187,32 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
               <li>No deductions — all scored controls are Met or Not Applicable.</li>
             )}
           </ol>
+          <h3 className="w-h2" style={{ marginTop: 18, fontSize: '1.15em' }}>
+            Assessment Objective Coverage (NIST SP 800-171A)
+          </h3>
+          <p className="muted" style={{ margin: '2px 0 0', fontSize: '.92em' }}>
+            {objCoverage.controlsFullyCovered} of {objCoverage.controlsWithObjectives} controls have
+            full objective coverage; {objCoverage.controlsPartiallyCovered} partial,{' '}
+            {objCoverage.controlsNotCovered} missing coverage.{' '}
+            {objCoverage.coveredObjectives}/{objCoverage.totalObjectives} objectives covered by evidence
+            metadata. Method scope — Examine {objCoverage.methodCounts.examine}, Interview{' '}
+            {objCoverage.methodCounts.interview}, Test {objCoverage.methodCounts.test}.
+          </p>
+          {objCoverage.topNeedingEvidence.length > 0 && (
+            <>
+              <p className="muted" style={{ margin: '6px 0 0', fontSize: '.9em', fontWeight: 700 }}>
+                Top controls needing objective evidence:
+              </p>
+              <ol className="muted" style={{ paddingLeft: 18, margin: '2px 0 0' }}>
+                {objCoverage.topNeedingEvidence.map((t) => (
+                  <li key={t.controlId}>
+                    <span className="mono">{t.controlId}</span> — {t.uncovered}/{t.total} objectives
+                    uncovered
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
           <h3 className="w-h2" style={{ marginTop: 18, fontSize: '1.15em' }}>
             Top Findings
           </h3>

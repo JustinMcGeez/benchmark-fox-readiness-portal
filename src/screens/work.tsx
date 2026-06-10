@@ -22,6 +22,10 @@ import {
 } from '../components/primitives';
 import { useData } from '../data/store';
 import { useReference } from '../data/referenceStore';
+import {
+  controlObjectiveCoverage,
+  coveredObjectiveIdsForControl,
+} from '../lib/objectives';
 import { CURRENT_CLIENT } from '../data/clients';
 import { EVIDENCE_ITEMS } from '../data/evidence';
 import { POAM_ITEMS } from '../data/poam';
@@ -99,12 +103,33 @@ export function SSPScreen({ go }: ScreenProps) {
                 <th>SSP Status</th>
                 <th>Implementation</th>
                 <th>Evidence?</th>
+                <th title="NIST SP 800-171A objective coverage from evidence metadata">Objectives</th>
                 <th></th>
               </tr>
             </thead>
             <tbody>
               {rows.map((a) => {
                 const c = controlsById[a.controlId];
+                const cov = controlObjectiveCoverage(
+                  c,
+                  coveredObjectiveIdsForControl(a.controlId, EVIDENCE_ITEMS),
+                );
+                const covTone =
+                  cov.status === 'addressed'
+                    ? 'ok'
+                    : cov.status === 'partial'
+                      ? 'warn'
+                      : cov.status === 'not-addressed'
+                        ? 'bad'
+                        : 'none';
+                const covLabel =
+                  cov.status === 'addressed'
+                    ? 'Addressed'
+                    : cov.status === 'partial'
+                      ? 'Needs review'
+                      : cov.status === 'not-addressed'
+                        ? 'Not addressed'
+                        : '—';
                 return (
                 <tr
                   key={a.controlId}
@@ -128,6 +153,11 @@ export function SSPScreen({ go }: ScreenProps) {
                   </td>
                   <td>
                     <Status s={evSupports(a)} />
+                  </td>
+                  <td>
+                    <Badge tone={covTone}>
+                      {cov.status === 'no-objectives' ? covLabel : `${covLabel} (${cov.coveredIds.length}/${cov.total})`}
+                    </Badge>
                   </td>
                   <td>
                     <a
@@ -157,6 +187,10 @@ export function SSPScreen({ go }: ScreenProps) {
               {controlsById[editor.controlId].summary}
             </p>
           )}
+          <p className="annot" style={{ margin: '0 0 8px' }}>
+            A strong SSP statement should explain what is implemented, where it is implemented, who
+            owns it, how it is enforced, and what evidence supports it.
+          </p>
           <Field
             label="Current SSP Statement"
             area
@@ -405,6 +439,40 @@ export function EvidenceScreen(_: ScreenProps) {
                 )}
               </span>
             </div>
+            {detailControl && detailControl.assessmentObjectives.length > 0 && (
+              <div className="w-box" style={{ padding: '8px 12px' }}>
+                <span className="w-label">OBJECTIVE COVERAGE (NIST SP 800-171A)</span>
+                {(() => {
+                  const cov = controlObjectiveCoverage(
+                    detailControl,
+                    new Set(detail.objectiveIds ?? []),
+                  );
+                  return (
+                    <div className="col" style={{ gap: 4, marginTop: 6, fontSize: '.85em' }}>
+                      <div className="row gap-sm">
+                        <Badge tone={cov.coveredIds.length ? 'ok' : 'none'}>
+                          {cov.coveredIds.length}/{cov.total} objectives covered
+                        </Badge>
+                        {cov.methodsCovered.map((mth) => (
+                          <Badge key={mth} tone="none">
+                            {mth.charAt(0).toUpperCase() + mth.slice(1)}
+                          </Badge>
+                        ))}
+                      </div>
+                      {cov.coveredIds.length === 0 ? (
+                        <span className="faint">
+                          No specific objectives selected — this evidence maps to the control overall.
+                        </span>
+                      ) : (
+                        cov.uncoveredIds.length > 0 && (
+                          <span className="faint">Uncovered: {cov.uncoveredIds.join(', ')}</span>
+                        )
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
             <div className="between">
               <span className="w-label">ASSESSMENT OBJECTIVE</span>
               <span className="mono">{detail.assessmentObjective ?? '—'}</span>

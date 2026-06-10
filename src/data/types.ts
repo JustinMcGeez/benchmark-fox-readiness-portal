@@ -80,6 +80,24 @@ export interface Client {
  */
 export type SprsDeduction = -5 | -3 | -1 | 0;
 
+/** NIST SP 800-171A assessment methods. */
+export type AssessmentMethod = 'examine' | 'interview' | 'test';
+
+/**
+ * A single official NIST SP 800-171A assessment objective (determination
+ * statement). `objectiveText` is OFFICIAL source text and must stay separate
+ * from any Benchmark Fox-authored guidance (`benchmarkFoxNotes`).
+ */
+export interface AssessmentObjective {
+  objectiveId: string; // e.g. '3.1.1[a]' (or '3.4.4' for single-objective reqs)
+  objectiveText: string; // official NIST SP 800-171A text — never mixed with BF notes
+  assessmentMethods: AssessmentMethod[];
+  source: string; // 'nist-sp-800-171a'
+  sourceVersion?: string;
+  /** Optional Benchmark Fox readiness note — NOT official source text. */
+  benchmarkFoxNotes?: string;
+}
+
 /** Library-level control definition (client-independent). */
 export interface Control {
   id: string; // e.g. '3.1.1' (same as number)
@@ -125,8 +143,13 @@ export interface Control {
   guidance?: { implementation?: string; interview?: string };
   sspGuidance?: string | null; // BF SSP language guidance (null = TODO)
   poamGuidance?: string | null; // BF POA&M guidance (null = TODO)
-  /** NIST SP 800-171A assessment objectives (null = TODO, not bundled locally) */
-  assessmentObjectives?: string[] | null;
+  /**
+   * Official NIST SP 800-171A assessment objectives (determination statements
+   * + assessment methods). Always populated from
+   * data-sources/sp800-171a-assessment-objectives.json. Official `objectiveText`
+   * is kept SEPARATE from Benchmark Fox-authored notes (`benchmarkFoxNotes`).
+   */
+  assessmentObjectives: AssessmentObjective[];
   /** all sourceId references into SOURCE_REFS (official + Benchmark Fox) */
   sourceRefs: string[];
   /** official document sourceIds (NIST/FAR/DFARS/CMMC/CFR) */
@@ -158,6 +181,12 @@ export interface EvidenceItem {
   controlId: string;
   /** NIST SP 800-171A assessment objective this evidence supports (e.g. '3.5.3[a]') */
   assessmentObjective?: string;
+  /**
+   * Optional NIST SP 800-171A objective ids this evidence covers (e.g.
+   * ['3.1.1[a]','3.1.1[b]']). If empty/omitted, the evidence still maps to the
+   * control. Metadata only — no evidence files are stored.
+   */
+  objectiveIds?: string[];
   owner: string;
   status: EvidenceStatus;
   quality: EvidenceQuality;

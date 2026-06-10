@@ -147,26 +147,31 @@ Registry, and Benchmark Fox internal templates. Requirement text in
 
 ### Local source file process
 
-Two local source files are the source of truth for the control library:
+Three local source files are the source of truth for the control library:
 - `data-sources/sp800-171r2.json` — the 110 official requirement statements.
 - `data-sources/dod-assessment-methodology-scoring.json` — the official SPRS
   deduction value (−5/−3/−1, or NA) for each requirement, from the DoD Assessment
   Methodology v1.2.1 (Annex A).
+- `data-sources/sp800-171a-assessment-objectives.json` — the official NIST SP
+  800-171A assessment objectives (320 determination statements + examine/
+  interview/test methods) for the 110 controls.
 
 `scripts/import-sp800-171.ts` merges them into
-`src/data/generated/controls.generated.ts` (and **fails** if a scoring id does
-not match a control, or a control has no scoring record — values are never
-guessed). `scripts/validate-controls.mjs` and `scripts/validate-scoring.mjs`
+`src/data/generated/controls.generated.ts` (and **fails** if a scoring/objective
+id does not match a control, or a control has no scoring record or no objectives
+— values are never guessed). `scripts/validate-controls.mjs`,
+`scripts/validate-scoring.mjs`, and `scripts/validate-assessment-objectives.mjs`
 check the result (count = 110, 14 families, no duplicates, `nist-sp-800-171r2`
-cited, every control officially scored with an allowed −5/−3/−1/NA value):
+cited, official −5/−3/−1/NA scoring, and 320 unique official objectives):
 
 ```bash
-npm run build:data       # import:sources + validate:controls + validate:scoring + check:sourcerefs
-npm run validate:scoring # scoring data <-> control library cross-check
+npm run build:data         # import + validate:controls + validate:scoring + validate:objectives + check:sourcerefs
+npm run validate:scoring   # scoring data <-> control library cross-check
+npm run validate:objectives # 800-171A objectives <-> control library cross-check
 ```
 
-To import other official data we don't bundle yet (e.g. NIST SP 800-171A
-objectives), drop the file in `data-sources/`, extend the importer, and re-run —
+To import other official data we don't bundle yet, drop the file in
+`data-sources/`, extend the importer, and re-run —
 no screen changes required.
 
 ### What is data-driven vs. placeholder
@@ -177,8 +182,35 @@ no screen changes required.
 | Readiness %, status counts, dashboards, matrix, detail, SSP/POA&M/Evidence/Tasks/Reports/Mobile | ✅ computed from data |
 | Intake summary, CMMC path recommendation, scope summary + assets | ✅ data-driven **and editable** (`intake.ts` / `scope.ts`, persisted to localStorage) |
 | SPRS deduction values (`sprsDeductionValue`, `scoreValue`, `scoreSource`) | ✅ **official** — all 110 from the DoD Assessment Methodology v1.2.1, Annex A (`data-sources/dod-assessment-methodology-scoring.json`). Distribution −5:44 · −3:14 · −1:51 · NA:1 (3.12.4) |
-| Assessment objectives (800-171A) | ⚠️ placeholder (not bundled) |
+| Assessment objectives (800-171A) | ✅ **official** — all 320 NIST SP 800-171A determination statements for the 110 controls (`data-sources/sp800-171a-assessment-objectives.json`), with examine/interview/test methods. Official text is kept separate from Benchmark Fox notes |
 | Plain-English explanations / evidence examples / SSP & POA&M guidance | ✏️ Benchmark Fox-authored for a curated subset; the rest show TODO placeholders |
+
+### NIST SP 800-171A assessment objectives (official)
+
+Every control carries its **official NIST SP 800-171A assessment objectives** —
+the determination statements (e.g. `3.1.1[a] authorized users are identified.`)
+with their assessment methods (**examine / interview / test**). All **320**
+objectives across the 110 controls are bundled in
+`data-sources/sp800-171a-assessment-objectives.json` and loaded into the
+generated control library (validated by `npm run validate:objectives`).
+
+- **Official text stays separate from Benchmark Fox guidance.** `objectiveText`
+  is verbatim official source text; any Benchmark Fox readiness note lives in a
+  separate `benchmarkFoxNotes` field — the two are never mixed.
+- **Evidence maps at control and objective level.** Evidence metadata can
+  reference a `controlId` and optional `objectiveIds`; if none are selected the
+  evidence still maps to the control. **Metadata only — no evidence files are
+  stored.**
+- **Where it shows up:** Control Detail lists the objectives + methods; Evidence
+  Hub shows objective coverage; SSP Workspace shows an objective-coverage
+  indicator per control; Reports summarize objective coverage and top controls
+  needing objective evidence.
+- **Readiness support only.** Objectives describe what an assessor *may* examine,
+  interview, or test — this is **not** an official CMMC assessment, C3PAO result,
+  legal opinion, certification guarantee, or contract award guarantee.
+- **Source:** NIST SP 800-171A (public-domain U.S. Government work), extracted
+  from the official NIST publication and validated (110 groups, 320 unique
+  objectives, methods restricted to examine/interview/test, no placeholders).
 
 ### SPRS scoring (official, estimated)
 
@@ -257,6 +289,10 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   (3.12.4 = NA). The app computes an **estimated** SPRS score (110 minus
   deductions for unmet controls; Partial counted conservatively as Not Met).
   Validated by `npm run validate:scoring`.
+- **Official NIST SP 800-171A assessment objectives for all 110 controls** — 320
+  determination statements with examine/interview/test methods, official text kept
+  separate from Benchmark Fox notes. Shown in Control Detail; objective coverage in
+  Evidence Hub, SSP Workspace, and Reports. Validated by `npm run validate:objectives`.
 - Every major screen is data-driven (no hard-coded client metrics in components):
   internal Dashboard, Clients, Client Dashboard, Control Matrix, Control Detail,
   SSP, POA&M, Evidence, Tasks, Reports, Report Preview, Audit, Knowledge,
@@ -286,7 +322,6 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   fake computed scores.
 
 **Placeholder**
-- NIST SP 800-171A assessment objectives (not bundled).
 - Intake / Path / Scope are seeded from `intake.ts` / `scope.ts` and are
   **editable with localStorage persistence** (summary fields, contract/data
   selections, scope assets) — auto-saved with reset-to-seed controls; prototype
@@ -304,8 +339,10 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   official assessment result (Partial counted conservatively as Not Met).
 
 **Next recommended build phase**
-1. Import NIST SP 800-171A assessment objectives into the control library.
-3. Introduce Supabase/Postgres behind `data/store.ts` (multi-client, real auth,
+1. Author Benchmark Fox plain-English explanations / guidance for the remaining
+   controls (the official requirement text, SPRS values, and 800-171A objectives
+   are all bundled).
+2. Introduce Supabase/Postgres behind `data/store.ts` (multi-client, real auth,
    evidence metadata + approved secure external links) — the data interfaces are
    already the seam for this. (No CUI or real evidence files are stored.)
 
