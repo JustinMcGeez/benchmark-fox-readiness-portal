@@ -30,7 +30,6 @@ import {
   formatScore,
   readinessPct,
   scoringFinalized,
-  sprsScore,
   topDeductionDrivers,
 } from '../lib/scoring';
 import { blockerItems, missingEvidenceCount, openTaskCount, topFindings } from '../lib/selectors';
@@ -396,7 +395,7 @@ export function MobileScreen(_: ScreenProps) {
   const { assessments } = useData();
   const { controlsById } = useReference();
   const readiness = readinessPct(assessments);
-  const score = sprsScore(assessments, controlsById);
+  const sprs = estimateSprs(assessments, controlsById);
   const blockers = blockerItems(POAM_ITEMS).length;
   const missingEvidence = missingEvidenceCount(EVIDENCE_ITEMS);
   const openTasks = openTaskCount(TASKS);
@@ -449,7 +448,7 @@ export function MobileScreen(_: ScreenProps) {
                   <div className="mono faint" style={{ fontSize: '.6em' }}>
                     SCORE
                   </div>
-                  <div className="w-h2">{formatScore(score)}</div>
+                  <div className="w-h2">{formatScore(sprs.estimatedSprsScore)}</div>
                 </div>
               </div>
               <div className="w-box between" style={{ padding: '8px 10px' }}>

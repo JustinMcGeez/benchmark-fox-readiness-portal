@@ -8,9 +8,11 @@
    - SEED_ASSESSMENTS: a default (Not Reviewed) assessment for every control,
      overlaid with a realistic worked subset for the active client.
 
-   Official SPRS deduction values (DoD Assessment Methodology v1.2.1, Annex A)
-   are loaded per control via the generator — see scoring.ts. 3.12.4 is "NA"
-   (System Security Plan; not point-scored), so its scoreValue is null by design.
+   Official SPRS scoring now comes from
+   data-sources/dod-assessment-methodology-scoring.json (DoD Assessment
+   Methodology v1.2.1, Annex A): the generator loads each control's official
+   sprsDeductionValue into the generated library. 3.12.4 is "NA" (System Security
+   Plan; not point-scored), so its scoreValue is null / deduction 0 by design.
    ============================================================ */
 import type {
   ClientControlAssessment,

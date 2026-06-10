@@ -1,16 +1,17 @@
 /* ============================================================
-   Scoring engine — isolated readiness/SPRS math.
+   Scoring engine — isolated readiness/SPRS math. This file contains:
 
-   This is a prototype model, intentionally simple and kept in one
-   place so it can be swapped for the official CMMC/SPRS rules later
-   without touching any screen.
-
-   Model:
-   - SPRS-style score starts at 110 and deducts each control's point
-     weight when the control is not implemented (binary, like SPRS:
-     Met = 0 deduction, otherwise full deduction; N/A excluded).
-   - Readiness % is a softer consultant metric that gives Partial
-     half credit: (Met + 0.5·Partial) / applicable controls.
+   a. Readiness percentage logic — a softer consultant metric that gives
+      Partial half credit: (Met + 0.5·Partial) / applicable controls.
+   b. Estimated SPRS scoring logic using the OFFICIAL DoD Assessment
+      Methodology values (v1.2.1, Annex A): start at 110 and subtract each
+      control's official -5/-3/-1 deduction when it is not implemented
+      (3.12.4 is "NA" — 0). The result is an estimate, not an official
+      assessment result, and can go below zero.
+   c. Conservative handling for "Partial": Partial is NOT an official final
+      SPRS status, so for the estimate it is counted as a full deduction
+      (treated like Not Met) and surfaced in warnings; only the readiness %
+      gives Partial half credit.
    ============================================================ */
 import type { ClientControlAssessment, Control, ReadinessStatus } from '../data/types';
 
