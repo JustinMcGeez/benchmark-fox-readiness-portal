@@ -4,7 +4,7 @@ Rules: strictly in order. One task per Claude Code session (/clear between).
 Merge each task's branch before starting the next. [security] tasks get the
 security-reviewer subagent in addition to verifier.
 
-- [ ] 01 — Testing infrastructure (Vitest + Playwright + CI) — prompts/01-testing-infrastructure.md
+- [x] 01 — Testing infrastructure (Vitest + Playwright + CI) — prompts/01-testing-infrastructure.md
 - [ ] 02 — React Router, client-scoped URLs — prompts/02-react-router.md
 - [ ] 03 — Supabase Auth [security] — prompts/03-supabase-auth.md
 - [ ] 04 — Repository layer: localStorage → Supabase [security] — prompts/04-repository-layer.md
@@ -20,3 +20,5 @@ security-reviewer subagent in addition to verifier.
 
 ## Completed log
 (/build-next appends here: date, task, one-line summary)
+
+- 2026-06-12 — 01 Testing infrastructure: Vitest (63 unit tests: scoring/selectors/objectives/store/integrity, src/lib at 100% line coverage for tested modules) + Playwright chromium smoke suite (5 tests) + CI workflow; verifier PASS.

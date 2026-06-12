@@ -12,6 +12,13 @@ dist-ssr
 dev-out.log
 dev-err.log
 
+# Test artifacts
+coverage
+test-results
+playwright-report
+blob-report
+playwright/.cache
+
 # Environment / secrets — never commit real values; .env.example is the only one tracked
 .env
 .env.*
