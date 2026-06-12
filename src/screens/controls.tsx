@@ -356,19 +356,22 @@ function FilterSelect({
 }
 
 /* ---------- 11. CONTROL DETAIL ---------- */
-export function ControlDetailScreen({ go }: ScreenProps) {
+/* `controlId` comes from the /clients/:clientId/controls/:controlId route;
+   without it (legacy callers) the store's selected control is shown. */
+export function ControlDetailScreen({ go, controlId }: ScreenProps & { controlId?: string }) {
   const { selectedControlId, assessmentFor, updateAssessment } = useData();
   const { controlsById } = useReference();
   const [tab, setTab] = useState('Overview');
   const tabs = ['Overview', 'Assessment', 'SSP', 'Evidence', 'POA&M', 'Tasks', 'Guidance'];
 
+  const activeControlId = controlId ?? selectedControlId;
   // Prefer the reference-data control (Supabase or local); fall back to the
   // local generated definition if a reference control is missing.
-  const control = controlsById[selectedControlId] ?? CONTROLS_BY_ID[selectedControlId];
-  const a = assessmentFor(selectedControlId);
-  const evidence = evidenceForControl(selectedControlId);
-  const poam = poamForControl(selectedControlId);
-  const tasks = tasksForControl(selectedControlId);
+  const control = controlsById[activeControlId] ?? CONTROLS_BY_ID[activeControlId];
+  const a = assessmentFor(activeControlId);
+  const evidence = evidenceForControl(activeControlId);
+  const poam = poamForControl(activeControlId);
+  const tasks = tasksForControl(activeControlId);
 
   if (!control || !a) {
     return (

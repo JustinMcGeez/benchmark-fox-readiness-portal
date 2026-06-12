@@ -45,37 +45,46 @@ All **21 screens** are reachable in one app:
 - Keyboard: `[` / `]` step through screens, `g` toggles the index.
 - Click through naturally — sidebar nav, client tabs, table rows, and primary
   buttons all navigate.
-- Deep-link any screen with `?screen=<key>` (e.g. `/?screen=controls`); the URL
-  stays in sync as you navigate.
+- Every screen has a real URL (react-router, see the Route column below) —
+  deep-link or refresh any of them. Client screens are scoped as
+  `/clients/:clientId/…` (seed client: `acme`); an unknown client id redirects
+  to `/clients`.
+- Legacy `?screen=<key>` links (e.g. `/?screen=controls`) still work — they
+  redirect to the new route (mapping lives in `src/routes.tsx`).
 - **⚙ Tweaks** panel (bottom-right) toggles the **nav style**
   (sidebar / topnav / hybrid) and **spacing** density. Choices persist to
   `localStorage`.
 
 ### Screen map
 
-| #  | Screen              | Key                |
-|----|---------------------|--------------------|
-| 01 | Login               | `login`            |
-| 02 | Internal Dashboard  | `dashboard`        |
-| 03 | Clients List        | `clients`          |
-| 04 | Create Client       | `create-client`    |
-| 05 | Client Dashboard    | `client-dashboard` |
-| 06 | Guided Intake       | `intake`           |
-| 07 | CMMC Path           | `path`             |
-| 08 | Scoping Workspace   | `scope`            |
-| 09 | Control Library     | `control-library`  |
-| 10 | Control Matrix ★    | `controls`         |
-| 11 | Control Detail      | `control-detail`   |
-| 12 | SSP Workspace       | `ssp`              |
-| 13 | POA&M Tracker       | `poam`             |
-| 14 | Evidence Hub        | `evidence`         |
-| 15 | Task Management     | `tasks`            |
-| 16 | Reports             | `reports`          |
-| 17 | Report Preview      | `report-preview`   |
-| 18 | Knowledge Base      | `knowledge`        |
-| 19 | Audit Log           | `audit`            |
-| 20 | Settings            | `settings`         |
-| 21 | Mobile Direction    | `mobile`           |
+| #  | Screen              | Key                | Route                                   |
+|----|---------------------|--------------------|-----------------------------------------|
+| 01 | Login               | `login`            | `/login`                                |
+| 02 | Internal Dashboard  | `dashboard`        | `/dashboard`                            |
+| 03 | Clients List        | `clients`          | `/clients`                              |
+| 04 | Create Client       | `create-client`    | `/clients/new`                          |
+| 05 | Client Dashboard    | `client-dashboard` | `/clients/:clientId`                    |
+| 06 | Guided Intake       | `intake`           | `/clients/:clientId/intake`             |
+| 07 | CMMC Path           | `path`             | `/clients/:clientId/path`               |
+| 08 | Scoping Workspace   | `scope`            | `/clients/:clientId/scope`              |
+| 09 | Control Library     | `control-library`  | `/library`                              |
+| 10 | Control Matrix ★    | `controls`         | `/clients/:clientId/controls`           |
+| 11 | Control Detail      | `control-detail`   | `/clients/:clientId/controls/:controlId`|
+| 12 | SSP Workspace       | `ssp`              | `/clients/:clientId/ssp`                |
+| 13 | POA&M Tracker       | `poam`             | `/clients/:clientId/poam`               |
+| 14 | Evidence Hub        | `evidence`         | `/clients/:clientId/evidence`           |
+| 15 | Task Management     | `tasks`            | `/clients/:clientId/tasks`              |
+| 16 | Reports             | `reports`          | `/clients/:clientId/reports`            |
+| 17 | Report Preview      | `report-preview`   | `/clients/:clientId/reports/preview`    |
+| 18 | Knowledge Base      | `knowledge`        | `/knowledge`                            |
+| 19 | Audit Log           | `audit`            | `/audit`                                |
+| 20 | Settings            | `settings`         | `/settings`                             |
+| 21 | Mobile Direction    | `mobile`           | `/mobile`                               |
+
+Unknown URLs render a NotFound screen with a link back to `/dashboard`. `/`
+restores the last visited screen (else `/login`). All routes except `/login`
+are wrapped in a `<ProtectedRoute>` placeholder (a pass-through until real
+auth lands).
 
 The **Client Dashboard** and **Control Matrix** are the heart of the platform.
 
@@ -270,7 +279,8 @@ five-point requirements + the two "3 to 5" special cases 3.5.3 / 3.13.11, base
 ```
 src/
   main.tsx                 # React entry (wraps App in <DataProvider>)
-  App.tsx                  # router, screen-index launcher, tweaks, ?screen= deep-link
+  App.tsx                  # router host (BrowserRouter), screen-index launcher, tweaks
+  routes.tsx               # route tree (react-router v6), ScreenKey↔path map, legacy ?screen= redirect
   types.ts                 # app/nav types (ScreenKey, tones, tweak values…)
   styles/wireframe.css     # the design system (navy/silver brand tokens)
   components/

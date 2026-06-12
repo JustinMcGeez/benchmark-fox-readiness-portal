@@ -1,62 +1,14 @@
 /* ============================================================
-   App — router, screen-index launcher, live tweaks
+   App — router host, screen-index launcher, live tweaks
+   (routes + ScreenKey↔path mapping live in src/routes.tsx)
    ============================================================ */
-import { useEffect, useState, type ComponentType } from 'react';
+import { useEffect, useState } from 'react';
+import { BrowserRouter, useLocation } from 'react-router-dom';
 import { LayoutGrid } from 'lucide-react';
-import type { Density, Go, NavStyle, ScreenKey, ScreenProps, TweakValues } from './types';
-import { Shell } from './components/Shell';
+import type { Density, NavStyle, ScreenKey, TweakValues } from './types';
 import { Btn } from './components/primitives';
 import { TweaksPanel, TweakSection, TweakRadio, useTweaks } from './tweaks/TweaksPanel';
-import {
-  LoginScreen,
-  DashboardScreen,
-  ClientsScreen,
-  CreateClientScreen,
-  ClientDashboardScreen,
-  IntakeScreen,
-  PathScreen,
-  ScopeScreen,
-  ControlLibraryScreen,
-  ControlMatrixScreen,
-  ControlDetailScreen,
-  SSPScreen,
-  POAMScreen,
-  EvidenceScreen,
-  TasksScreen,
-  ReportsScreen,
-  ReportPreviewScreen,
-  KnowledgeScreen,
-  AuditScreen,
-  SettingsScreen,
-  MobileScreen,
-} from './screens';
-
-const SCREENS: Record<ScreenKey, ComponentType<ScreenProps>> = {
-  login: LoginScreen,
-  dashboard: DashboardScreen,
-  clients: ClientsScreen,
-  'create-client': CreateClientScreen,
-  'client-dashboard': ClientDashboardScreen,
-  intake: IntakeScreen,
-  path: PathScreen,
-  scope: ScopeScreen,
-  'control-library': ControlLibraryScreen,
-  controls: ControlMatrixScreen,
-  'control-detail': ControlDetailScreen,
-  ssp: SSPScreen,
-  poam: POAMScreen,
-  evidence: EvidenceScreen,
-  tasks: TasksScreen,
-  reports: ReportsScreen,
-  'report-preview': ReportPreviewScreen,
-  knowledge: KnowledgeScreen,
-  audit: AuditScreen,
-  settings: SettingsScreen,
-  mobile: MobileScreen,
-};
-
-/* full-bleed screens (no app shell) */
-const NO_SHELL: ScreenKey[] = ['login', 'mobile'];
+import { AppRoutes, screenKeyFromPath, useGo } from './routes';
 
 /* index, grouped — for the launcher overlay */
 const INDEX: [string, [ScreenKey, string][]][] = [
@@ -118,22 +70,24 @@ const NAV_OPTIONS: NavStyle[] = ['sidebar', 'topnav', 'hybrid'];
 const DENSITY_OPTIONS: Density[] = ['breathable', 'dense'];
 
 export default function App() {
-  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const [screen, setScreen] = useState<ScreenKey>(() => {
-    const fromUrl = new URLSearchParams(window.location.search).get('screen');
-    if (fromUrl && fromUrl in SCREENS) return fromUrl as ScreenKey;
-    return (localStorage.getItem('bf_screen') as ScreenKey) || 'login';
-  });
-  const [menu, setMenu] = useState(false);
+  return (
+    <BrowserRouter>
+      <AppChrome />
+    </BrowserRouter>
+  );
+}
 
-  const go: Go = (s) => {
-    setScreen(s);
-    localStorage.setItem('bf_screen', s);
-    const url = new URL(window.location.href);
-    url.searchParams.set('screen', s);
-    window.history.replaceState(null, '', url);
-    window.scrollTo(0, 0);
-  };
+function AppChrome() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const [menu, setMenu] = useState(false);
+  const go = useGo();
+  const { pathname } = useLocation();
+  const screen = screenKeyFromPath(pathname);
+
+  /* persist the last visited screen (the `/` route restores it) */
+  useEffect(() => {
+    if (screen) localStorage.setItem('bf_screen', screen);
+  }, [screen]);
 
   /* developer helper — wipe persisted edits and reload to seed data */
   const resetData = () => {
@@ -162,23 +116,13 @@ export default function App() {
     };
     window.addEventListener('keydown', h);
     return () => window.removeEventListener('keydown', h);
-  }, [screen]);
+  }, [screen, go]);
 
-  const Screen = SCREENS[screen] || DashboardScreen;
-  const noShell = NO_SHELL.includes(screen);
   const idx = FLAT.findIndex((f) => f[0] === screen) + 1;
-
-  const content = noShell ? (
-    <Screen go={go} />
-  ) : (
-    <Shell screen={screen} go={go} navStyle={t.navStyle}>
-      <Screen go={go} />
-    </Shell>
-  );
 
   return (
     <>
-      {content}
+      <AppRoutes navStyle={t.navStyle} />
 
       {/* screen-index launcher */}
       <button
