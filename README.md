@@ -17,7 +17,8 @@ npm run typecheck
 # data pipeline
 npm run import:sources    # regenerate src/data/generated/controls.generated.ts
 npm run validate:controls # validate the generated 110-control library
-npm run build:data        # import:sources + validate:controls
+npm run validate:guidance # validate Benchmark Fox guidance covers all 110 controls
+npm run build:data        # import:sources + all validators + check:sourcerefs
 ```
 
 ### Network / proxy
@@ -165,9 +166,10 @@ check the result (count = 110, 14 families, no duplicates, `nist-sp-800-171r2`
 cited, official −5/−3/−1/NA scoring, and 320 unique official objectives):
 
 ```bash
-npm run build:data         # import + validate:controls + validate:scoring + validate:objectives + check:sourcerefs
+npm run build:data         # import + validate:controls + validate:scoring + validate:objectives + validate:guidance + check:sourcerefs
 npm run validate:scoring   # scoring data <-> control library cross-check
 npm run validate:objectives # 800-171A objectives <-> control library cross-check
+npm run validate:guidance  # Benchmark Fox guidance completeness for all 110 controls
 ```
 
 To import other official data we don't bundle yet, drop the file in
@@ -183,7 +185,7 @@ no screen changes required.
 | Intake summary, CMMC path recommendation, scope summary + assets | ✅ data-driven **and editable** (`intake.ts` / `scope.ts`, persisted to localStorage) |
 | SPRS deduction values (`sprsDeductionValue`, `scoreValue`, `scoreSource`) | ✅ **official** — all 110 from the DoD Assessment Methodology v1.2.1, Annex A (`data-sources/dod-assessment-methodology-scoring.json`). Distribution −5:44 · −3:14 · −1:51 · NA:1 (3.12.4) |
 | Assessment objectives (800-171A) | ✅ **official** — all 320 NIST SP 800-171A determination statements for the 110 controls (`data-sources/sp800-171a-assessment-objectives.json`), with examine/interview/test methods. Official text is kept separate from Benchmark Fox notes |
-| Plain-English explanations / evidence examples / SSP & POA&M guidance | ✏️ Benchmark Fox-authored for a curated subset; the rest show TODO placeholders |
+| Plain-English explanations / common mistakes / evidence examples / implementation & interview guidance / SSP & POA&M guidance | ✅ **Benchmark Fox-authored guidance covers all 110 controls** and is validated by `npm run validate:guidance`. Authored overlay content (`BF_OVERLAY` in `src/data/controls.ts`) — kept strictly separate from official source text |
 
 ### NIST SP 800-171A assessment objectives (official)
 
@@ -211,6 +213,33 @@ generated control library (validated by `npm run validate:objectives`).
 - **Source:** NIST SP 800-171A (public-domain U.S. Government work), extracted
   from the official NIST publication and validated (110 groups, 320 unique
   objectives, methods restricted to examine/interview/test, no placeholders).
+
+### Benchmark Fox guidance (authored overlay, all 110 controls)
+
+Every control carries **Benchmark Fox-authored plain-English guidance**: an
+explanation, common mistakes, evidence examples, implementation and interview
+guidance, SSP statement guidance, and POA&M guidance. Key properties:
+
+- **Official source text remains official and separate.** The NIST requirement
+  text and 800-171A objective text are never rewritten or mixed with authored
+  content. Benchmark Fox guidance is **authored overlay content** living in
+  `BF_OVERLAY` in `src/data/controls.ts`, merged onto the generated official
+  skeleton at load time.
+- **Coverage is validated.** `npm run validate:guidance` (also part of
+  `build:data`) verifies all 110 controls have complete guidance with no
+  placeholder language, and that official requirement/objective text was not
+  copied off as the authored explanation. Guidance covers all 110 controls when
+  this validation passes.
+- **Bracketed values are client variables.** Placeholders like
+  `[identity provider]`, `[EDR solution]`, or `[SIEM/logging platform]` are
+  intentional client-fillable variables — the guidance never invents
+  client-specific implementation details.
+- **Where it shows up:** Control Detail (explanation, common mistakes, evidence
+  examples, implementation/interview guidance on Overview/Guidance tabs; SSP and
+  POA&M guidance on their tabs), and the SSP Workspace statement editor.
+- **Readiness guidance only.** This content supports CMMC readiness work. It is
+  **not legal advice, not a C3PAO assessment result, and not a certification
+  guarantee**.
 
 ### SPRS scoring (official, estimated)
 
@@ -293,6 +322,13 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   determination statements with examine/interview/test methods, official text kept
   separate from Benchmark Fox notes. Shown in Control Detail; objective coverage in
   Evidence Hub, SSP Workspace, and Reports. Validated by `npm run validate:objectives`.
+- **Benchmark Fox-authored guidance for all 110 controls** — plain-English
+  explanation, common mistakes, evidence examples, implementation/interview
+  guidance, SSP guidance, and POA&M guidance, authored as overlay content kept
+  separate from official source text. Validated by `npm run validate:guidance`
+  (no placeholder language, no official text copied off as authored guidance).
+  Readiness guidance only — not legal advice, not a C3PAO assessment result,
+  and not a certification guarantee.
 - Every major screen is data-driven (no hard-coded client metrics in components):
   internal Dashboard, Clients, Client Dashboard, Control Matrix, Control Detail,
   SSP, POA&M, Evidence, Tasks, Reports, Report Preview, Audit, Knowledge,
@@ -313,9 +349,6 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
 - Type-safe: `npm run typecheck` and `npm run build` pass (strict TS).
 
 **Partially complete**
-- Benchmark Fox plain-English explanations / evidence examples / SSP & POA&M
-  guidance authored for a curated control subset; remaining controls show TODO
-  placeholders.
 - Worked client data covers one active engagement (Acme Defense); its Clients-list
   row computes live (readiness/score from assessments, labeled `live`). Clients
   without assessments show **"Seed summary only"** / **"Not started"** instead of
@@ -339,10 +372,7 @@ Matrix/detail edits persist in `localStorage`. To reset to seed data:
   official assessment result (Partial counted conservatively as Not Met).
 
 **Next recommended build phase**
-1. Author Benchmark Fox plain-English explanations / guidance for the remaining
-   controls (the official requirement text, SPRS values, and 800-171A objectives
-   are all bundled).
-2. Introduce Supabase/Postgres behind `data/store.ts` (multi-client, real auth,
+1. Introduce Supabase/Postgres behind `data/store.ts` (multi-client, real auth,
    evidence metadata + approved secure external links) — the data interfaces are
    already the seam for this. (No CUI or real evidence files are stored.)
 

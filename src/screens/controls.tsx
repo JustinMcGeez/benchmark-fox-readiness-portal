@@ -526,6 +526,12 @@ export function ControlDetailScreen({ go }: ScreenProps) {
           )}
           {tab === 'SSP' && (
             <Card title="SSP Statement">
+              {control.sspGuidance && (
+                <div className="w-box muted" style={{ padding: '10px 12px', marginBottom: 12, fontSize: '.92em' }}>
+                  <span className="w-eyebrow">Benchmark Fox SSP guidance</span>
+                  <p style={{ margin: '4px 0 0' }}>{control.sspGuidance}</p>
+                </div>
+              )}
               <Field
                 area
                 value={a.sspStatement ?? ''}
@@ -571,6 +577,12 @@ export function ControlDetailScreen({ go }: ScreenProps) {
           )}
           {tab === 'POA&M' && (
             <Card title="POA&M">
+              {control.poamGuidance && (
+                <div className="w-box muted" style={{ padding: '10px 12px', marginBottom: 12, fontSize: '.92em' }}>
+                  <span className="w-eyebrow">Benchmark Fox POA&M guidance</span>
+                  <p style={{ margin: '4px 0 0' }}>{control.poamGuidance}</p>
+                </div>
+              )}
               {poam.length ? (
                 <div className="col" style={{ gap: 10 }}>
                   {poam.map((p) => (

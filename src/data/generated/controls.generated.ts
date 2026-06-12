@@ -5,7 +5,9 @@
    data-sources/sp800-171a-assessment-objectives.json (official NIST SP 800-171A
    assessment objectives). sprsDeductionValue/scoreValue/scoreSource and
    assessmentObjectives are official. The Benchmark Fox guidance fields
-   (explanation/sspGuidance/poamGuidance) remain '' / null placeholders.
+   (explanation/sspGuidance/poamGuidance) are '' / null in this skeleton; the
+   authored guidance for all 110 controls is merged from BF_OVERLAY in
+   src/data/controls.ts and stays separate from the official text.
    Regenerate: node scripts/import-sp800-171.ts
    Count: 110 requirements. */
 import type { Control } from '../types';

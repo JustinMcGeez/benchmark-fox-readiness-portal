@@ -204,10 +204,12 @@ export function SSPScreen({ go }: ScreenProps) {
             <Select label="EVIDENCE SUPPORTS" value={evSupports(editor)} />
           </div>
           <div className="w-field mt">
-            <span className="w-label">RECOMMENDED BENCHMARK FOX LANGUAGE</span>
+            <span className="w-label">BENCHMARK FOX SSP GUIDANCE</span>
+            {/* Authored per-control guidance from the BF overlay (bracketed values
+                like [identity provider] are client-fillable variables). */}
             <div className="w-box fill muted" style={{ padding: 12, fontSize: '.92em' }}>
-              “The organization limits system access to authorized users through [identity provider]
-              security groups, enforced by conditional access policies and reviewed [frequency].”
+              {controlsById[editor.controlId]?.sspGuidance ??
+                'A strong SSP statement should explain what is implemented, where it is implemented, who owns it, how it is enforced, how often it is reviewed, and what evidence supports it.'}
             </div>
           </div>
           <div className="row gap-sm mt" style={{ justifyContent: 'flex-end' }}>

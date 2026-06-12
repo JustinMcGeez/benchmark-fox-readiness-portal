@@ -137,12 +137,19 @@ export interface Control {
   title: string; // short display label (derived from requirement)
   summary: string; // requirement summary for tables
   requirement: string; // official NIST SP 800-171 Rev. 2 requirement text
-  explanation: string; // Benchmark Fox plain-English explanation ('' = TODO placeholder)
+  /**
+   * Benchmark Fox plain-English explanation — authored overlay content for all
+   * 110 controls (BF_OVERLAY in data/controls.ts; validated by
+   * npm run validate:guidance). '' only in the generated skeleton before merge.
+   */
+  explanation: string;
   commonMistakes?: string[];
   evidenceExamples?: string[];
   guidance?: { implementation?: string; interview?: string };
-  sspGuidance?: string | null; // BF SSP language guidance (null = TODO)
-  poamGuidance?: string | null; // BF POA&M guidance (null = TODO)
+  /** BF-authored SSP language guidance (null only in the pre-merge skeleton). */
+  sspGuidance?: string | null;
+  /** BF-authored POA&M guidance (null only in the pre-merge skeleton). */
+  poamGuidance?: string | null;
   /**
    * Official NIST SP 800-171A assessment objectives (determination statements
    * + assessment methods). Always populated from
