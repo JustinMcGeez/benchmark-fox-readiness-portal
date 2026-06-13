@@ -179,3 +179,12 @@ export function useAuth(): AuthContextValue {
   if (!ctx) throw new Error('useAuth must be used inside <AuthProvider>.');
   return ctx;
 }
+
+/**
+ * Like useAuth(), but returns null instead of throwing when there is no
+ * <AuthProvider> above (e.g. DataProvider mounted bare in unit tests).
+ * Used by the repository selection seam to default to Local Prototype mode.
+ */
+export function useOptionalAuth(): AuthContextValue | null {
+  return useContext(AuthContext);
+}
