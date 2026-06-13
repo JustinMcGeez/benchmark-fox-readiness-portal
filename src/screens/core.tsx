@@ -12,6 +12,7 @@ import type {
 } from '../data/types';
 import { ShieldCheck } from 'lucide-react';
 import { signInErrorMessage, useAuth } from '../auth/AuthProvider';
+import { usePermissions } from '../auth/permissions';
 import {
   Badge,
   BarChart,
@@ -35,10 +36,10 @@ import { formatScore, readinessPct, sprsScore } from '../lib/scoring';
 import { blockerItems, openPoamItems } from '../lib/selectors';
 
 /* Client management (create/archive) is admin-only in Supabase mode; in Local
-   Prototype mode (no auth) it is always available so demos can show the flow. */
+   Prototype mode (no simulated role) it is available so demos can show the flow.
+   Centralized in auth/roles.ts so a simulated client role cannot manage clients. */
 function useCanManageClients(): boolean {
-  const { isConfigured, role } = useAuth();
-  return !isConfigured || role === 'benchmark_fox_admin';
+  return usePermissions().canManageClients;
 }
 
 /* Build scoring-shaped rows from per-client readiness statuses (status +

@@ -32,6 +32,7 @@ import { TASKS } from '../data/tasks';
 import { useData } from '../data/store';
 import { EXPECTED_CONTROL_COUNT } from '../data/controls';
 import { useReference } from '../data/referenceStore';
+import { usePermissions } from '../auth/permissions';
 import {
   estimateSprs,
   formatScore,
@@ -284,12 +285,14 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
 
 /* ---------- 18. KNOWLEDGE BASE ---------- */
 export function KnowledgeScreen(_: ScreenProps) {
+  // Authoring is internal; client-portal roles read the knowledge base only.
+  const { isInternalUser } = usePermissions();
   return (
     <div className="col">
       <PageHead
         title="Knowledge Base"
         sub="Benchmark Fox guidance, examples, templates, and implementation notes."
-        actions={<Btn primary>+ New Article</Btn>}
+        actions={isInternalUser ? <Btn primary>+ New Article</Btn> : undefined}
       />
       <Toolbar search="Search knowledge…" filters={['Control', 'Family', 'Tool', 'Artifact Type']} />
       <Card style={{ padding: '6px 6px' }}>

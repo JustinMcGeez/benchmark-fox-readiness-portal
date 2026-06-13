@@ -23,7 +23,7 @@ import {
 } from '../components/primitives';
 import { useData } from '../data/store';
 import { useReference } from '../data/referenceStore';
-import { useAuth } from '../auth/AuthProvider';
+import { usePermissions } from '../auth/permissions';
 import { useCurrentClient } from '../data/clientsStore';
 import {
   controlEvidenceCoverage,
@@ -60,15 +60,11 @@ const EVIDENCE_QUALITY_OPTIONS: EvidenceQuality[] = [
   'Missing',
 ];
 
-/* Evidence review (the In Review → Accepted/Needs Revision/Rejected transitions)
-   is consultant/admin only — hidden in the UI here and enforced server-side by
-   migration 007. Local Prototype mode (no auth) allows it so demos work. */
-function useCanReviewEvidence(): boolean {
-  const { isConfigured, role } = useAuth();
-  return !isConfigured || role === 'benchmark_fox_admin' || role === 'benchmark_fox_consultant';
-}
-
 const isHttpsLink = (v: string): boolean => /^https:\/\/\S+$/i.test(v.trim());
+
+/* Statuses an evidence_uploader is actively responsible for — their focused
+   queue (Prompt 8 link-submission flow). */
+const UPLOADER_QUEUE_STATUSES = new Set<EvidenceStatus>(['Requested', 'Needs Revision']);
 
 const SSP_FILTERS: { label: string; value: SspStatus | 'All' }[] = [
   { label: 'All', value: 'All' },
@@ -415,12 +411,20 @@ export function EvidenceScreen(_: ScreenProps) {
   const { evidence, requestEvidence, updateEvidence, transitionEvidence } = useData();
   const { controlsById, controls } = useReference();
   const currentClient = useCurrentClient();
-  const canReview = useCanReviewEvidence();
+  // Review = staff only (also enforced by the 007 trigger); submit = staff +
+  // evidence_uploader; request (new brief) = staff only. View-only client roles
+  // (executive / it_owner / readonly_viewer) get neither.
+  const { role, canReviewEvidence: canReview, canSubmitEvidence: canSubmit, canRequestEvidence: canRequest } =
+    usePermissions();
+  const isUploader = role === 'evidence_uploader';
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<EvidenceStatus | 'All'>('All');
   const [zeroAcceptedOnly, setZeroAcceptedOnly] = useState(false);
   const [requesting, setRequesting] = useState(false);
+  // evidence_uploader lands on their focused submission queue (Requested /
+  // Needs Revision) by default; they can still browse via the chips.
+  const [queueOnly, setQueueOnly] = useState(isUploader);
 
   const counts = useMemo(() => evidenceCountsByStatus(evidence), [evidence]);
   const gapControlIds = useMemo(() => controlIdsWithoutAcceptedEvidence(evidence), [evidence]);
@@ -428,11 +432,12 @@ export function EvidenceScreen(_: ScreenProps) {
   const visible = useMemo(
     () =>
       evidence.filter((e) => {
+        if (queueOnly && !UPLOADER_QUEUE_STATUSES.has(effectiveStatus(e))) return false;
         if (statusFilter !== 'All' && effectiveStatus(e) !== statusFilter) return false;
         if (zeroAcceptedOnly && !(e.controlId && gapControlIds.has(e.controlId))) return false;
         return true;
       }),
-    [evidence, statusFilter, zeroAcceptedOnly, gapControlIds],
+    [evidence, queueOnly, statusFilter, zeroAcceptedOnly, gapControlIds],
   );
 
   // Group the visible items by EFFECTIVE status, in canonical order.
@@ -455,11 +460,17 @@ export function EvidenceScreen(_: ScreenProps) {
     <div className="col">
       <PageHead
         title={`Evidence Hub — ${currentClient?.name ?? 'Client'}`}
-        sub="Request, review, and map evidence to controls."
+        sub={
+          isUploader
+            ? 'Submit secure links for the evidence Benchmark Fox has requested.'
+            : 'Request, review, and map evidence to controls.'
+        }
         actions={
-          <Btn primary onClick={() => setRequesting(true)}>
-            + Request Evidence
-          </Btn>
+          canRequest ? (
+            <Btn primary onClick={() => setRequesting(true)}>
+              + Request Evidence
+            </Btn>
+          ) : undefined
         }
       />
       <WarnBanner tone="bad">
@@ -470,17 +481,35 @@ export function EvidenceScreen(_: ScreenProps) {
       {/* status filter chips with per-status counts + the zero-coverage filter */}
       <Card style={{ padding: '6px 6px' }}>
         <div className="row wrap gap-sm" style={{ padding: '8px 10px', alignItems: 'center' }}>
+          {isUploader && (
+            <button
+              className={'w-btn sm' + (queueOnly ? ' primary' : ' ghost')}
+              title="Items Benchmark Fox has requested or returned for revision"
+              onClick={() => {
+                setQueueOnly((v) => !v);
+                setStatusFilter('All');
+              }}
+            >
+              My queue ({evidence.filter((e) => UPLOADER_QUEUE_STATUSES.has(effectiveStatus(e))).length})
+            </button>
+          )}
           <button
-            className={'w-btn sm' + (statusFilter === 'All' ? ' primary' : ' ghost')}
-            onClick={() => setStatusFilter('All')}
+            className={'w-btn sm' + (!queueOnly && statusFilter === 'All' ? ' primary' : ' ghost')}
+            onClick={() => {
+              setStatusFilter('All');
+              setQueueOnly(false);
+            }}
           >
             All ({evidence.length})
           </button>
           {EVIDENCE_OPTIONS.map((s) => (
             <button
               key={s}
-              className={'w-btn sm' + (statusFilter === s ? ' primary' : ' ghost')}
-              onClick={() => setStatusFilter(s)}
+              className={'w-btn sm' + (!queueOnly && statusFilter === s ? ' primary' : ' ghost')}
+              onClick={() => {
+                setStatusFilter(s);
+                setQueueOnly(false);
+              }}
             >
               {s} ({counts[s]})
             </button>
@@ -559,6 +588,7 @@ export function EvidenceScreen(_: ScreenProps) {
             control={controlsById[detail.controlId]}
             evidence={evidence}
             canReview={canReview}
+            canSubmit={canSubmit}
             onUpdate={updateEvidence}
             onTransition={transitionEvidence}
           />
@@ -604,6 +634,7 @@ function EvidenceDetail({
   control,
   evidence,
   canReview,
+  canSubmit,
   onUpdate,
   onTransition,
 }: {
@@ -611,6 +642,9 @@ function EvidenceDetail({
   control: Control | undefined;
   evidence: EvidenceItem[];
   canReview: boolean;
+  /** May change metadata / advance the item (staff + evidence_uploader). View-
+      only client roles get a fully read-only drawer. */
+  canSubmit: boolean;
   onUpdate: (id: string, patch: EvidencePatch) => void;
   onTransition: (id: string, toStatus: EvidenceStatus, note?: string) => void;
 }) {
@@ -623,8 +657,9 @@ function EvidenceDetail({
   const eff = effectiveStatus(item);
   const fresh = effectiveFreshness(item);
   const cov = controlEvidenceCoverage(control, evidence);
-  // Transitions act on the STORED status; only the user's allowed moves are shown.
-  const nexts = allowedNextStatuses(item.status, canReview);
+  // Transitions act on the STORED status; only the user's allowed moves are shown
+  // — and only when they may act at all (view-only roles get none).
+  const nexts = canSubmit ? allowedNextStatuses(item.status, canReview) : [];
 
   return (
     <Card title="Evidence Detail">
@@ -677,35 +712,54 @@ function EvidenceDetail({
         )}
 
         {/* external secure link — https only, with the standing warning */}
-        <div className="w-field">
-          <span className="w-label">SECURE EXTERNAL LINK</span>
-          <input
-            className="w-input"
-            type="url"
-            placeholder="https://… (link to the artifact in the client's secure store)"
-            value={link}
-            aria-label="Secure external link"
-            onChange={(e) => setLink(e.target.value)}
-          />
-          {!linkValid && (
-            <span className="faint" style={{ color: 'var(--bad, #b4232a)', fontSize: '.8em' }}>
-              Enter an https:// link. The artifact itself is never uploaded — only a secure link.
-            </span>
-          )}
-          <p className="annot" style={{ margin: '4px 0 0' }}>
-            The artifact stays in the client's secure store; this records a pointer only.
-          </p>
-          <div className="row gap-sm mt" style={{ justifyContent: 'flex-end' }}>
-            <Btn
-              sm
-              primary
-              disabled={!linkValid || !linkChanged}
-              onClick={() => onUpdate(item.id, { externalLink: linkTrimmed })}
-            >
-              Save Link
-            </Btn>
+        {canSubmit ? (
+          <div className="w-field">
+            <span className="w-label">SECURE EXTERNAL LINK</span>
+            <input
+              className="w-input"
+              type="url"
+              placeholder="https://… (link to the artifact in the client's secure store)"
+              value={link}
+              aria-label="Secure external link"
+              onChange={(e) => setLink(e.target.value)}
+            />
+            {!linkValid && (
+              <span className="faint" style={{ color: 'var(--bad, #b4232a)', fontSize: '.8em' }}>
+                Enter an https:// link. The artifact itself is never uploaded — only a secure link.
+              </span>
+            )}
+            <p className="annot" style={{ margin: '4px 0 0' }}>
+              The artifact stays in the client's secure store; this records a pointer only.
+            </p>
+            <div className="row gap-sm mt" style={{ justifyContent: 'flex-end' }}>
+              <Btn
+                sm
+                primary
+                disabled={!linkValid || !linkChanged}
+                onClick={() => onUpdate(item.id, { externalLink: linkTrimmed })}
+              >
+                Save Link
+              </Btn>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="between">
+            <span className="w-label">SECURE EXTERNAL LINK</span>
+            {item.externalLink ? (
+              <a
+                href={item.externalLink}
+                target="_blank"
+                rel="noreferrer"
+                className="mono"
+                style={{ fontSize: '.82em', textAlign: 'right', maxWidth: '70%', wordBreak: 'break-all' }}
+              >
+                {item.externalLink}
+              </a>
+            ) : (
+              <span className="faint">No link recorded yet.</span>
+            )}
+          </div>
+        )}
         {item.storageLocationNote && (
           <div className="between">
             <span className="w-label">STORAGE LOCATION</span>
@@ -717,12 +771,17 @@ function EvidenceDetail({
 
         <div className="between">
           <span className="w-label">QUALITY</span>
-          <InlineSelect
-            ariaLabel="Evidence quality"
-            value={item.quality}
-            options={EVIDENCE_QUALITY_OPTIONS}
-            onChange={(q) => onUpdate(item.id, { quality: q })}
-          />
+          {/* Quality is a reviewer judgment (staff). Uploaders/view-only see it read-only. */}
+          {canReview ? (
+            <InlineSelect
+              ariaLabel="Evidence quality"
+              value={item.quality}
+              options={EVIDENCE_QUALITY_OPTIONS}
+              onChange={(q) => onUpdate(item.id, { quality: q })}
+            />
+          ) : (
+            <Status s={item.quality} />
+          )}
         </div>
         <div className="between">
           <span className="w-label">FRESHNESS</span>
@@ -744,13 +803,15 @@ function EvidenceDetail({
           <Status s={eff} />
         </div>
 
-        <Field
-          label="REVIEW / TRANSITION NOTE"
-          area
-          value={note}
-          onChange={setNote}
-          placeholder="Optional note recorded with the next status change…"
-        />
+        {canSubmit && (
+          <Field
+            label="REVIEW / TRANSITION NOTE"
+            area
+            value={note}
+            onChange={setNote}
+            placeholder="Optional note recorded with the next status change…"
+          />
+        )}
         {item.notes && (
           <div className="w-box muted" style={{ padding: '8px 12px', fontSize: '.88em' }}>
             <span className="w-eyebrow">Last note</span>
@@ -760,17 +821,21 @@ function EvidenceDetail({
 
         <div className="between">
           <span className="w-label">SUPPORTS SSP STATEMENT?</span>
-          <div className="row gap-sm">
-            {(['Yes', 'Partial', 'No'] as const).map((s) => (
-              <button
-                key={s}
-                className={'w-check' + ((item.sspSupported ?? 'Partial') === s ? ' on radio' : ' radio')}
-                onClick={() => onUpdate(item.id, { sspSupported: s })}
-              >
-                <span className="bx" /> <span>{s}</span>
-              </button>
-            ))}
-          </div>
+          {canSubmit ? (
+            <div className="row gap-sm">
+              {(['Yes', 'Partial', 'No'] as const).map((s) => (
+                <button
+                  key={s}
+                  className={'w-check' + ((item.sspSupported ?? 'Partial') === s ? ' on radio' : ' radio')}
+                  onClick={() => onUpdate(item.id, { sspSupported: s })}
+                >
+                  <span className="bx" /> <span>{s}</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <Status s={item.sspSupported ?? 'Partial'} />
+          )}
         </div>
 
         <hr className="w-hr" style={{ margin: '4px 0' }} />

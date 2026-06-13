@@ -34,8 +34,22 @@ export type AssessmentPatch = Partial<
   >
 >;
 
+/**
+ * Read options for assessments. `includeInternal: false` is the CLIENT-PORTAL
+ * read path: it omits internal-only fields (consultant_notes — see
+ * src/data/internalFields.ts) and, in Supabase mode, reads through the
+ * column-restricted client view (migration 009) so the hiding is enforced
+ * SERVER-SIDE, not just in the UI. Defaults to true (full, staff/internal read).
+ */
+export interface AssessmentReadOptions {
+  includeInternal?: boolean;
+}
+
 export interface ClientDataRepository {
-  getAssessments(clientId: string): Promise<ClientControlAssessment[]>;
+  getAssessments(
+    clientId: string,
+    opts?: AssessmentReadOptions,
+  ): Promise<ClientControlAssessment[]>;
   patchAssessment(clientId: string, controlId: string, patch: AssessmentPatch): Promise<void>;
   getIntake(clientId: string): Promise<IntakeState>;
   saveIntake(clientId: string, intake: IntakeState): Promise<void>;

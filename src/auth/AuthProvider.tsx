@@ -30,6 +30,7 @@ import type { Session } from '../lib/supabaseClient';
 import type { AppRoleEnum } from '../lib/database.types';
 import {
   authEnabled,
+  fetchAssignedClientId,
   fetchOwnProfile,
   getCurrentSession,
   onAuthStateChange,
@@ -39,7 +40,22 @@ import {
   type AuthProfile,
   type SignInResult,
 } from '../services/authService';
+import { isAppRole, isClientRole } from './roles';
+import { DEMO_CLIENT_ID } from '../data/clients';
 import { logEvent } from '../lib/audit';
+
+/** localStorage key for the Local-Prototype-only simulated role (Tweaks). */
+const SIM_ROLE_KEY = 'bf_sim_role';
+
+function loadSimulatedRole(): AppRoleEnum | null {
+  if (authEnabled) return null; // real auth governs the role when configured
+  try {
+    const v = localStorage.getItem(SIM_ROLE_KEY);
+    return isAppRole(v) ? v : null;
+  } catch {
+    return null;
+  }
+}
 
 export { signInErrorMessage } from '../services/authService';
 export type { AuthProfile, SignInErrorKind, SignInResult } from '../services/authService';
@@ -60,10 +76,22 @@ export interface AuthContextValue {
   session: Session | null;
   profile: AuthProfile | null;
   role: AppRoleEnum | null;
-  /** True until the initial session is restored, or while a signed-in
-      caller's profile row is still being fetched. Always false in
-      Local Prototype mode. */
+  /**
+   * For a client-portal role, the single client engagement they are scoped to
+   * (resolved once from their assignment). null for staff/admin (who pick a
+   * client) and for client users with no assignment. In Local Prototype mode a
+   * simulated client role resolves to the demo engagement.
+   */
+  assignedClientId: string | null;
+  /** True until the initial session is restored, while a signed-in caller's
+      profile row is still being fetched, or (for a client role) while their
+      assignment is being resolved. Always false in Local Prototype mode. */
   loading: boolean;
+  /** The Local-Prototype-only simulated role (Tweaks role switcher); null = the
+      internal staff demo. Always null when Supabase auth is configured. */
+  simulatedRole: AppRoleEnum | null;
+  /** Set the simulated role (Local Prototype mode only — a no-op when configured). */
+  setSimulatedRole(role: AppRoleEnum | null): void;
   signInWithPassword(email: string, password: string): Promise<SignInResult>;
   signInWithMagicLink(email: string): Promise<SignInResult>;
   signOut(): Promise<void>;
@@ -77,6 +105,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Local mode is "ready" immediately; Supabase mode waits for getSession().
   const [sessionReady, setSessionReady] = useState(!authEnabled);
   const [profilePending, setProfilePending] = useState(false);
+  // Client-portal role resolution (Supabase mode) + the Local-mode simulated role.
+  const [assignedClientId, setAssignedClientId] = useState<string | null>(null);
+  const [assignmentPending, setAssignmentPending] = useState(false);
+  const [simulatedRole, setSimulatedRoleState] = useState<AppRoleEnum | null>(loadSimulatedRole);
 
   /* Restore the persisted session and track auth state changes. */
   useEffect(() => {
@@ -133,6 +165,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [userId]);
 
+  /* Resolve the assigned client for a signed-in CLIENT-portal user (Supabase
+     mode). Staff/admin and unauthenticated states resolve to no assigned client.
+     The fetch runs only for client roles, so staff loading is never delayed. */
+  const profileId = profile?.id ?? null;
+  const profileIsClientRole = isClientRole(profile?.role ?? null);
+  useEffect(() => {
+    if (!authEnabled) return;
+    if (!profileId || !profileIsClientRole) {
+      setAssignedClientId(null);
+      setAssignmentPending(false);
+      return;
+    }
+    let active = true;
+    setAssignmentPending(true);
+    fetchAssignedClientId(profileId)
+      .then((clientId) => {
+        if (!active) return;
+        setAssignedClientId(clientId);
+        setAssignmentPending(false);
+      })
+      .catch(() => {
+        if (!active) return;
+        console.warn('[auth] Signed in as a client role, but the assignment lookup failed.');
+        setAssignedClientId(null);
+        setAssignmentPending(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [profileId, profileIsClientRole]);
+
+  /* Local-Prototype-only: switch the simulated role (Tweaks). Persisted so the
+     simulated portal session survives a reload. No-op when Supabase configured. */
+  const setSimulatedRole = useCallback((next: AppRoleEnum | null) => {
+    if (authEnabled) return;
+    setSimulatedRoleState(next);
+    try {
+      if (next) localStorage.setItem(SIM_ROLE_KEY, next);
+      else localStorage.removeItem(SIM_ROLE_KEY);
+    } catch {
+      /* ignore quota / private-mode errors */
+    }
+  }, []);
+
   const signInWithPassword = useCallback(
     async (email: string, password: string): Promise<SignInResult> => {
       const { session: s, error } = await requestPasswordSignIn(email, password);
@@ -163,18 +239,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
   }, []);
 
+  // Effective role: the real profile role when configured, else the simulated
+  // role (Local Prototype mode; null = the internal staff demo).
+  const role = authEnabled ? profile?.role ?? null : simulatedRole;
+  // Effective assigned client: the resolved assignment (Supabase), or the demo
+  // engagement for a simulated client role (Local Prototype mode).
+  const resolvedAssignedClientId = authEnabled
+    ? assignedClientId
+    : isClientRole(simulatedRole)
+      ? DEMO_CLIENT_ID
+      : null;
+
   const value = useMemo<AuthContextValue>(
     () => ({
       isConfigured: authEnabled,
       session,
       profile,
-      role: profile?.role ?? null,
-      loading: authEnabled && (!sessionReady || profilePending),
+      role,
+      assignedClientId: resolvedAssignedClientId,
+      loading: authEnabled && (!sessionReady || profilePending || assignmentPending),
+      simulatedRole: authEnabled ? null : simulatedRole,
+      setSimulatedRole,
       signInWithPassword,
       signInWithMagicLink,
       signOut,
     }),
-    [session, profile, sessionReady, profilePending, signInWithPassword, signInWithMagicLink, signOut],
+    [
+      session,
+      profile,
+      role,
+      resolvedAssignedClientId,
+      sessionReady,
+      profilePending,
+      assignmentPending,
+      simulatedRole,
+      setSimulatedRole,
+      signInWithPassword,
+      signInWithMagicLink,
+      signOut,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import type { Go, NavStyle, ScreenKey } from '../types';
 import { ROLE_LABELS, useAuth } from '../auth/AuthProvider';
+import { isClientRole } from '../auth/roles';
 import { Badge, Btn, RiskBadge } from './primitives';
 import { BrandLockup, BrandMark } from './Brand';
 import { useCurrentClient } from '../data/clientsStore';
@@ -37,6 +38,16 @@ const PRIMARY_NAV: [ScreenKey, string, LucideIcon][] = [
   ['knowledge', 'Knowledge Base', BookOpen],
   ['audit', 'Audit Log', Activity],
   ['settings', 'Settings', SettingsIcon],
+];
+
+/* Reduced navigation shown to client-portal roles (Task 11): no clients list,
+   audit, settings, internal dashboard, intake/scope/tasks, or control library. */
+const PORTAL_NAV: [ScreenKey, string, LucideIcon][] = [
+  ['client-dashboard', 'Dashboard', LayoutGrid],
+  ['controls', 'Controls', Shield],
+  ['evidence', 'Evidence', FileText],
+  ['reports', 'Documents', ListChecks],
+  ['knowledge', 'Knowledge', BookOpen],
 ];
 
 /* which screens belong to a client context (show client tab strip) */
@@ -229,15 +240,34 @@ export function Shell({
   navStyle: NavStyle;
   children: ReactNode;
 }) {
+  const { role } = useAuth();
+  const portal = isClientRole(role);
   const inClient = CLIENT_SCREENS.includes(screen);
   const currentClient = useCurrentClient();
+  const nav = portal ? PORTAL_NAV : PRIMARY_NAV;
 
   const primaryActive = (key: ScreenKey) => {
+    if (portal) {
+      if (key === 'controls' && screen === 'control-detail') return true;
+      if (key === 'reports' && screen === 'report-preview') return true;
+      return key === screen;
+    }
     if (key === 'clients' && inClient) return true;
     if (key === 'control-library' && (screen === 'controls' || screen === 'control-detail'))
       return true;
     return key === screen;
   };
+
+  /* "Client Portal" identity strip (replaces the search box / READINESS PORTAL
+     eyebrow for client-role sessions, so screenshots are unambiguous). */
+  const portalTag = (
+    <span className="center" style={{ gap: 10 }}>
+      <Badge tone="ok">Client Portal</Badge>
+      <span style={{ fontFamily: 'var(--head)', fontWeight: 700, fontSize: '.95rem', color: 'var(--navy-ink)' }}>
+        {currentClient?.name ?? 'Your engagement'}
+      </span>
+    </span>
+  );
 
   const SideNav = (
     <nav
@@ -261,7 +291,7 @@ export function Shell({
         <BrandLockup variant="white" size={26} showTagline />
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '14px 12px' }}>
-        {PRIMARY_NAV.map(([k, label, Icon]) => {
+        {nav.map(([k, label, Icon]) => {
           const on = primaryActive(k);
           return (
             <a
@@ -334,7 +364,7 @@ export function Shell({
           padding: '12px 0',
         }}
       >
-        {PRIMARY_NAV.map(([k, label, Icon]) => {
+        {nav.map(([k, label, Icon]) => {
           const on = primaryActive(k);
           return (
             <a
@@ -377,10 +407,14 @@ export function Shell({
         borderBottom: '1px solid rgba(255,255,255,.06)',
       }}
     >
-      <span style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: '.8rem', color: 'rgba(243,246,251,.5)', letterSpacing: '.04em' }}>
-        READINESS PORTAL
-      </span>
-      <TopActions />
+      {portal ? (
+        portalTag
+      ) : (
+        <span style={{ fontFamily: 'var(--body)', fontWeight: 600, fontSize: '.8rem', color: 'rgba(243,246,251,.5)', letterSpacing: '.04em' }}>
+          READINESS PORTAL
+        </span>
+      )}
+      <TopActions compact={portal} />
     </div>
   );
 
@@ -393,7 +427,10 @@ export function Shell({
       }}
     >
       <div className="between" style={{ padding: '0 24px', height: 60 }}>
-        <BrandLockup variant="white" size={26} />
+        <span className="center" style={{ gap: 16 }}>
+          <BrandLockup variant="white" size={26} />
+          {portal && portalTag}
+        </span>
         <TopActions compact />
       </div>
       <div
@@ -406,7 +443,7 @@ export function Shell({
           overflowX: 'auto',
         }}
       >
-        {PRIMARY_NAV.map(([k, label, Icon]) => {
+        {nav.map(([k, label, Icon]) => {
           const on = primaryActive(k);
           return (
             <a
@@ -434,8 +471,10 @@ export function Shell({
     </div>
   );
 
-  /* client context bar (breadcrumb + horizontal tabs) */
-  const clientBar = inClient && (
+  /* client context bar (breadcrumb + horizontal tabs). Internal only — portal
+     users get the reduced top-level nav instead, never the intake/scope/tasks
+     /audit tab strip. */
+  const clientBar = !portal && inClient && (
     <div className="w-card" style={{ marginBottom: 'var(--gap)', padding: '14px 18px 0' }}>
       <div className="between" style={{ marginBottom: 12 }}>
         <div>

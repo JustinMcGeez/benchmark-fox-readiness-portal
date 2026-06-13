@@ -39,6 +39,9 @@ import type {
 } from './types';
 import { DEMO_CLIENT_ID } from './clients';
 import { SEED_ASSESSMENTS } from './controls';
+import { stripInternalAssessmentFields } from './internalFields';
+import { isClientRole } from '../auth/roles';
+import { useOptionalAuth } from '../auth/AuthProvider';
 import { DEFAULT_INTAKE, type IntakeState } from './intake';
 import { DEFAULT_SCOPE, type ScopeAsset, type ScopeState, type ScopeSummary } from './scope';
 import { Btn, Card, WarnBanner } from '../components/primitives';
@@ -155,9 +158,14 @@ function DataEngine({ clientId, children }: { clientId: string; children: ReactN
 
   const [mutationError, setMutationError] = useState<string | null>(null);
 
+  // Client-portal read posture: a client-role session never receives internal-
+  // only fields (consultant_notes). useOptionalAuth so the store still works when
+  // mounted bare in unit tests (no AuthProvider → null → staff/full read).
+  const hideInternal = isClientRole(useOptionalAuth()?.role ?? null);
+
   /* Both engines run every render (stable hook order); only one is exposed. */
-  const local = useLocalEngine(clientId, setMutationError);
-  const remote = useSupabaseEngine(repository, evidenceRepo, clientId, mode === 'supabase', setMutationError);
+  const local = useLocalEngine(clientId, setMutationError, hideInternal);
+  const remote = useSupabaseEngine(repository, evidenceRepo, clientId, mode === 'supabase', setMutationError, hideInternal);
   const engine = mode === 'supabase' ? remote : local;
 
   const value = useMemo<DataContextValue>(
@@ -192,6 +200,7 @@ function DataEngine({ clientId, children }: { clientId: string; children: ReactN
 function useLocalEngine(
   clientId: string,
   setMutationError: (message: string) => void,
+  hideInternal: boolean,
 ): EngineResult {
   const [overrides, setOverrides] = useState<Overrides>(loadOverrides);
   const [intake, setIntake] = useState<IntakeState>(() => loadJson(LS_INTAKE, DEFAULT_INTAKE));
@@ -236,9 +245,10 @@ function useLocalEngine(
     () =>
       baseAssessmentsFor(clientId).map((a) => {
         const ov = overrides[overrideKey(clientId, a.controlId)];
-        return ov ? { ...a, ...ov } : a;
+        const merged = ov ? { ...a, ...ov } : a;
+        return hideInternal ? stripInternalAssessmentFields(merged) : merged;
       }),
-    [overrides, clientId],
+    [overrides, clientId, hideInternal],
   );
 
   const assessmentFor = useCallback(
@@ -412,6 +422,7 @@ function useSupabaseEngine(
   clientId: string,
   enabled: boolean,
   setMutationError: (message: string) => void,
+  hideInternal: boolean,
 ): EngineResult {
   const qc = useQueryClient();
   const assessmentsKey = useMemo(() => ['assessments', clientId] as const, [clientId]);
@@ -421,7 +432,11 @@ function useSupabaseEngine(
 
   const assessmentsQ = useQuery({
     queryKey: assessmentsKey,
-    queryFn: () => repository.getAssessments(clientId),
+    // Client-portal sessions read through the column-restricted view (no
+    // internal-only fields); staff read the full row. The mutation key stays
+    // ['assessments', clientId] — client roles are read-only, so optimistic
+    // patches (staff only) and this read never disagree on the cache key.
+    queryFn: () => repository.getAssessments(clientId, { includeInternal: !hideInternal }),
     enabled,
   });
   const intakeQ = useQuery({

@@ -23,6 +23,8 @@ import {
 import { useData } from '../data/store';
 import { useCurrentClient } from '../data/clientsStore';
 import { useReference } from '../data/referenceStore';
+import { usePermissions } from '../auth/permissions';
+import { visiblePoamItems } from '../data/internalFields';
 import { INTAKE_SUMMARY_FIELDS, PATH_RECOMMENDATION } from '../data/intake';
 import { ASSET_CATEGORIES } from '../data/scope';
 import { POAM_ITEMS } from '../data/poam';
@@ -51,6 +53,7 @@ export function ClientDashboardScreen({ go }: ScreenProps) {
   const { assessments, evidence } = useData();
   // Control definitions for scoring come from the reference-data provider.
   const { controlsById } = useReference();
+  const { role } = usePermissions();
 
   const counts = useMemo(() => statusCounts(assessments), [assessments]);
   const readiness = useMemo(() => readinessPct(assessments), [assessments]);
@@ -60,10 +63,13 @@ export function ClientDashboardScreen({ go }: ScreenProps) {
     [assessments, controlsById],
   );
 
-  const openPoam = openPoamItems(POAM_ITEMS);
-  const blockers = blockerItems(POAM_ITEMS);
+  // Client-portal roles never see internal-classified POA&M items (the same
+  // list drives the internal staff view, unfiltered).
+  const poam = useMemo(() => visiblePoamItems(POAM_ITEMS, role), [role]);
+  const openPoam = openPoamItems(poam);
+  const blockers = blockerItems(poam);
   const missingEvidence = missingEvidenceCount(evidence);
-  const topBlockers = selTopBlockers(POAM_ITEMS);
+  const topBlockers = selTopBlockers(poam);
   const nextActions = selNextActions(TASKS);
 
   const notMetTotal = counts.notMet + counts.notReviewed;

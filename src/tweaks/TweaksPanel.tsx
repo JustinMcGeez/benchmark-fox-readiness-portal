@@ -259,6 +259,48 @@ export function TweakRadio<T extends string>({
   );
 }
 
+/* Labeled dropdown (used by the Local-Prototype role switcher — more options
+   than a segmented radio comfortably fits). */
+export function TweakSelect<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T) => void;
+}) {
+  return (
+    <TweakRow label={label}>
+      <select
+        className="w-input"
+        aria-label={label}
+        value={value}
+        onChange={(e) => onChange(e.target.value as T)}
+        style={{
+          appearance: 'auto',
+          width: '100%',
+          padding: '5px 8px',
+          borderRadius: 7,
+          border: '.5px solid rgba(0,0,0,.18)',
+          background: 'rgba(255,255,255,.7)',
+          color: 'inherit',
+          font: 'inherit',
+          cursor: 'pointer',
+        }}
+      >
+        {options.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
+    </TweakRow>
+  );
+}
+
 function isLight(hex: string): boolean {
   const h = String(hex).replace('#', '');
   const x = h.length === 3 ? h.replace(/./g, (c) => c + c) : h.padEnd(6, '0');

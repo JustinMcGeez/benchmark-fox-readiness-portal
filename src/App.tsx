@@ -6,13 +6,15 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { BrowserRouter, useLocation } from 'react-router-dom';
 import { LayoutGrid } from 'lucide-react';
 import type { Density, NavStyle, ScreenKey, TweakValues } from './types';
-import { AuthProvider } from './auth/AuthProvider';
+import type { AppRoleEnum } from './lib/database.types';
+import { AuthProvider, useAuth } from './auth/AuthProvider';
+import { isClientRole } from './auth/roles';
 import { DataProvider } from './data/store';
 import { ClientsProvider } from './data/clientsStore';
 import { DEMO_CLIENT_ID } from './data/clients';
 import { clientIdFromPathname } from './data/clientRoute';
 import { Btn } from './components/primitives';
-import { TweaksPanel, TweakSection, TweakRadio, useTweaks } from './tweaks/TweaksPanel';
+import { TweaksPanel, TweakSection, TweakRadio, TweakSelect, useTweaks } from './tweaks/TweaksPanel';
 import { AppRoutes, screenKeyFromPath, useGo } from './routes';
 
 /* index, grouped — for the launcher overlay */
@@ -74,6 +76,17 @@ const TWEAK_DEFAULTS: TweakValues = {
 const NAV_OPTIONS: NavStyle[] = ['sidebar', 'topnav', 'hybrid'];
 const DENSITY_OPTIONS: Density[] = ['breathable', 'dense'];
 
+/* Local-Prototype-only role switcher — preview the client portal as each role.
+   '' = the internal Benchmark Fox staff demo (no simulated role). Gated to Local
+   Prototype mode in AppChrome; real sessions get their role from Supabase auth. */
+const ROLE_SWITCHER_OPTIONS: { value: '' | AppRoleEnum; label: string }[] = [
+  { value: '', label: 'Internal — Benchmark Fox' },
+  { value: 'client_executive', label: 'Client Executive' },
+  { value: 'client_it_owner', label: 'Client IT Owner' },
+  { value: 'evidence_uploader', label: 'Evidence Uploader' },
+  { value: 'readonly_viewer', label: 'Read-only Viewer' },
+];
+
 export default function App() {
   return (
     <BrowserRouter>
@@ -104,6 +117,10 @@ function AppChrome() {
   const go = useGo();
   const { pathname } = useLocation();
   const screen = screenKeyFromPath(pathname);
+  const { isConfigured, role, simulatedRole, setSimulatedRole } = useAuth();
+  // Client-portal session: hide the internal dev affordances (screen launcher,
+  // keyboard stepping) and — for a REAL client user — the Tweaks panel entirely.
+  const portal = isClientRole(role);
 
   /* persist the last visited screen (the `/` route restores it) */
   useEffect(() => {
@@ -125,8 +142,10 @@ function AppChrome() {
     );
   }, [t.density]);
 
-  /* keyboard: [ and ] to step screens, g to toggle the index */
+  /* keyboard: [ and ] to step screens, g to toggle the index. Disabled for
+     client-portal sessions (stepping would cross the portal screen boundary). */
   useEffect(() => {
+    if (portal) return;
     const h = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement;
       if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return;
@@ -145,27 +164,29 @@ function AppChrome() {
     <>
       <AppRoutes navStyle={t.navStyle} />
 
-      {/* screen-index launcher */}
-      <button
-        onClick={() => setMenu(true)}
-        className="w-btn"
-        id="screen-launcher"
-        style={{
-          position: 'fixed',
-          left: 16,
-          bottom: 16,
-          zIndex: 1000,
-          boxShadow: 'var(--sh-md)',
-          background: 'var(--white)',
-        }}
-      >
-        <LayoutGrid size={15} strokeWidth={2} /> Screens{' '}
-        <span className="mono faint" style={{ fontSize: '.82em' }}>
-          {String(idx).padStart(2, '0')}/{FLAT.length}
-        </span>
-      </button>
+      {/* screen-index launcher (internal dev affordance — hidden in the portal) */}
+      {!portal && (
+        <button
+          onClick={() => setMenu(true)}
+          className="w-btn"
+          id="screen-launcher"
+          style={{
+            position: 'fixed',
+            left: 16,
+            bottom: 16,
+            zIndex: 1000,
+            boxShadow: 'var(--sh-md)',
+            background: 'var(--white)',
+          }}
+        >
+          <LayoutGrid size={15} strokeWidth={2} /> Screens{' '}
+          <span className="mono faint" style={{ fontSize: '.82em' }}>
+            {String(idx).padStart(2, '0')}/{FLAT.length}
+          </span>
+        </button>
+      )}
 
-      {menu && (
+      {menu && !portal && (
         <div
           onClick={() => setMenu(false)}
           style={{
@@ -223,8 +244,25 @@ function AppChrome() {
         </div>
       )}
 
-      {/* tweaks */}
+      {/* tweaks — hidden entirely for a REAL client-portal user (Supabase mode);
+          in Local Prototype mode it stays available so a demo can switch roles. */}
+      {!(isConfigured && portal) && (
       <TweaksPanel title="Tweaks">
+        {/* Local-Prototype-only role switcher: preview the client portal. */}
+        {!isConfigured && (
+          <>
+            <TweakSection label="Demo session" />
+            <TweakSelect
+              label="View as"
+              value={simulatedRole ?? ''}
+              options={ROLE_SWITCHER_OPTIONS}
+              onChange={(v) => setSimulatedRole(v === '' ? null : (v as AppRoleEnum))}
+            />
+            <p style={{ margin: '2px 4px 0', fontSize: 11, opacity: 0.6, fontFamily: 'var(--mono)' }}>
+              Local Prototype only · preview the role-scoped client portal
+            </p>
+          </>
+        )}
         <TweakSection label="Navigation structure" />
         <TweakRadio
           label="Nav style"
@@ -261,6 +299,7 @@ function AppChrome() {
           ↺ Reset demo data
         </button>
       </TweaksPanel>
+      )}
     </>
   );
 }

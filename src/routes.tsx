@@ -20,6 +20,7 @@ import {
 import type { Go, NavStyle, ScreenKey, ScreenProps } from './types';
 import type { AppRoleEnum } from './lib/database.types';
 import { useAuth } from './auth/AuthProvider';
+import { isClientRole } from './auth/roles';
 import { Shell } from './components/Shell';
 import { useData } from './data/store';
 import { useClients } from './data/clientsStore';
@@ -138,12 +139,16 @@ function clientIdFromPath(pathname: string): string {
 export function useGo(): Go {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const { role, assignedClientId } = useAuth();
+  // A client-portal user is always scoped to their single assigned engagement,
+  // so every go(...) stays inside their client (never the path-derived demo id).
+  const portalClientId = isClientRole(role) ? assignedClientId : null;
   return useCallback(
     (key: ScreenKey) => {
-      navigate(screenPath(key, { clientId: clientIdFromPath(pathname) }));
+      navigate(screenPath(key, { clientId: portalClientId ?? clientIdFromPath(pathname) }));
       window.scrollTo(0, 0);
     },
-    [navigate, pathname],
+    [navigate, pathname, portalClientId],
   );
 }
 
@@ -267,6 +272,62 @@ export function RequireRole({
   return <>{children}</>;
 }
 
+/* ------------------------------------------------------------
+   Client portal guard (Task 11). The HARD boundary is RLS + the client
+   column view; this is the matching UX gate so a client-role user only
+   ever lands on their own engagement's reduced screen set.
+   ------------------------------------------------------------ */
+
+/** The only screens a client-portal role may reach (everything else → their
+    dashboard). Mirrors the reduced portal nav in Shell.tsx. */
+const PORTAL_SCREEN_KEYS = new Set<ScreenKey>([
+  'client-dashboard',
+  'controls',
+  'control-detail',
+  'evidence',
+  'reports',
+  'report-preview',
+  'knowledge',
+]);
+
+function NoAssignedClientScreen() {
+  return (
+    <div className="center" style={{ minHeight: '100vh', justifyContent: 'center', padding: 24 }}>
+      <div className="w-card col" style={{ maxWidth: 460, padding: 28, gap: 12, textAlign: 'center' }}>
+        <h1 className="w-h1">No engagement assigned</h1>
+        <p className="muted" style={{ margin: 0 }}>
+          Your account isn&rsquo;t linked to a client engagement yet. Contact your Benchmark Fox
+          consultant to get access.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Wraps the authenticated screens. Staff/admin (and the internal Local-Prototype
+ * demo) pass straight through. A client-portal role is constrained to:
+ *   - their OWN assigned client (any other :clientId → their dashboard), and
+ *   - the reduced PORTAL_SCREEN_KEYS set (any internal screen → their dashboard).
+ * While their role/assignment is still resolving it shows the pending screen, so
+ * internal chrome never flashes for a client user.
+ */
+export function PortalGuard() {
+  const { loading, role, assignedClientId } = useAuth();
+  const { pathname } = useLocation();
+  if (loading) return <AuthPendingScreen />;
+  if (!isClientRole(role)) return <Outlet />;
+  if (!assignedClientId) return <NoAssignedClientScreen />;
+
+  const target = screenPath('client-dashboard', { clientId: assignedClientId });
+  const routeClientId = clientIdFromPathname(pathname);
+  const key = screenKeyFromPath(pathname);
+  // Wrong client (not theirs), or a screen outside the portal set → bounce home.
+  if (routeClientId && routeClientId !== assignedClientId) return <Navigate to={target} replace />;
+  if (!key || !PORTAL_SCREEN_KEYS.has(key)) return <Navigate to={target} replace />;
+  return <Outlet />;
+}
+
 /* Layout route: app shell (sidebar/topnav/hybrid) around every screen
    except the full-bleed ones (login, mobile). */
 function ShellLayout({ navStyle }: { navStyle: NavStyle }) {
@@ -347,10 +408,13 @@ export function AppRoutes({ navStyle }: { navStyle: NavStyle }) {
       <Route path="/login" element={<ScreenRoute component={LoginScreen} />} />
 
       <Route element={<ProtectedRoute />}>
-        {/* full-bleed (no shell) */}
-        <Route path="/mobile" element={<ScreenRoute component={MobileScreen} />} />
+        {/* Client-portal roles are constrained to their engagement's reduced
+            screen set here; staff/admin pass through unchanged. */}
+        <Route element={<PortalGuard />}>
+          {/* full-bleed (no shell) */}
+          <Route path="/mobile" element={<ScreenRoute component={MobileScreen} />} />
 
-        <Route element={<ShellLayout navStyle={navStyle} />}>
+          <Route element={<ShellLayout navStyle={navStyle} />}>
           <Route path="/dashboard" element={<ScreenRoute component={DashboardScreen} />} />
           <Route path="/clients" element={<ScreenRoute component={ClientsScreen} />} />
           <Route
@@ -375,10 +439,11 @@ export function AppRoutes({ navStyle }: { navStyle: NavStyle }) {
             <Route path="reports" element={<ScreenRoute component={ReportsScreen} />} />
             <Route path="reports/preview" element={<ScreenRoute component={ReportPreviewScreen} />} />
           </Route>
-          <Route path="/library" element={<ScreenRoute component={ControlLibraryScreen} />} />
-          <Route path="/knowledge" element={<ScreenRoute component={KnowledgeScreen} />} />
-          <Route path="/audit" element={<ScreenRoute component={AuditScreen} />} />
-          <Route path="/settings" element={<ScreenRoute component={SettingsScreen} />} />
+            <Route path="/library" element={<ScreenRoute component={ControlLibraryScreen} />} />
+            <Route path="/knowledge" element={<ScreenRoute component={KnowledgeScreen} />} />
+            <Route path="/audit" element={<ScreenRoute component={AuditScreen} />} />
+            <Route path="/settings" element={<ScreenRoute component={SettingsScreen} />} />
+          </Route>
         </Route>
       </Route>
 

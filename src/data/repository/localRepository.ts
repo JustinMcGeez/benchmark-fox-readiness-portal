@@ -30,9 +30,11 @@ import { DEFAULT_INTAKE, type IntakeState } from '../intake';
 import { DEFAULT_SCOPE, type ScopeState } from '../scope';
 import { assertTransition } from '../../lib/evidenceWorkflow';
 import { cmmcLevelForPath } from './mappers';
+import { stripInternalAssessmentFields } from '../internalFields';
 import {
   RepositoryError,
   type AssessmentPatch,
+  type AssessmentReadOptions,
   type ClientAssessmentStatus,
   type ClientDataRepository,
   type ClientsRepository,
@@ -161,8 +163,13 @@ export function readLocalSnapshot(clientId: string): LocalSnapshot {
 /* ---- ClientDataRepository implementation (resolves immediately) ---- */
 
 export const localRepository: ClientDataRepository = {
-  getAssessments(clientId: string) {
-    return Promise.resolve(mergeAssessmentsFor(clientId, loadOverrides()));
+  getAssessments(clientId: string, opts?: AssessmentReadOptions) {
+    const list = mergeAssessmentsFor(clientId, loadOverrides());
+    // Client-portal read path: strip internal-only fields (mirrors the Supabase
+    // client view) so a simulated client role never receives consultant_notes.
+    return Promise.resolve(
+      opts?.includeInternal === false ? list.map(stripInternalAssessmentFields) : list,
+    );
   },
   patchAssessment(clientId: string, controlId: string, patch: AssessmentPatch) {
     const overrides = loadOverrides();

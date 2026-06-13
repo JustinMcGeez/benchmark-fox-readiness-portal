@@ -23,6 +23,7 @@ import { ScoringWarning } from '../components/ScoringWarning';
 import { useData } from '../data/store';
 import { useReference } from '../data/referenceStore';
 import { useCurrentClient } from '../data/clientsStore';
+import { usePermissions } from '../auth/permissions';
 import { CONTROLS_BY_ID, EXPECTED_CONTROL_COUNT } from '../data/controls';
 import { poamForControl } from '../data/poam';
 import { tasksForControl } from '../data/tasks';
@@ -151,6 +152,9 @@ const ALL = 'All';
 export function ControlMatrixScreen({ go }: ScreenProps) {
   const { assessments, updateAssessment, selectControl } = useData();
   const currentClient = useCurrentClient();
+  // Client-portal roles get a READ-ONLY matrix (RLS blocks assessment writes;
+  // the UI shows status badges instead of editable selects + hides staff actions).
+  const { canEditAssessments } = usePermissions();
   // Control definitions from the reference-data provider (Supabase or local).
   const { controls, controlsById, controlFamilies } = useReference();
   const [q, setQ] = useState('');
@@ -226,12 +230,14 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
             {counts.total} CONTROLS · {counts.met} MET · {counts.partial} PARTIAL · {counts.notMet} NOT MET
             {rows.length !== counts.total && ` · ${rows.length} SHOWN`}
           </span>
-          <div className="row gap-sm wrap">
-            <Btn sm ghost>Assign Owner</Btn>
-            <Btn sm ghost onClick={() => go('evidence')}>Request Evidence</Btn>
-            <Btn sm ghost onClick={() => go('poam')}>Create POA&M</Btn>
-            <Btn sm>Export Matrix</Btn>
-          </div>
+          {canEditAssessments && (
+            <div className="row gap-sm wrap">
+              <Btn sm ghost>Assign Owner</Btn>
+              <Btn sm ghost onClick={() => go('evidence')}>Request Evidence</Btn>
+              <Btn sm ghost onClick={() => go('poam')}>Create POA&M</Btn>
+              <Btn sm>Export Matrix</Btn>
+            </div>
+          )}
         </div>
         <table className="w-table">
           <thead>
@@ -270,48 +276,68 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
                   )}
                 </td>
                 <td>
-                  <InlineSelect
-                    ariaLabel="Readiness status"
-                    value={a.status}
-                    options={READINESS_OPTIONS}
-                    onChange={(v) => updateAssessment(a.controlId, { status: v })}
-                  />
+                  {canEditAssessments ? (
+                    <InlineSelect
+                      ariaLabel="Readiness status"
+                      value={a.status}
+                      options={READINESS_OPTIONS}
+                      onChange={(v) => updateAssessment(a.controlId, { status: v })}
+                    />
+                  ) : (
+                    <Status s={a.status} />
+                  )}
                 </td>
                 <td className="num">{controlScoreDisplay(a, c)}</td>
                 <td>
-                  <InlineSelect
-                    ariaLabel="SSP status"
-                    value={a.sspStatus}
-                    options={SSP_OPTIONS}
-                    onChange={(v) => updateAssessment(a.controlId, { sspStatus: v })}
-                  />
+                  {canEditAssessments ? (
+                    <InlineSelect
+                      ariaLabel="SSP status"
+                      value={a.sspStatus}
+                      options={SSP_OPTIONS}
+                      onChange={(v) => updateAssessment(a.controlId, { sspStatus: v })}
+                    />
+                  ) : (
+                    <Status s={a.sspStatus} />
+                  )}
                 </td>
                 <td>
-                  <InlineSelect
-                    ariaLabel="Evidence status"
-                    value={a.evidenceStatus}
-                    options={EVIDENCE_OPTIONS}
-                    onChange={(v) => updateAssessment(a.controlId, { evidenceStatus: v })}
-                  />
+                  {canEditAssessments ? (
+                    <InlineSelect
+                      ariaLabel="Evidence status"
+                      value={a.evidenceStatus}
+                      options={EVIDENCE_OPTIONS}
+                      onChange={(v) => updateAssessment(a.controlId, { evidenceStatus: v })}
+                    />
+                  ) : (
+                    <Status s={a.evidenceStatus} />
+                  )}
                 </td>
                 <td>
-                  <InlineSelect
-                    ariaLabel="POA&M status"
-                    value={a.poamStatus}
-                    options={POAM_OPTIONS}
-                    onChange={(v) => updateAssessment(a.controlId, { poamStatus: v })}
-                  />
+                  {canEditAssessments ? (
+                    <InlineSelect
+                      ariaLabel="POA&M status"
+                      value={a.poamStatus}
+                      options={POAM_OPTIONS}
+                      onChange={(v) => updateAssessment(a.controlId, { poamStatus: v })}
+                    />
+                  ) : (
+                    <Status s={a.poamStatus} />
+                  )}
                 </td>
                 <td>
                   <RiskBadge level={a.risk} />
                 </td>
                 <td>
-                  <InlineSelect
-                    ariaLabel="Owner"
-                    value={a.owner}
-                    options={OWNER_OPTIONS}
-                    onChange={(v) => updateAssessment(a.controlId, { owner: v })}
-                  />
+                  {canEditAssessments ? (
+                    <InlineSelect
+                      ariaLabel="Owner"
+                      value={a.owner}
+                      options={OWNER_OPTIONS}
+                      onChange={(v) => updateAssessment(a.controlId, { owner: v })}
+                    />
+                  ) : (
+                    <span>{a.owner}</span>
+                  )}
                 </td>
               </tr>
             ))}
@@ -363,6 +389,8 @@ function FilterSelect({
 export function ControlDetailScreen({ go, controlId }: ScreenProps & { controlId?: string }) {
   const { selectedControlId, assessmentFor, updateAssessment, evidence: allEvidence } = useData();
   const { controlsById } = useReference();
+  // Read-only for client-portal roles (consultant notes hidden; no edit actions).
+  const { canEditAssessments } = usePermissions();
   const [tab, setTab] = useState('Overview');
   const tabs = ['Overview', 'Assessment', 'SSP', 'Evidence', 'POA&M', 'Tasks', 'Guidance'];
 
@@ -511,23 +539,31 @@ export function ControlDetailScreen({ go, controlId }: ScreenProps & { controlId
               <div className="col" style={{ gap: 14 }}>
                 <div className="between">
                   <span className="w-label">Readiness Status</span>
-                  <InlineSelect
-                    ariaLabel="Readiness status"
-                    value={a.status}
-                    options={READINESS_OPTIONS}
-                    onChange={(v) => updateAssessment(control.id, { status: v })}
-                  />
+                  {canEditAssessments ? (
+                    <InlineSelect
+                      ariaLabel="Readiness status"
+                      value={a.status}
+                      options={READINESS_OPTIONS}
+                      onChange={(v) => updateAssessment(control.id, { status: v })}
+                    />
+                  ) : (
+                    <Status s={a.status} />
+                  )}
                 </div>
                 <div className="between">
                   <span className="w-label">Validation Method</span>
                   <span className="muted" style={{ fontSize: '.9em' }}>Examine · Test</span>
                 </div>
-                <Field
-                  label="Consultant Notes"
-                  value={a.consultantNotes ?? ''}
-                  placeholder="Findings, verification, follow-ups…"
-                  area
-                />
+                {/* Consultant Notes are INTERNAL to Benchmark Fox — never shown to
+                    client-portal roles (also stripped server-side by the client view). */}
+                {canEditAssessments && (
+                  <Field
+                    label="Consultant Notes"
+                    value={a.consultantNotes ?? ''}
+                    placeholder="Findings, verification, follow-ups…"
+                    area
+                  />
+                )}
               </div>
             </Card>
           )}
@@ -547,12 +583,16 @@ export function ControlDetailScreen({ go, controlId }: ScreenProps & { controlId
               <div className="grid-2 mt">
                 <div className="between">
                   <span className="w-label">SSP Status</span>
-                  <InlineSelect
-                    ariaLabel="SSP status"
-                    value={a.sspStatus}
-                    options={SSP_OPTIONS}
-                    onChange={(v) => updateAssessment(control.id, { sspStatus: v })}
-                  />
+                  {canEditAssessments ? (
+                    <InlineSelect
+                      ariaLabel="SSP status"
+                      value={a.sspStatus}
+                      options={SSP_OPTIONS}
+                      onChange={(v) => updateAssessment(control.id, { sspStatus: v })}
+                    />
+                  ) : (
+                    <Status s={a.sspStatus} />
+                  )}
                 </div>
                 <div className="between">
                   <span className="w-label">Evidence Supports?</span>
@@ -717,10 +757,14 @@ export function ControlDetailScreen({ go, controlId }: ScreenProps & { controlId
                 <Badge tone={tasks.length ? 'warn' : 'none'}>{tasks.length} tasks</Badge>
               </span>
             </div>
-            <hr className="w-hr" style={{ margin: '4px 0' }} />
-            <Btn primary>Save Changes</Btn>
-            <Btn onClick={() => go('evidence')}>Request Evidence</Btn>
-            <Btn onClick={() => go('poam')}>Create POA&M</Btn>
+            {canEditAssessments && (
+              <>
+                <hr className="w-hr" style={{ margin: '4px 0' }} />
+                <Btn primary>Save Changes</Btn>
+                <Btn onClick={() => go('evidence')}>Request Evidence</Btn>
+                <Btn onClick={() => go('poam')}>Create POA&M</Btn>
+              </>
+            )}
           </div>
         </Card>
       </div>

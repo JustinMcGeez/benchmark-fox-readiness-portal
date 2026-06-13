@@ -606,7 +606,7 @@ test('UPDATE on an assessment writes exactly ONE audit row with the correct diff
   assert.notEqual(latest.data.actor_name, 'system', 'authenticated writes are not "system"');
 });
 
-test('long free-text note change is collapsed to "[text changed]" (no CUI in the trail)', async () => {
+test('consultant_notes change is recorded as an INTERNAL note action, collapsed, never in a client-visible diff (009)', async () => {
   const cur = await admin
     .from('client_control_assessments')
     .select('id')
@@ -628,25 +628,45 @@ test('long free-text note change is collapsed to "[text changed]" (no CUI in the
   assert.equal(upd.error, null);
   assert.equal(upd.data.length, 1);
 
-  const latest = await admin
+  // The change rides on an INTERNAL action type (assessment.internal_note) — the
+  // 009 trigger keeps internal-only columns out of the client-visible diff.
+  const internal = await admin
+    .from('audit_events')
+    .select('new_value')
+    .eq('entity_type', 'client_control_assessments')
+    .eq('entity_id', entityId)
+    .eq('action', 'assessment.internal_note')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  assert.equal(internal.error, null);
+  assert.equal(
+    internal.data.new_value.consultant_notes.new,
+    '[text changed]',
+    'long note value is replaced by the marker',
+  );
+  assert.ok(
+    !JSON.stringify(internal.data.new_value).includes('SENSITIVE-'),
+    'the long note text is NEVER copied into the audit row',
+  );
+
+  // The most recent client-visible assessment.updated diff (if any) NEVER carries
+  // consultant_notes.
+  const visible = await admin
     .from('audit_events')
     .select('new_value')
     .eq('entity_type', 'client_control_assessments')
     .eq('entity_id', entityId)
     .eq('action', 'assessment.updated')
     .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
-  assert.equal(latest.error, null);
-  assert.equal(
-    latest.data.new_value.consultant_notes.new,
-    '[text changed]',
-    'long note value is replaced by the marker',
-  );
-  assert.ok(
-    !JSON.stringify(latest.data.new_value).includes('SENSITIVE-'),
-    'the long note text is NEVER copied into the audit row',
-  );
+    .limit(1);
+  assert.equal(visible.error, null);
+  for (const row of visible.data) {
+    assert.ok(
+      !Object.prototype.hasOwnProperty.call(row.new_value, 'consultant_notes'),
+      'consultant_notes must never appear in a client-visible assessment.updated diff',
+    );
+  }
 });
 
 test('an idempotent no-op UPDATE writes no audit row', async () => {
@@ -819,4 +839,81 @@ test('soft-removing an assignment (deleted_at) revokes access via the helpers', 
   const revoked = await clients.consultant.from('clients').select('id').eq('id', CLIENT_B);
   assert.equal(revoked.error, null, 'cross-client read is filtered, not an error');
   assert.equal(revoked.data.length, 0, 'soft-removed assignment must revoke client B access');
+});
+
+// ===========================================================================
+// CLIENT PORTAL — column-restricted view + internal-action hiding (Task 11,
+// migration 009). A client-role user reads assessments through the client view,
+// which OMITS internal-only columns (consultant_notes) while RLS still scopes
+// rows to their assigned client (security_invoker = on).
+// ===========================================================================
+const ASSESS_CLIENT_VIEW = 'client_control_assessments_client';
+
+test('client view omits consultant_notes and still scopes rows to the assigned client', async () => {
+  const { data, error } = await clients.readonly
+    .from(ASSESS_CLIENT_VIEW)
+    .select('*')
+    .eq('client_id', CLIENT_A);
+  assert.equal(error, null, 'client role may read its assigned client via the view');
+  assert.ok(data.length >= 1, 'view returns the assigned client rows');
+  for (const row of data) {
+    assert.ok(
+      !Object.prototype.hasOwnProperty.call(row, 'consultant_notes'),
+      'the client view must NOT expose consultant_notes',
+    );
+    // a client-visible column is still present
+    assert.ok(Object.prototype.hasOwnProperty.call(row, 'readiness_status'));
+  }
+});
+
+test('client role cannot SELECT consultant_notes through the view (column does not exist)', async () => {
+  const { error } = await clients.readonly.from(ASSESS_CLIENT_VIEW).select('consultant_notes');
+  assert.notEqual(error, null, 'consultant_notes is not a column on the client view');
+});
+
+test('client view honors row RLS: a client role reads ZERO rows for an unassigned client', async () => {
+  const { data, error } = await clients.readonly
+    .from(ASSESS_CLIENT_VIEW)
+    .select('id')
+    .eq('client_id', CLIENT_B);
+  assert.equal(error, null, 'cross-client view read is filtered, not an error');
+  assert.equal(data.length, 0, 'security_invoker view must not leak another client (B) rows');
+});
+
+test('staff still read consultant_notes from the base table (their full read path is unchanged)', async () => {
+  const { data, error } = await clients.consultant
+    .from('client_control_assessments')
+    .select('consultant_notes')
+    .eq('client_id', CLIENT_A)
+    .limit(1);
+  assert.equal(error, null);
+  assert.ok(data.length >= 1);
+  assert.ok(
+    Object.prototype.hasOwnProperty.call(data[0], 'consultant_notes'),
+    'staff base-table reads include the internal column',
+  );
+});
+
+test('client roles never see *.internal_note audit actions; staff do (009 hardening)', async () => {
+  // Seed an internal-note row + a normal row for client A (service_role).
+  const ins = await admin.from('audit_events').insert([
+    { client_id: CLIENT_A, action: 'assessment.internal_note', new_value: { consultant_notes: { old: null, new: 'x' } } },
+    { client_id: CLIENT_A, action: 'assessment.updated' },
+  ]);
+  assert.equal(ins.error, null);
+
+  const ro = await clients.readonly.from('audit_events').select('action').eq('client_id', CLIENT_A);
+  assert.equal(ro.error, null);
+  assert.ok(
+    ro.data.every((r) => r.action !== 'assessment.internal_note' && !r.action.endsWith('.internal_note')),
+    'client role must never see internal-note audit actions',
+  );
+
+  const staff = await clients.consultant
+    .from('audit_events')
+    .select('action')
+    .eq('client_id', CLIENT_A)
+    .eq('action', 'assessment.internal_note');
+  assert.equal(staff.error, null);
+  assert.ok(staff.data.length >= 1, 'BF staff DO see internal-note actions for their client');
 });

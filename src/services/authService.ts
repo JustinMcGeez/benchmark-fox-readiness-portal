@@ -179,3 +179,32 @@ export async function fetchOwnProfile(userId: string): Promise<AuthProfile | nul
     status: data.status,
   };
 }
+
+/* ---------------------------------------------------------------------------
+   Assigned client lookup — for client-portal roles (Task 11).
+   --------------------------------------------------------------------------- */
+
+/**
+ * The single client a portal user is scoped to, resolved from their (non
+ * soft-deleted) client_assignments row. Client-role users have exactly one
+ * assignment; the primary one wins if there were ever more. Returns null when
+ * none exists (the portal then shows a "no engagement assigned" notice).
+ *
+ * RLS (client_assignments_read, migration 004 + 006 soft-delete) limits this to
+ * the caller's OWN assignment rows — a client user can never enumerate others.
+ * The thrown error is deliberately detail-free.
+ */
+export async function fetchAssignedClientId(profileId: string): Promise<string | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('client_assignments')
+    .select('client_id')
+    .eq('profile_id', profileId)
+    .is('deleted_at', null)
+    .order('is_primary', { ascending: false })
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw new Error('assignment-fetch-failed');
+  return data?.client_id ?? null;
+}

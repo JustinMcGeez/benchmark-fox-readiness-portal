@@ -30,6 +30,7 @@ import type {
   EvidenceStatus,
 } from '../types';
 import { SEED_ASSESSMENTS } from '../controls';
+import { stripInternalAssessmentFields } from '../internalFields';
 import { DEFAULT_INTAKE, type IntakeState } from '../intake';
 import { DEFAULT_SCOPE, type ScopeState } from '../scope';
 import { assertTransition } from '../../lib/evidenceWorkflow';
@@ -55,11 +56,13 @@ import {
   scopeAssetToRowPayload,
   scopeRowToSummary,
   scopeSummaryToRowPayload,
+  type AssessmentRow,
   type AssessmentRowPayload,
 } from './mappers';
 import {
   RepositoryError,
   type AssessmentPatch,
+  type AssessmentReadOptions,
   type ClientAssessmentStatus,
   type ClientDataRepository,
   type ClientsRepository,
@@ -67,6 +70,12 @@ import {
 } from './types';
 
 const ASSESSMENTS = 'client_control_assessments';
+/** Column-restricted client-facing view (migration 009): omits internal-only
+    columns (consultant_notes). security_invoker=on, so the 004 row RLS still
+    applies — client roles read ONLY their assigned client's rows, minus the
+    internal columns. The client-portal read path uses this instead of the base
+    table so column hiding is enforced server-side, not just in the UI. */
+const ASSESSMENTS_CLIENT_VIEW = 'client_control_assessments_client';
 const INTAKE = 'intake_records';
 const SCOPE = 'scope_records';
 const SCOPE_ASSETS = 'scope_assets';
@@ -139,18 +148,31 @@ function controlUuidOrThrow(maps: ControlIdMaps, controlId: string): string {
 
 /* ---- assessments ---- */
 
-async function getAssessments(clientId: string): Promise<ClientControlAssessment[]> {
+async function getAssessments(
+  clientId: string,
+  opts?: AssessmentReadOptions,
+): Promise<ClientControlAssessment[]> {
   return guard('load-failed', 'Could not load assessments from the cloud workspace.', async () => {
     const clientUuid = resolveClientUuid(clientId);
     const maps = await getControlIdMaps();
-    const { data, error } = await getSupabase().from(ASSESSMENTS).select('*').eq('client_id', clientUuid);
+    const sb = getSupabase();
+    // Client-portal read path: the column-restricted view (no consultant_notes).
+    // The view is a strict column SUBSET of the base table, so its rows map with
+    // the same mapper (consultant_notes simply reads back undefined, then we strip
+    // it to guarantee no seed fall-back leaks the field).
+    const includeInternal = opts?.includeInternal !== false;
+    const { data, error } = includeInternal
+      ? await sb.from(ASSESSMENTS).select('*').eq('client_id', clientUuid)
+      : await sb.from(ASSESSMENTS_CLIENT_VIEW).select('*').eq('client_id', clientUuid);
     if (error) throw new RepositoryError('load-failed', 'Could not load assessments.', { cause: error });
 
-    const rowByControlUuid = new Map((data ?? []).map((row) => [row.control_id, row]));
+    const rows = (data ?? []) as unknown as AssessmentRow[];
+    const rowByControlUuid = new Map(rows.map((row) => [row.control_id, row]));
     return SEED_ASSESSMENTS.map((seed) => {
       const controlUuid = maps.byNatural.get(seed.controlId);
       const row = controlUuid ? rowByControlUuid.get(controlUuid) : undefined;
-      return row ? assessmentRowToDomain(row, seed) : seed;
+      const domain = row ? assessmentRowToDomain(row, seed) : seed;
+      return includeInternal ? domain : stripInternalAssessmentFields(domain);
     });
   });
 }

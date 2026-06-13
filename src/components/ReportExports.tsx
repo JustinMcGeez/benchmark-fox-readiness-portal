@@ -15,6 +15,8 @@ import { Btn } from './primitives';
 import { useData } from '../data/store';
 import { useReference } from '../data/referenceStore';
 import { useCurrentClient } from '../data/clientsStore';
+import { usePermissions } from '../auth/permissions';
+import { visiblePoamItems } from '../data/internalFields';
 import { POAM_ITEMS } from '../data/poam';
 import { logEvent } from '../lib/audit';
 import { formatScore } from '../lib/scoring';
@@ -26,11 +28,13 @@ function useClientExportData() {
   const { assessments, evidence, currentClientId } = useData();
   const { controls, controlsById } = useReference();
   const client = useCurrentClient();
+  const { role } = usePermissions();
   const clientName = client?.name ?? 'Client';
   const cmmcTarget = client?.cmmcPath ?? 'Undetermined';
+  // Client-portal exports never include internal-classified POA&M items.
   const poam = useMemo(
-    () => POAM_ITEMS.filter((p) => p.clientId === currentClientId),
-    [currentClientId],
+    () => visiblePoamItems(POAM_ITEMS.filter((p) => p.clientId === currentClientId), role),
+    [currentClientId, role],
   );
   return {
     assessments,
