@@ -1,0 +1,58 @@
+# Supabase local-stack config — used by `supabase start` / `supabase test db`.
+# Purpose in this repo: boot a local Postgres + Auth + PostgREST so the RLS test
+# suite (scripts/test-rls.mjs) can exercise the policies in migrations/ as real
+# authenticated users. The CI `rls` job in .github/workflows/ci.yml runs this.
+#
+# This is LOCAL/CI scaffolding only — it is NOT the production project config.
+# Production auth posture (invite-only, public signups disabled) is set in the
+# Supabase dashboard, not here (see 002_auth_profiles.sql operational note).
+
+project_id = "benchmark-fox-readiness-portal"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+
+[db.pooler]
+enabled = false
+
+[realtime]
+enabled = false
+
+[studio]
+enabled = false
+
+[inbucket]
+enabled = false
+
+[storage]
+# Hard MVP rule: no Supabase Storage, ever (no CUI / no evidence files).
+enabled = false
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["http://127.0.0.1:3000"]
+jwt_expiry = 3600
+enable_refresh_token_rotation = true
+refresh_token_reuse_interval = 10
+# Local test users are created via the admin API (admin.createUser, which bypasses
+# the signup setting); keep signups off to mirror the invite-only production posture.
+enable_signup = false
+
+[auth.email]
+enable_signup = false
+# Tests create users with email_confirm:true via the admin API — no real email
+# round-trip is needed, so confirmations are off for the local stack.
+enable_confirmations = false
+
+[analytics]
+enabled = false

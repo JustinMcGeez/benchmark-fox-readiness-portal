@@ -13,6 +13,7 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:rls": "node --test scripts/test-rls.mjs",
     "import:sources": "node scripts/import-sp800-171.ts",
     "validate:controls": "node scripts/validate-controls.mjs",
     "validate:scoring": "node scripts/validate-scoring.mjs",

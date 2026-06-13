@@ -40,3 +40,45 @@ jobs:
 
       - name: E2E smoke tests
         run: npm run test:e2e
+
+  # RLS policy tests — boot the local Supabase stack (Postgres + Auth + PostgREST),
+  # apply all migrations + seed, then run the cross-tenant RLS suite as real
+  # authenticated users. A policy regression fails the build. Separate job so the
+  # Docker-based stack does not slow the main typecheck/build/unit/e2e gate.
+  rls:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Start Supabase local stack (applies migrations + seed)
+        run: supabase start
+
+      - name: Export local Supabase URL + keys for the harness
+        run: |
+          set -a
+          eval "$(supabase status -o env)"
+          set +a
+          {
+            echo "SUPABASE_URL=$API_URL"
+            echo "SUPABASE_ANON_KEY=$ANON_KEY"
+            echo "SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY"
+          } >> "$GITHUB_ENV"
+
+      - name: RLS policy tests
+        run: npm run test:rls
+
+      - name: Stop Supabase local stack
+        if: always()
+        run: supabase stop

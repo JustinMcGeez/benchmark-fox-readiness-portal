@@ -1,8 +1,9 @@
 # Benchmark Fox Readiness Portal — Supabase / Postgres Backend Architecture
 
 > **Status (phased):**
-> - **Phase 0 — schema/scaffold: DONE.** Migration, RLS draft, seed, env example,
->   typed client, and config are committed.
+> - **Phase 0 — schema/scaffold: DONE.** Migration, seed, env example,
+>   typed client, and config are committed. RLS policies are implemented and
+>   tested (Task 05 — migration `004`, see §11).
 > - **Phase 1 — reference-data seeding: DONE.** `supabase/seed.sql` +
 >   `scripts/seed-supabase-reference-data.ts` load global reference data; validated
 >   by `scripts/validate-supabase-schema.mjs`.
@@ -309,30 +310,78 @@ committed, placed in a `VITE_` var, or shipped to the browser. Only
 - `audit_events *—1 organizations | clients | profiles` (all nullable; an event
   may be org-level, client-level, or system-level)
 
-## 11. Row Level Security plan
+## 11. Row Level Security (implemented + tested)
 
-Full draft policies live in [`supabase/policies/rls_plan.sql`](../../supabase/policies/rls_plan.sql).
-Summary of intent:
+**Status: IMPLEMENTED and TESTED (Task 05).** The applied policy set lives in
+[`supabase/migrations/004_rls_policies.sql`](../../supabase/migrations/004_rls_policies.sql)
+(auto-applied by `supabase db reset` / `supabase start`). The access-model
+narrative is preserved in
+[`supabase/policies/rls_plan.sql`](../../supabase/policies/rls_plan.sql), which is
+now a SUPERSEDED reference (no executable SQL) so there is a single source of
+truth. Cross-tenant isolation is proven by an automated suite
+([`scripts/test-rls.mjs`](../../scripts/test-rls.mjs)) that runs in CI (the `rls`
+job) on every PR.
 
-- **RLS is enabled on every tenant table.** Reference tables
-  (`control_families`, `controls`, `source_references`,
-  `control_source_references`) are readable by any authenticated user and
-  writable only by admins.
-- **`benchmark_fox_admin`** — full access to all Benchmark Fox records.
-- **`benchmark_fox_consultant`** — access limited to clients they are assigned to
-  via `client_assignments`.
-- **Client users (future)** — access limited to their single assigned client.
-- **`evidence_uploader` (future)** — may create/read **evidence metadata** for
-  assigned clients only; no edits to assessments/POA&Ms.
-- **`readonly_viewer`** — may read assigned-client dashboards/reports; **no
-  writes**.
-- **No cross-client leakage** — every tenant table's policy is rooted in the
-  `is_assigned_to_client()` / `is_bf_admin()` helper predicates, so a row is
-  visible only if the caller's assignment (or admin status) allows it.
+**Authoritative role source:** `profiles.role` (set by the admin promotion path,
+read by the app). Every tenant-table policy roots in SECURITY-DEFINER helper
+predicates — `is_bf_admin()`, `is_bf_consultant()`, `is_assigned_to_client()`,
+`can_write_client()` — so "who can see / write which client" has one definition
+and **no tenant policy uses `auth.uid()` directly**.
 
-The plan deliberately keeps the helper predicates small and the policy set
-realistic rather than exhaustive — it is a foundation to harden, not a finished
-production policy set.
+- **`benchmark_fox_admin`** — full read/write on all tenant tables.
+- **`benchmark_fox_consultant`** — read/write only clients in their
+  `client_assignments` rows.
+- **`client_executive` / `client_it_owner` / `readonly_viewer`** — read-only on
+  their single assigned client; no access to other clients or the clients list.
+- **`evidence_uploader`** — read assigned client + insert/update **evidence
+  metadata** for that client only; no edits to assessments/POA&Ms.
+- **Reference tables** (`control_families`, `controls`, `source_references`,
+  `control_source_references`) — readable by any authenticated user; **writable
+  by NOBODY via anon/auth keys**. Only the seed script's `service_role` key
+  (which bypasses RLS) writes them.
+- **`audit_events`** — append-only: INSERT allowed for a caller's accessible
+  clients; **no UPDATE/DELETE policy** for any non-service role.
+- **No cross-client leakage** — a row is visible/writable only if the caller's
+  assignment (or admin status) allows it; writes carry `WITH CHECK` so a row can
+  never be written into another client's tenancy.
+
+### Role × table access matrix
+
+`R` = read, `W` = read+write, `R/W*` = read all + insert/update evidence metadata
+only, `Ins` = insert-only, `—` = no access via anon/auth keys (service_role
+bypasses RLS for seeding/admin scripts).
+
+| Table | admin | consultant (assigned) | client roles / readonly (assigned) | evidence_uploader (assigned) | anon |
+|---|---|---|---|---|---|
+| reference (4 tables) | R | R | R | R | — |
+| organizations | W | R | R | R | — |
+| profiles | R (all) + self | self | self | self | — |
+| user_roles / client_assignments | W | own (R) | own (R) | own (R) | — |
+| clients | W | W | R | R | — |
+| client_control_assessments | W | W | R | R | — |
+| intake / scope / scope_assets | W | W | R | R | — |
+| evidence_items | W | W | R | R/W* | — |
+| poam_items / tasks / reports | W | W | R | R | — |
+| audit_events | R + Ins | R + Ins | R | R | — |
+
+(Read columns reflect the caller's **assigned** client only; an unassigned client
+is invisible — zero rows, not an error.)
+
+### Running the RLS tests
+
+Locally (needs Docker + the Supabase CLI):
+
+```bash
+supabase start
+# map the local stack URL/keys into the env the harness reads:
+#   bash:        set -a; eval "$(supabase status -o env)"; set +a
+#   then SUPABASE_URL=$API_URL  SUPABASE_ANON_KEY=$ANON_KEY  SUPABASE_SERVICE_ROLE_KEY=$SERVICE_ROLE_KEY
+npm run test:rls
+supabase stop
+```
+
+In CI the `rls` job (`.github/workflows/ci.yml`) does the same automatically and
+**fails the build on any policy regression**.
 
 ## 12. Audit logging plan
 
@@ -357,8 +406,11 @@ production policy set.
   fallback. **No writes** occur, and all **client-specific** data
   (assessments/intake/scope/evidence/POA&M/tasks/reports) still lives in
   `localStorage`. Auth and client writes are Phase 3.
-- **RLS is a draft.** Policies are realistic but unhardened and untested against
-  a live project; they need review and integration tests before production.
+- **RLS is implemented + tested** (Task 05, migration `004`, suite
+  `scripts/test-rls.mjs`, CI `rls` job). Remaining hardening is post-MVP:
+  column-level hiding of internal notes from client users (Task 11 portal) and
+  DB triggers that auto-emit `audit_events` on mutating statements (Task 06,
+  defense in depth).
 - **Types are a stub.** `src/lib/database.types.ts` is a hand-written placeholder
   until `supabase gen types typescript` is run against a real project (see the
   README backend section and the file header).
