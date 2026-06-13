@@ -225,6 +225,7 @@ export interface Database {
         entity_id: string | null;
         old_value: Json | null;
         new_value: Json | null;
+        actor_name: string | null; // added by migration 005 (denormalized actor)
         ip_address: string | null;
         user_agent: string | null;
         created_at: string;

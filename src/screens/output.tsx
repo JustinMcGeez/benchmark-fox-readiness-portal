@@ -13,11 +13,18 @@ import {
   Ph,
   Tabs,
   Toolbar,
+  WarnBanner,
 } from '../components/primitives';
 import { BrandLockup } from '../components/Brand';
 import { BackendStatusCard } from '../components/BackendStatusCard';
 import { EXPORT_FORMATS, REPORTS } from '../data/reports';
-import { AUDIT_EVENTS, CURRENT_CLIENT, USERS } from '../data/clients';
+import { CURRENT_CLIENT, USERS } from '../data/clients';
+import {
+  useAuditLog,
+  AUDIT_FILTER_ALL,
+  type AuditFilterOption,
+} from '../data/useAuditLog';
+import { auditDiffLines, humanizeAuditAction, type AuditLogEntry } from '../lib/auditLog';
 import { KNOWLEDGE } from '../data/knowledge';
 import { POAM_ITEMS } from '../data/poam';
 import { EVIDENCE_ITEMS } from '../data/evidence';
@@ -281,39 +288,151 @@ export function KnowledgeScreen(_: ScreenProps) {
 }
 
 /* ---------- 19. AUDIT LOG ---------- */
+function AuditFilter({
+  allLabel,
+  value,
+  options,
+  onChange,
+}: {
+  allLabel: string;
+  value: string;
+  options: AuditFilterOption[];
+  onChange: (v: string) => void;
+}) {
+  return (
+    <select
+      className="w-input"
+      aria-label={allLabel}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      style={{ width: 'auto', padding: '7px 10px', fontSize: '.85rem', cursor: 'pointer', color: 'var(--ink-soft)' }}
+    >
+      <option value={AUDIT_FILTER_ALL}>{allLabel}</option>
+      {options.map((o) => (
+        <option key={o.value} value={o.value}>
+          {o.label}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/** Humanized diff (or the seed's freeform detail) for the Details column. */
+function AuditDetails({ entry }: { entry: AuditLogEntry }) {
+  if (entry.diff) {
+    return (
+      <div className="col" style={{ gap: 2 }}>
+        {auditDiffLines(entry.diff).map((l) => (
+          <span key={l.field} className="mono" style={{ fontSize: '.85em' }}>
+            {l.label}: {l.created ? l.new : `${l.old} → ${l.new}`}
+          </span>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <span className="mono" style={{ fontSize: '.85em' }}>
+      {entry.details ?? '—'}
+    </span>
+  );
+}
+
 export function AuditScreen(_: ScreenProps) {
+  const {
+    mode,
+    entries,
+    isLoading,
+    isError,
+    retry,
+    hasMore,
+    loadMore,
+    isFetchingMore,
+    filters,
+    setFilter,
+    clientOptions,
+    actorOptions,
+    actionOptions,
+  } = useAuditLog();
+
   return (
     <div className="col">
-      <PageHead title="Audit Log" sub="Review platform activity and important changes." />
-      <Toolbar search="Search activity…" filters={['User', 'Client', 'Action', 'Date Range']} />
+      <PageHead
+        title="Audit Log"
+        sub="Review platform activity and important changes."
+        actions={mode === 'local' ? <Badge tone="warn">Demo data</Badge> : undefined}
+      />
+
+      <div className="w-card row wrap" style={{ alignItems: 'center', padding: '10px 12px', gap: 10 }}>
+        <span className="muted" style={{ fontSize: '.85em' }}>
+          Filter
+        </span>
+        <div className="grow" />
+        <AuditFilter allLabel="All clients" value={filters.client} options={clientOptions} onChange={(v) => setFilter('client', v)} />
+        <AuditFilter allLabel="All actors" value={filters.actor} options={actorOptions} onChange={(v) => setFilter('actor', v)} />
+        <AuditFilter allLabel="All actions" value={filters.action} options={actionOptions} onChange={(v) => setFilter('action', v)} />
+      </div>
+
       <Card style={{ padding: '6px 6px' }}>
-        <table className="w-table">
-          <thead>
-            <tr>
-              <th>Timestamp</th>
-              <th>User</th>
-              <th>Client</th>
-              <th>Action</th>
-              <th>Details</th>
-            </tr>
-          </thead>
-          <tbody>
-            {AUDIT_EVENTS.map((a) => (
-              <tr key={a.id}>
-                <td className="mono faint" style={{ fontSize: '.85em' }}>
-                  {a.timestamp}
-                </td>
-                <td>{a.user}</td>
-                <td className="muted">{a.client}</td>
-                <td>{a.action}</td>
-                <td className="mono" style={{ fontSize: '.85em' }}>
-                  {a.details}
-                </td>
-              </tr>
+        {isError ? (
+          <div className="col" style={{ gap: 12, padding: 16 }}>
+            <WarnBanner tone="bad">We couldn’t load the audit log. Please try again.</WarnBanner>
+            <div>
+              <Btn primary onClick={retry}>
+                Retry
+              </Btn>
+            </div>
+          </div>
+        ) : isLoading ? (
+          <div className="col" style={{ gap: 10, padding: 16 }}>
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div key={i} className="w-skeleton" style={{ height: 18, width: `${90 - i * 8}%` }} />
             ))}
-          </tbody>
-        </table>
+          </div>
+        ) : (
+          <table className="w-table">
+            <thead>
+              <tr>
+                <th>Timestamp</th>
+                <th>User</th>
+                <th>Client</th>
+                <th>Action</th>
+                <th>Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="muted" style={{ padding: 16, textAlign: 'center' }}>
+                    No activity matches these filters.
+                  </td>
+                </tr>
+              ) : (
+                entries.map((e) => (
+                  <tr key={e.id}>
+                    <td className="mono faint" style={{ fontSize: '.85em' }}>
+                      {e.timestamp}
+                    </td>
+                    <td>{e.actorName}</td>
+                    <td className="muted">{e.clientName ?? '—'}</td>
+                    <td>{humanizeAuditAction(e.action)}</td>
+                    <td>
+                      <AuditDetails entry={e} />
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        )}
       </Card>
+
+      {hasMore && (
+        <div className="center" style={{ justifyContent: 'center', padding: 8 }}>
+          <Btn onClick={loadMore} disabled={isFetchingMore}>
+            {isFetchingMore ? 'Loading…' : 'Load more'}
+          </Btn>
+        </div>
+      )}
     </div>
   );
 }

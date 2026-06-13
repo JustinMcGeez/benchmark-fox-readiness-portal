@@ -455,3 +455,177 @@ test('admin reads across all clients', async () => {
   const seen = new Set(data.map((r) => r.client_id));
   assert.ok(seen.has(CLIENT_A) && seen.has(CLIENT_B), 'admin should see both clients');
 });
+
+// ===========================================================================
+// AUDIT TRIGGERS (migration 005): data-change capture + actor stamping +
+// internal-action hiding. `admin` is the service_role client (reads bypass RLS),
+// used here to inspect the trail deterministically.
+// ===========================================================================
+
+/** Count assessment.updated audit rows for one entity (service_role read). */
+async function countAssessmentUpdates(entityId) {
+  const { count, error } = await admin
+    .from('audit_events')
+    .select('id', { count: 'exact', head: true })
+    .eq('entity_type', 'client_control_assessments')
+    .eq('entity_id', entityId)
+    .eq('action', 'assessment.updated');
+  if (error) throw new Error(`count audit rows: ${error.message}`);
+  return count ?? 0;
+}
+
+test('UPDATE on an assessment writes exactly ONE audit row with the correct diff', async () => {
+  // Current state of the client A assessment (read past RLS for setup).
+  const cur = await admin
+    .from('client_control_assessments')
+    .select('id, readiness_status')
+    .eq('client_id', CLIENT_A)
+    .eq('control_id', controlId)
+    .single();
+  assert.equal(cur.error, null);
+  const entityId = cur.data.id;
+  const oldStatus = cur.data.readiness_status;
+  const newStatus = oldStatus === 'Met' ? 'Partial' : 'Met'; // guaranteed change
+
+  const before = await countAssessmentUpdates(entityId);
+
+  // Make the change as the assigned consultant (a real authenticated user).
+  const upd = await clients.consultant
+    .from('client_control_assessments')
+    .update({ readiness_status: newStatus })
+    .eq('id', entityId)
+    .select();
+  assert.equal(upd.error, null);
+  assert.equal(upd.data.length, 1, 'consultant should update its assigned client');
+
+  const after = await countAssessmentUpdates(entityId);
+  assert.equal(after - before, 1, 'exactly one assessment.updated audit row per change');
+
+  // Inspect the newest audit row for this entity.
+  const latest = await admin
+    .from('audit_events')
+    .select('user_id, actor_name, new_value')
+    .eq('entity_type', 'client_control_assessments')
+    .eq('entity_id', entityId)
+    .eq('action', 'assessment.updated')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  assert.equal(latest.error, null);
+  assert.deepEqual(
+    latest.data.new_value.readiness_status,
+    { old: oldStatus, new: newStatus },
+    'diff records only the changed field, old → new',
+  );
+  // Actor is resolved from auth.uid() → profile (not service_role / system).
+  assert.equal(latest.data.user_id, profileIds.consultant, 'actor stamped from the session');
+  assert.notEqual(latest.data.actor_name, 'system', 'authenticated writes are not "system"');
+});
+
+test('long free-text note change is collapsed to "[text changed]" (no CUI in the trail)', async () => {
+  const cur = await admin
+    .from('client_control_assessments')
+    .select('id')
+    .eq('client_id', CLIENT_A)
+    .eq('control_id', controlId)
+    .single();
+  assert.equal(cur.error, null);
+  const entityId = cur.data.id;
+
+  // Unique > 500-char value so it always differs from the prior note.
+  const longNote = 'SENSITIVE-'.repeat(60) + Date.now(); // ~600+ chars
+  assert.ok(longNote.length > 500);
+
+  const upd = await clients.consultant
+    .from('client_control_assessments')
+    .update({ consultant_notes: longNote })
+    .eq('id', entityId)
+    .select();
+  assert.equal(upd.error, null);
+  assert.equal(upd.data.length, 1);
+
+  const latest = await admin
+    .from('audit_events')
+    .select('new_value')
+    .eq('entity_type', 'client_control_assessments')
+    .eq('entity_id', entityId)
+    .eq('action', 'assessment.updated')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  assert.equal(latest.error, null);
+  assert.equal(
+    latest.data.new_value.consultant_notes.new,
+    '[text changed]',
+    'long note value is replaced by the marker',
+  );
+  assert.ok(
+    !JSON.stringify(latest.data.new_value).includes('SENSITIVE-'),
+    'the long note text is NEVER copied into the audit row',
+  );
+});
+
+test('an idempotent no-op UPDATE writes no audit row', async () => {
+  const cur = await admin
+    .from('client_control_assessments')
+    .select('id, readiness_status')
+    .eq('client_id', CLIENT_A)
+    .eq('control_id', controlId)
+    .single();
+  assert.equal(cur.error, null);
+  const entityId = cur.data.id;
+  const before = await countAssessmentUpdates(entityId);
+
+  // Re-write the SAME value → diff is empty → no row.
+  const upd = await clients.consultant
+    .from('client_control_assessments')
+    .update({ readiness_status: cur.data.readiness_status })
+    .eq('id', entityId)
+    .select();
+  assert.equal(upd.error, null);
+
+  const after = await countAssessmentUpdates(entityId);
+  assert.equal(after, before, 'no diff → no audit row');
+});
+
+test('consultant cannot read another client\'s audit rows (0 rows, no error)', async () => {
+  // Seed an audit row for client B (service_role bypasses RLS).
+  const seed = await admin
+    .from('audit_events')
+    .insert({ client_id: CLIENT_B, action: 'assessment.updated' });
+  assert.equal(seed.error, null);
+
+  const ro = await clients.consultant
+    .from('audit_events')
+    .select('id')
+    .eq('client_id', CLIENT_B);
+  assert.equal(ro.error, null, 'cross-client audit read is filtered, not an error');
+  assert.equal(ro.data.length, 0, 'consultant assigned to A must not read client B audit rows');
+});
+
+test('client-role users never see internal-only audit actions; staff do', async () => {
+  // Seed one internal-action row + one normal row for client A (service_role).
+  const ins = await admin.from('audit_events').insert([
+    { client_id: CLIENT_A, action: 'internal.secret_test' },
+    { client_id: CLIENT_A, action: 'assessment.updated' },
+  ]);
+  assert.equal(ins.error, null);
+
+  // readonly_viewer (client role, assigned to A): sees normal rows, NOT internal.
+  const ro = await clients.readonly.from('audit_events').select('action').eq('client_id', CLIENT_A);
+  assert.equal(ro.error, null);
+  assert.ok(ro.data.length >= 1, 'client role should still see non-internal client rows');
+  assert.ok(
+    ro.data.every((r) => !r.action.startsWith('internal.')),
+    'client role must never see internal-only actions',
+  );
+
+  // consultant (BF staff, assigned to A): sees the internal row.
+  const staff = await clients.consultant
+    .from('audit_events')
+    .select('action')
+    .eq('client_id', CLIENT_A)
+    .eq('action', 'internal.secret_test');
+  assert.equal(staff.error, null);
+  assert.ok(staff.data.length >= 1, 'BF staff should see internal actions for their client');
+});

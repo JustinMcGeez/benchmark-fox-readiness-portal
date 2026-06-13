@@ -39,6 +39,7 @@ import {
   type AuthProfile,
   type SignInResult,
 } from '../services/authService';
+import { logEvent } from '../lib/audit';
 
 export { signInErrorMessage } from '../services/authService';
 export type { AuthProfile, SignInErrorKind, SignInResult } from '../services/authService';
@@ -139,6 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Adopt the session immediately so post-sign-in navigation never races
       // the onAuthStateChange event.
       if (s) setSession(s);
+      // Audit the sign-in (fire-and-forget; the session persists, no race).
+      void logEvent('auth.signed_in');
       return { ok: true };
     },
     [],
@@ -150,6 +153,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    // Audit the sign-out while the session is still valid (the RLS INSERT needs
+    // it); logEvent never throws, so a slow/failed insert can't block sign-out.
+    await logEvent('auth.signed_out');
     // Clears ONLY Supabase's own persisted auth state; the bf_* demo data
     // keys in localStorage are never touched.
     await requestSignOut();

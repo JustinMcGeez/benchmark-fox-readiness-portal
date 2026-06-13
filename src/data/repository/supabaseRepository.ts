@@ -21,6 +21,11 @@ import type { ClientControlAssessment } from '../types';
 import { SEED_ASSESSMENTS } from '../controls';
 import { DEFAULT_INTAKE, type IntakeState } from '../intake';
 import { DEFAULT_SCOPE, type ScopeState } from '../scope';
+import {
+  auditRowToEntry,
+  type AuditEventRow,
+  type AuditLogEntry,
+} from '../../lib/auditLog';
 import { isUuid, resolveClientUuid } from './clientIds';
 import {
   assessmentRowToDomain,
@@ -38,6 +43,8 @@ const ASSESSMENTS = 'client_control_assessments';
 const INTAKE = 'intake_records';
 const SCOPE = 'scope_records';
 const SCOPE_ASSETS = 'scope_assets';
+const AUDIT = 'audit_events';
+const CLIENTS = 'clients';
 
 const SEED_BY_CONTROL = new Map(SEED_ASSESSMENTS.map((s) => [s.controlId, s]));
 
@@ -354,6 +361,93 @@ export async function importLocalData(clientId: string, snapshot: ImportSnapshot
 
     if (snapshot.intake) await saveIntake(clientId, snapshot.intake);
     if (snapshot.scope) await saveScope(clientId, snapshot.scope);
+  });
+}
+
+/* ---- audit log (append-only) ---- */
+
+/** Append an app-level audit event. The DB stamps the actor (user_id +
+    actor_name) from the session; callers never pass identity. Used by
+    src/lib/audit.ts logEvent for sign-in / sign-out. */
+export interface AppendAuditEvent {
+  action: string;
+  /** Domain client id or uuid; null for global events (e.g. auth). */
+  clientId?: string | null;
+}
+
+export async function appendAuditEvent(event: AppendAuditEvent): Promise<void> {
+  return guard('save-failed', 'Could not record the audit event.', async () => {
+    const clientUuid = event.clientId ? resolveClientUuid(event.clientId) : null;
+    const { error } = await getSupabase()
+      .from(AUDIT)
+      .insert({ action: event.action, client_id: clientUuid });
+    if (error) throw new RepositoryError('save-failed', 'Could not record the audit event.', { cause: error });
+  });
+}
+
+export interface AuditQuery {
+  /** Domain client id or uuid; resolved before querying. */
+  clientId?: string | null;
+  actorName?: string | null;
+  action?: string | null;
+  /** Page size. */
+  limit: number;
+  /** Rows to skip (page * limit). */
+  offset: number;
+}
+
+export interface AuditPage {
+  entries: AuditLogEntry[];
+  /** True when more rows exist past this page. */
+  hasMore: boolean;
+}
+
+/**
+ * Read a page of audit events (newest first). RLS scopes the rows to what the
+ * caller may see (admins: all; staff: assigned clients; client roles: their
+ * client minus internal-only actions). Client names are resolved with a second
+ * RLS-safe lookup; actor names ride on the row (denormalized in migration 005).
+ */
+export async function listAuditEvents(query: AuditQuery): Promise<AuditPage> {
+  return guard('load-failed', 'Could not load the audit log.', async () => {
+    const sb = getSupabase();
+    let q = sb
+      .from(AUDIT)
+      .select('id, created_at, action, entity_type, entity_id, client_id, user_id, actor_name, new_value')
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: false })
+      // fetch one extra row to detect a next page without a count query.
+      .range(query.offset, query.offset + query.limit);
+    if (query.clientId) q = q.eq('client_id', resolveClientUuid(query.clientId));
+    if (query.actorName) q = q.eq('actor_name', query.actorName);
+    if (query.action) q = q.eq('action', query.action);
+
+    const { data, error } = await q;
+    if (error) throw new RepositoryError('load-failed', 'Could not load the audit log.', { cause: error });
+
+    const rows = (data ?? []) as unknown as AuditEventRow[];
+    const hasMore = rows.length > query.limit;
+    const pageRows = hasMore ? rows.slice(0, query.limit) : rows;
+
+    // Resolve client names for the page (RLS returns only accessible clients —
+    // which is exactly the set the visible audit rows belong to).
+    const clientIds = [...new Set(pageRows.map((r) => r.client_id).filter((id): id is string => Boolean(id)))];
+    const nameById = new Map<string, string>();
+    if (clientIds.length > 0) {
+      const { data: clientsData, error: clientsError } = await sb
+        .from(CLIENTS)
+        .select('id, name')
+        .in('id', clientIds);
+      if (clientsError) {
+        throw new RepositoryError('load-failed', 'Could not load the audit log.', { cause: clientsError });
+      }
+      for (const c of clientsData ?? []) nameById.set(c.id, c.name);
+    }
+
+    return {
+      entries: pageRows.map((r) => auditRowToEntry(r, r.client_id ? nameById.get(r.client_id) ?? null : null)),
+      hasMore,
+    };
   });
 }
 
