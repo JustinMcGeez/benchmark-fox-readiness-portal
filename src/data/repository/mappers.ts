@@ -246,6 +246,7 @@ export function choiceOptionsToJson(options: ChoiceOption[]): Json {
 
 export function intakeRowToDomain(row: IntakeRow): IntakeState {
   return {
+    systemName: row.system_name ?? DEFAULT_INTAKE.systemName,
     likelyPath: row.likely_cmmc_path ?? DEFAULT_INTAKE.likelyPath,
     estimatedScope: row.estimated_scope ?? DEFAULT_INTAKE.estimatedScope,
     likelyDataType: row.likely_data_type ?? DEFAULT_INTAKE.likelyDataType,
@@ -258,6 +259,7 @@ export function intakeRowToDomain(row: IntakeRow): IntakeState {
 }
 
 export interface IntakeRowPayload {
+  system_name: string;
   likely_cmmc_path: string;
   estimated_scope: string;
   likely_data_type: string;
@@ -271,6 +273,7 @@ export interface IntakeRowPayload {
 /** The `notes` column is not part of the domain and is never touched. */
 export function intakeToRowPayload(intake: IntakeState): IntakeRowPayload {
   return {
+    system_name: intake.systemName,
     likely_cmmc_path: intake.likelyPath,
     estimated_scope: intake.estimatedScope,
     likely_data_type: intake.likelyDataType,

@@ -190,6 +190,7 @@ describe('intake mapping', () => {
   const baseRow: IntakeRow = {
     id: 'i-1',
     client_id: IDS.clientUuid,
+    system_name: null,
     likely_cmmc_path: null,
     estimated_scope: null,
     likely_data_type: null,

@@ -69,6 +69,7 @@ const ACTION_LABELS: Record<string, string> = {
   'evidence.updated': 'Evidence updated',
   'evidence.status_changed': 'Evidence status changed',
   'client.created': 'Client created',
+  'report.ssp_generated': 'SSP generated',
   'auth.signed_in': 'Signed in',
   'auth.signed_out': 'Signed out',
 };

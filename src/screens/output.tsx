@@ -18,6 +18,7 @@ import {
 import { BrandLockup } from '../components/Brand';
 import { BackendStatusCard } from '../components/BackendStatusCard';
 import { EXPORT_FORMATS, REPORTS } from '../data/reports';
+import { READINESS_SUPPORT_DISCLAIMER } from '../data/disclaimers';
 import { USERS } from '../data/clients';
 import { useClients, useCurrentClient } from '../data/clientsStore';
 import {
@@ -48,6 +49,7 @@ import {
 } from '../lib/selectors';
 import { SourceRefs } from '../components/SourceRefs';
 import { ScoringWarning } from '../components/ScoringWarning';
+import { GenerateSspButton } from '../components/SspExport';
 
 /* ---------- 16. REPORTS ---------- */
 export function ReportsScreen({ go }: ScreenProps) {
@@ -57,6 +59,7 @@ export function ReportsScreen({ go }: ScreenProps) {
       <PageHead
         title={`Reports — ${currentClient?.name ?? 'Client'}`}
         sub="Generate client-ready Benchmark Fox readiness deliverables."
+        actions={<GenerateSspButton />}
       />
       <div className="grid-2">
         {REPORTS.map((r) => (
@@ -241,9 +244,7 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
             [ readiness-by-family chart ]
           </Ph>
           <p className="annot" style={{ marginTop: 16, fontSize: '.78em' }}>
-            This report is for readiness support only and does not represent an official CMMC
-            assessment, C3PAO result, legal opinion, certification guarantee, or contract award
-            guarantee.
+            {READINESS_SUPPORT_DISCLAIMER}
           </p>
         </div>
       </div>

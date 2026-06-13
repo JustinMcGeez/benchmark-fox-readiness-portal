@@ -49,6 +49,7 @@ import {
   type SspStatus,
 } from '../data/types';
 import { SourceRefs } from '../components/SourceRefs';
+import { GenerateSspButton } from '../components/SspExport';
 
 const EVIDENCE_QUALITY_OPTIONS: EvidenceQuality[] = [
   'Strong',
@@ -111,7 +112,12 @@ export function SSPScreen({ go }: ScreenProps) {
       <PageHead
         title={`SSP Workspace — ${currentClient?.name ?? 'Client'}`}
         sub="Track SSP completeness, accuracy, and implementation statements."
-        actions={<Btn onClick={() => go('reports')}>Export SSP</Btn>}
+        actions={
+          <>
+            <Btn onClick={() => go('reports')}>Reports</Btn>
+            <GenerateSspButton />
+          </>
+        }
       />
       <div className="grid-4">
         <StatCard k="Complete" v={counts.Complete} d="statements" tone="ok" />

@@ -12,6 +12,12 @@ export interface ChoiceOption {
 
 /** Editable intake state (persisted to localStorage). */
 export interface IntakeState {
+  /**
+   * Name of the information system the SSP describes (e.g. "Acme CUI Enclave").
+   * Drives the SSP cover page + System Identification section. Empty until the
+   * consultant names it — the SSP then shows a visible placeholder. Not CUI.
+   */
+  systemName: string;
   likelyPath: string;
   estimatedScope: string;
   likelyDataType: string;
@@ -23,6 +29,7 @@ export interface IntakeState {
 }
 
 export const DEFAULT_INTAKE: IntakeState = {
+  systemName: '',
   likelyPath: 'Level 2 · C3PAO',
   estimatedScope: 'CUI enclave',
   likelyDataType: 'CUI / CTI',
@@ -46,10 +53,11 @@ export const DEFAULT_INTAKE: IntakeState = {
   ],
 };
 
-/** The six editable text fields of the auto-drafted intake summary, in display order. */
+/** The editable text fields of the auto-drafted intake summary, in display order. */
 export const INTAKE_SUMMARY_FIELDS: {
   key: keyof Pick<
     IntakeState,
+    | 'systemName'
     | 'likelyPath'
     | 'estimatedScope'
     | 'likelyDataType'
@@ -59,6 +67,7 @@ export const INTAKE_SUMMARY_FIELDS: {
   >;
   label: string;
 }[] = [
+  { key: 'systemName', label: 'System Name' },
   { key: 'likelyPath', label: 'Likely CMMC Path' },
   { key: 'estimatedScope', label: 'Estimated Scope' },
   { key: 'likelyDataType', label: 'Likely Data Type' },

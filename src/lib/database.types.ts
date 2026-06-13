@@ -169,6 +169,7 @@ export interface Database {
       intake_records: TableShape<{
         id: string;
         client_id: string;
+        system_name: string | null;
         likely_cmmc_path: string | null;
         estimated_scope: string | null;
         likely_data_type: string | null;

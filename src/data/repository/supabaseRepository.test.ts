@@ -338,6 +338,7 @@ function intakeRowDefaults() {
   return {
     id: 'i-1',
     client_id: ACME_UUID,
+    system_name: DEFAULT_INTAKE.systemName,
     likely_cmmc_path: DEFAULT_INTAKE.likelyPath,
     estimated_scope: DEFAULT_INTAKE.estimatedScope,
     likely_data_type: DEFAULT_INTAKE.likelyDataType,
