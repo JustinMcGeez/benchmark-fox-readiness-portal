@@ -28,6 +28,7 @@ import { SEED_ASSESSMENTS } from './controls';
 import { DEFAULT_INTAKE, type IntakeState } from './intake';
 import { DEFAULT_SCOPE, type ScopeAsset, type ScopeState, type ScopeSummary } from './scope';
 import { Btn, Card, WarnBanner } from '../components/primitives';
+import { MigrationPrompt } from './MigrationPrompt';
 import { RepositoryError, useRepository, type ClientDataRepository } from './repository';
 import type { AssessmentPatch } from './repository/types';
 import {
@@ -137,9 +138,11 @@ function DataEngine({ children }: { children: ReactNode }) {
   if (mode === 'supabase' && engine.isError) body = <DataErrorPanel onRetry={engine.retry} />;
   else if (mode === 'supabase' && engine.isPending) body = <DataLoadingGate />;
 
+  const ready = mode === 'supabase' && !engine.isPending && !engine.isError;
   return (
     <DataContext.Provider value={value}>
       {body}
+      {ready && <MigrationPrompt clientId={CURRENT_CLIENT_ID} onError={setMutationError} />}
       {mutationError && (
         <MutationErrorToast message={mutationError} onDismiss={() => setMutationError(null)} />
       )}
