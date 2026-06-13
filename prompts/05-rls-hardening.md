@@ -8,7 +8,7 @@ boundary for a CMMC consulting platform — cross-client data leakage is a
 catastrophic failure. Treat this as a security engineering task, not a CRUD task.
 
 PART A — Policy implementation
-1. Create supabase/migrations/003_rls_policies.sql implementing the access model
+1. Create supabase/migrations/004_rls_policies.sql implementing the access model
    documented at the top of rls_plan.sql and in
    docs/backend/supabase-architecture.md §11:
    - benchmark_fox_admin: full read/write on all tenant tables.
