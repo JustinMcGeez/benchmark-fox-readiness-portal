@@ -22,6 +22,7 @@
     "check:supabase-readonly": "node scripts/check-supabase-readonly-integration.mjs",
     "build:data": "npm run import:sources && npm run validate:controls && npm run validate:scoring && npm run validate:objectives && npm run validate:guidance && npm run check:sourcerefs",
     "db:seed:refs": "node scripts/seed-supabase-reference-data.ts",
+    "db:seed:demo": "node scripts/seed-demo-client.ts",
     "db:validate": "node scripts/validate-supabase-schema.mjs"
   },
   "dependencies": {
