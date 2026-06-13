@@ -342,6 +342,90 @@ test('evidence_uploader cannot update assessments (0 rows)', async () => {
 });
 
 // ---------------------------------------------------------------------------
+// EVIDENCE TRANSITION GUARD (migration 007): review transitions (In Review /
+// Accepted / Needs Revision / Rejected) are Benchmark Fox staff only, enforced
+// by the BEFORE INSERT/UPDATE trigger even though 004 lets an uploader write
+// evidence metadata. evidence_uploader may set non-review statuses; staff may
+// set any.
+// ---------------------------------------------------------------------------
+const EVIDENCE_GUARD = '05000000-0000-4000-8000-0000000000e7';
+
+test('evidence_uploader CAN move evidence to a non-review status (Uploaded)', async () => {
+  // service_role seeds a fresh row (bypasses RLS + the guard).
+  const seed = await admin.from('evidence_items').upsert(
+    { id: EVIDENCE_GUARD, client_id: CLIENT_A, title: 'Guard test evidence', status: 'Requested' },
+    { onConflict: 'id' },
+  );
+  assert.equal(seed.error, null);
+
+  const { data, error } = await clients.uploader
+    .from('evidence_items')
+    .update({ status: 'Uploaded' })
+    .eq('id', EVIDENCE_GUARD)
+    .select();
+  assert.equal(error, null, 'uploader may set a non-review status');
+  assert.equal(data.length, 1);
+  assert.equal(data[0].status, 'Uploaded');
+});
+
+test('evidence_uploader CANNOT make a review transition (status → Accepted)', async () => {
+  const { error } = await clients.uploader
+    .from('evidence_items')
+    .update({ status: 'Accepted' })
+    .eq('id', EVIDENCE_GUARD)
+    .select();
+  assert.notEqual(error, null, 'uploader review transition must be rejected by the guard');
+  assert.equal(error.code, RLS_VIOLATION); // trigger raises with errcode 42501
+});
+
+test('evidence_uploader CANNOT take an item into review (status → In Review)', async () => {
+  // 'In Review' is reviewer-only too — taking an item into review is a staff act.
+  const { error } = await clients.uploader
+    .from('evidence_items')
+    .update({ status: 'In Review' })
+    .eq('id', EVIDENCE_GUARD)
+    .select();
+  assert.notEqual(error, null, 'uploader cannot move evidence to In Review');
+  assert.equal(error.code, RLS_VIOLATION);
+});
+
+test('evidence_uploader CANNOT create evidence already in a review status', async () => {
+  const { error } = await clients.uploader
+    .from('evidence_items')
+    .insert({ client_id: CLIENT_A, title: 'self-accepted', status: 'Accepted' })
+    .select();
+  assert.notEqual(error, null, 'uploader cannot self-accept on insert');
+  assert.equal(error.code, RLS_VIOLATION);
+});
+
+test('consultant CAN make a review transition (status → Accepted) and it is audited', async () => {
+  const { data, error } = await clients.consultant
+    .from('evidence_items')
+    .update({ status: 'Accepted', notes: 'Reviewed — covers the objective.' })
+    .eq('id', EVIDENCE_GUARD)
+    .select();
+  assert.equal(error, null, 'Benchmark Fox staff may perform review transitions');
+  assert.equal(data.length, 1);
+  assert.equal(data[0].status, 'Accepted');
+
+  // The 005 trigger captures the status change as an evidence.status_changed
+  // audit row (service_role read bypasses RLS) — the acceptance criterion that a
+  // transition is "visible in the audit log".
+  const audit = await admin
+    .from('audit_events')
+    .select('action, new_value, actor_name')
+    .eq('entity_type', 'evidence_items')
+    .eq('entity_id', EVIDENCE_GUARD)
+    .eq('action', 'evidence.status_changed')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+  assert.equal(audit.error, null);
+  assert.deepEqual(audit.data.new_value.status, { old: 'Uploaded', new: 'Accepted' });
+  assert.notEqual(audit.data.actor_name, 'system', 'authenticated consultant is the stamped actor');
+});
+
+// ---------------------------------------------------------------------------
 // anon (no session): reads nothing from tenant tables.
 // ---------------------------------------------------------------------------
 test('anon reads nothing from tenant tables', async () => {

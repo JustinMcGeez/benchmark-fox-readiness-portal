@@ -24,7 +24,6 @@ import { useData } from '../data/store';
 import { useReference } from '../data/referenceStore';
 import { useCurrentClient } from '../data/clientsStore';
 import { CONTROLS_BY_ID, EXPECTED_CONTROL_COUNT } from '../data/controls';
-import { evidenceForControl } from '../data/evidence';
 import { poamForControl } from '../data/poam';
 import { tasksForControl } from '../data/tasks';
 import {
@@ -35,6 +34,8 @@ import {
   SSP_OPTIONS,
 } from '../data/types';
 import { controlScoreDisplay, deductionImpact, statusCounts } from '../lib/scoring';
+import { controlEvidenceCoverage, evidenceForControl } from '../lib/selectors';
+import { effectiveFreshness, effectiveStatus } from '../lib/evidenceWorkflow';
 
 /* ---------- 9. CONTROL LIBRARY ---------- */
 export function ControlLibraryScreen({ go }: ScreenProps) {
@@ -360,7 +361,7 @@ function FilterSelect({
 /* `controlId` comes from the /clients/:clientId/controls/:controlId route;
    without it (legacy callers) the store's selected control is shown. */
 export function ControlDetailScreen({ go, controlId }: ScreenProps & { controlId?: string }) {
-  const { selectedControlId, assessmentFor, updateAssessment } = useData();
+  const { selectedControlId, assessmentFor, updateAssessment, evidence: allEvidence } = useData();
   const { controlsById } = useReference();
   const [tab, setTab] = useState('Overview');
   const tabs = ['Overview', 'Assessment', 'SSP', 'Evidence', 'POA&M', 'Tasks', 'Guidance'];
@@ -370,7 +371,9 @@ export function ControlDetailScreen({ go, controlId }: ScreenProps & { controlId
   // local generated definition if a reference control is missing.
   const control = controlsById[activeControlId] ?? CONTROLS_BY_ID[activeControlId];
   const a = assessmentFor(activeControlId);
-  const evidence = evidenceForControl(activeControlId);
+  // Evidence + coverage come from the SAME selectors the Evidence Hub uses.
+  const evidence = evidenceForControl(allEvidence, activeControlId);
+  const coverage = controlEvidenceCoverage(control, allEvidence);
   const poam = poamForControl(activeControlId);
   const tasks = tasksForControl(activeControlId);
 
@@ -560,6 +563,21 @@ export function ControlDetailScreen({ go, controlId }: ScreenProps & { controlId
           )}
           {tab === 'Evidence' && (
             <Card title="Evidence" action={<Btn sm onClick={() => go('evidence')}>Request</Btn>}>
+              {coverage.status !== 'no-objectives' && (
+                <div className="row gap-sm" style={{ marginBottom: 10 }}>
+                  <Badge
+                    tone={
+                      coverage.status === 'addressed'
+                        ? 'ok'
+                        : coverage.coveredIds.length
+                          ? 'warn'
+                          : 'bad'
+                    }
+                  >
+                    {coverage.coveredIds.length}/{coverage.total} objectives covered by accepted evidence
+                  </Badge>
+                </div>
+              )}
               {evidence.length ? (
                 <table className="w-table">
                   <tbody>
@@ -567,9 +585,9 @@ export function ControlDetailScreen({ go, controlId }: ScreenProps & { controlId
                       <tr key={e.id}>
                         <td>{e.title}</td>
                         <td>
-                          <Status s={e.status} />
+                          <Status s={effectiveStatus(e)} />
                         </td>
-                        <td className="faint mono">{e.freshness}</td>
+                        <td className="faint mono">{effectiveFreshness(e)}</td>
                       </tr>
                     ))}
                   </tbody>

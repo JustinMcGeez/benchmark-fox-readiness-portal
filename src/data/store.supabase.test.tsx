@@ -6,17 +6,23 @@
    ============================================================ */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ClientControlAssessment } from './types';
+import type { ClientControlAssessment, EvidenceItem } from './types';
 import { SEED_ASSESSMENTS } from './controls';
 import { DEFAULT_INTAKE } from './intake';
 import { DEFAULT_SCOPE } from './scope';
-import { RepositoryError, type ClientDataRepository } from './repository';
+import { RepositoryError, type ClientDataRepository, type EvidenceRepository } from './repository';
 
 /* ---- force supabase mode with a controllable repository ---- */
-const holder = vi.hoisted(() => ({ repo: null as unknown as ClientDataRepository }));
+const holder = vi.hoisted(() => ({
+  repo: null as unknown as ClientDataRepository,
+  evidence: null as unknown as EvidenceRepository,
+}));
 vi.mock('./repository', async () => {
   const actual = await vi.importActual<typeof import('./repository')>('./repository');
-  return { ...actual, useRepository: () => ({ mode: 'supabase', repository: holder.repo }) };
+  return {
+    ...actual,
+    useRepository: () => ({ mode: 'supabase', repository: holder.repo, evidence: holder.evidence }),
+  };
 });
 
 const { DataProvider, useData } = await import('./store');
@@ -46,13 +52,35 @@ function makeRepo(): ClientDataRepository {
   };
 }
 
+const EVIDENCE_SEED: EvidenceItem = {
+  id: 'ev-test-1',
+  clientId: 'acme',
+  title: 'Uploaded artifact',
+  controlId: '3.1.1',
+  owner: 'IT Lead',
+  status: 'In Review',
+  quality: 'Acceptable',
+  freshness: 'Current',
+};
+
+function makeEvidenceRepo(): EvidenceRepository {
+  return {
+    list: vi.fn().mockResolvedValue([{ ...EVIDENCE_SEED }]),
+    create: vi.fn().mockResolvedValue(undefined),
+    updateMetadata: vi.fn().mockResolvedValue(undefined),
+    transition: vi.fn().mockResolvedValue({ ...EVIDENCE_SEED, status: 'Accepted' }),
+  };
+}
+
 /* probe screen */
 function Probe() {
-  const { assessmentFor, updateAssessment } = useData();
+  const { assessmentFor, updateAssessment, evidence, transitionEvidence } = useData();
   return (
     <div>
       <span data-testid="status">{assessmentFor('3.1.1')?.status}</span>
       <button onClick={() => updateAssessment('3.1.1', { status: 'Not Met' })}>patch</button>
+      <span data-testid="ev-status">{evidence[0]?.status}</span>
+      <button onClick={() => transitionEvidence('ev-test-1', 'Accepted', 'ok')}>accept</button>
     </div>
   );
 }
@@ -66,6 +94,7 @@ const renderApp = () =>
 
 beforeEach(() => {
   holder.repo = makeRepo();
+  holder.evidence = makeEvidenceRepo();
 });
 
 describe('supabase mode — loading + data', () => {
@@ -109,6 +138,26 @@ describe('supabase mode — optimistic patch', () => {
 
     fireEvent.click(screen.getByLabelText('Dismiss'));
     await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  });
+});
+
+describe('supabase mode — evidence workflow', () => {
+  it('loads evidence from the repository and transitions optimistically', async () => {
+    // Hold the write pending so the optimistic cache value is observable before
+    // the onSettled refetch would overwrite it.
+    const d = deferred<EvidenceItem>();
+    (holder.evidence.transition as ReturnType<typeof vi.fn>).mockReturnValue(d.promise);
+
+    renderApp();
+    await waitFor(() => expect(screen.getByTestId('ev-status')).toHaveTextContent('In Review'));
+
+    fireEvent.click(screen.getByText('accept'));
+
+    // optimistic cache update flips the status before the write resolves…
+    await waitFor(() => expect(screen.getByTestId('ev-status')).toHaveTextContent('Accepted'));
+    // …and the repository transition was called with the note.
+    expect(holder.evidence.transition).toHaveBeenCalledWith('acme', 'ev-test-1', 'Accepted', 'ok');
+    d.resolve({ ...EVIDENCE_SEED, status: 'Accepted' });
   });
 });
 

@@ -301,7 +301,55 @@ export interface EvidenceItem {
   taskId?: string;
   method?: string;
   notes?: string;
+  /**
+   * Approved secure external link to the artifact (https only). This is a
+   * POINTER — the artifact itself stays in the client's secure store. There is
+   * NO file storage in this product (HARD RULE: metadata + external links only).
+   */
+  externalLink?: string;
+  /** Free-text note describing where the artifact actually lives (secure store). */
+  storageLocationNote?: string;
+  /** What's needed — captured when evidence is requested (the request brief). */
+  description?: string;
+  /** Due date for requested evidence (ISO/date string). */
+  dueDate?: string;
+  /**
+   * Expiry date. When set, drives the read-time Expired derivation in
+   * src/lib/evidenceWorkflow.ts (effectiveStatus / effectiveFreshness) — no cron.
+   */
+  expiresOn?: string;
 }
+
+/** Fields the "Request evidence" flow collects (status starts Requested). */
+export interface EvidenceRequestInput {
+  controlId: string;
+  title: string;
+  /** Specific NIST SP 800-171A objective ids requested, or [] for the whole control. */
+  objectiveIds?: string[];
+  description?: string;
+  /** Assignee responsible for providing the evidence. */
+  owner?: string;
+  dueDate?: string;
+}
+
+/** Editable metadata on an existing evidence item (NOT the status — see transition). */
+export type EvidencePatch = Partial<
+  Pick<
+    EvidenceItem,
+    | 'title'
+    | 'owner'
+    | 'externalLink'
+    | 'storageLocationNote'
+    | 'quality'
+    | 'notes'
+    | 'objectiveIds'
+    | 'description'
+    | 'dueDate'
+    | 'expiresOn'
+    | 'sspSupported'
+    | 'method'
+  >
+>;
 
 export interface PoamMilestone {
   label: string;

@@ -14,7 +14,15 @@
    failures roll back the optimistic cache and surface a dismissible
    toast.
    ============================================================ */
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from 'react';
 import {
   QueryClient,
   QueryClientProvider,
@@ -22,23 +30,36 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
-import type { ClientControlAssessment } from './types';
+import type {
+  ClientControlAssessment,
+  EvidenceItem,
+  EvidencePatch,
+  EvidenceRequestInput,
+  EvidenceStatus,
+} from './types';
 import { DEMO_CLIENT_ID } from './clients';
 import { SEED_ASSESSMENTS } from './controls';
 import { DEFAULT_INTAKE, type IntakeState } from './intake';
 import { DEFAULT_SCOPE, type ScopeAsset, type ScopeState, type ScopeSummary } from './scope';
 import { Btn, Card, WarnBanner } from '../components/primitives';
 import { MigrationPrompt } from './MigrationPrompt';
-import { RepositoryError, useRepository, type ClientDataRepository } from './repository';
+import {
+  RepositoryError,
+  useRepository,
+  type ClientDataRepository,
+  type EvidenceRepository,
+} from './repository';
 import type { AssessmentPatch } from './repository/types';
 import {
   baseAssessmentsFor,
+  localEvidenceRepository,
   LS_ASSESS,
   LS_INTAKE,
   LS_SCOPE,
   loadJson,
   loadOverrides,
   overrideKey,
+  readLocalEvidence,
   saveJson,
   type Overrides,
 } from './repository/localRepository';
@@ -68,6 +89,12 @@ interface DataContextValue {
   toggleAssetInScope: (id: string) => void;
   toggleAssetHandlesCui: (id: string) => void;
   resetScope: () => void;
+
+  /* evidence lifecycle workflow (Task 08) */
+  evidence: EvidenceItem[];
+  requestEvidence: (input: EvidenceRequestInput) => void;
+  updateEvidence: (id: string, patch: EvidencePatch) => void;
+  transitionEvidence: (id: string, toStatus: EvidenceStatus, note?: string) => void;
 }
 
 /** The assessment/intake/scope portion produced by either engine. */
@@ -115,7 +142,7 @@ export function DataProvider({
 }
 
 function DataEngine({ clientId, children }: { clientId: string; children: ReactNode }) {
-  const { mode, repository } = useRepository();
+  const { mode, repository, evidence: evidenceRepo } = useRepository();
 
   /* selected control is shared by both modes and out of this task's scope */
   const [selectedControlId, setSelectedControlId] = useState<string>(
@@ -129,8 +156,8 @@ function DataEngine({ clientId, children }: { clientId: string; children: ReactN
   const [mutationError, setMutationError] = useState<string | null>(null);
 
   /* Both engines run every render (stable hook order); only one is exposed. */
-  const local = useLocalEngine(clientId);
-  const remote = useSupabaseEngine(repository, clientId, mode === 'supabase', setMutationError);
+  const local = useLocalEngine(clientId, setMutationError);
+  const remote = useSupabaseEngine(repository, evidenceRepo, clientId, mode === 'supabase', setMutationError);
   const engine = mode === 'supabase' ? remote : local;
 
   const value = useMemo<DataContextValue>(
@@ -162,10 +189,48 @@ function DataEngine({ clientId, children }: { clientId: string; children: ReactN
 /* ============================================================
    Local engine — the original synchronous localStorage logic.
    ============================================================ */
-function useLocalEngine(clientId: string): EngineResult {
+function useLocalEngine(
+  clientId: string,
+  setMutationError: (message: string) => void,
+): EngineResult {
   const [overrides, setOverrides] = useState<Overrides>(loadOverrides);
   const [intake, setIntake] = useState<IntakeState>(() => loadJson(LS_INTAKE, DEFAULT_INTAKE));
   const [scope, setScope] = useState<ScopeState>(() => loadJson(LS_SCOPE, DEFAULT_SCOPE));
+  const [evidence, setEvidence] = useState<EvidenceItem[]>(() => readLocalEvidence(clientId));
+
+  /* Re-read evidence whenever the route's client changes. */
+  useEffect(() => {
+    setEvidence(readLocalEvidence(clientId));
+  }, [clientId]);
+
+  /* Evidence mutations go through localEvidenceRepository (which persists +
+     validates transitions), then re-read into state. Promise.resolve().then
+     turns any synchronous throw (e.g. an illegal transition) into a rejection. */
+  const runEvidence = useCallback(
+    (work: () => Promise<unknown>) => {
+      Promise.resolve()
+        .then(work)
+        .then(() => setEvidence(readLocalEvidence(clientId)))
+        .catch((e) =>
+          setMutationError(e instanceof Error ? e.message : 'Could not update evidence.'),
+        );
+    },
+    [clientId, setMutationError],
+  );
+  const requestEvidence = useCallback(
+    (input: EvidenceRequestInput) => runEvidence(() => localEvidenceRepository.create(clientId, input)),
+    [runEvidence, clientId],
+  );
+  const updateEvidence = useCallback(
+    (id: string, patch: EvidencePatch) =>
+      runEvidence(() => localEvidenceRepository.updateMetadata(clientId, id, patch)),
+    [runEvidence, clientId],
+  );
+  const transitionEvidence = useCallback(
+    (id: string, toStatus: EvidenceStatus, note?: string) =>
+      runEvidence(() => localEvidenceRepository.transition(clientId, id, toStatus, note)),
+    [runEvidence, clientId],
+  );
 
   const assessments = useMemo(
     () =>
@@ -306,6 +371,10 @@ function useLocalEngine(clientId: string): EngineResult {
       toggleAssetInScope,
       toggleAssetHandlesCui,
       resetScope,
+      evidence,
+      requestEvidence,
+      updateEvidence,
+      transitionEvidence,
     }),
     [
       assessments,
@@ -323,6 +392,10 @@ function useLocalEngine(clientId: string): EngineResult {
       toggleAssetInScope,
       toggleAssetHandlesCui,
       resetScope,
+      evidence,
+      requestEvidence,
+      updateEvidence,
+      transitionEvidence,
     ],
   );
 
@@ -335,6 +408,7 @@ function useLocalEngine(clientId: string): EngineResult {
    ============================================================ */
 function useSupabaseEngine(
   repository: ClientDataRepository,
+  evidenceRepo: EvidenceRepository,
   clientId: string,
   enabled: boolean,
   setMutationError: (message: string) => void,
@@ -343,6 +417,7 @@ function useSupabaseEngine(
   const assessmentsKey = useMemo(() => ['assessments', clientId] as const, [clientId]);
   const intakeKey = useMemo(() => ['intake', clientId] as const, [clientId]);
   const scopeKey = useMemo(() => ['scope', clientId] as const, [clientId]);
+  const evidenceKey = useMemo(() => ['evidence', clientId] as const, [clientId]);
 
   const assessmentsQ = useQuery({
     queryKey: assessmentsKey,
@@ -359,11 +434,16 @@ function useSupabaseEngine(
     queryFn: () => repository.getScope(clientId),
     enabled,
   });
+  const evidenceQ = useQuery({
+    queryKey: evidenceKey,
+    queryFn: () => evidenceRepo.list(clientId),
+    enabled,
+  });
 
   const reportError = useCallback(
     (e: unknown) =>
       setMutationError(
-        e instanceof RepositoryError
+        e instanceof RepositoryError || e instanceof Error
           ? e.message
           : 'Could not save your change to the cloud workspace. Please try again.',
       ),
@@ -433,9 +513,73 @@ function useSupabaseEngine(
     },
   });
 
+  /* -- evidence: create / metadata patch / legal transition -- */
+  const requestMut = useMutation<EvidenceItem, unknown, EvidenceRequestInput>({
+    mutationFn: (input) => evidenceRepo.create(clientId, input),
+    onError: reportError,
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: evidenceKey });
+    },
+  });
+  const updateEvidenceMut = useMutation<
+    EvidenceItem,
+    unknown,
+    { id: string; patch: EvidencePatch },
+    { prev?: EvidenceItem[] }
+  >({
+    mutationKey: evidenceKey,
+    mutationFn: ({ id, patch }) => evidenceRepo.updateMetadata(clientId, id, patch),
+    onMutate: async ({ id, patch }) => {
+      await qc.cancelQueries({ queryKey: evidenceKey });
+      const prev = qc.getQueryData<EvidenceItem[]>(evidenceKey);
+      qc.setQueryData<EvidenceItem[]>(evidenceKey, (old) =>
+        (old ?? []).map((e) => (e.id === id ? { ...e, ...patch } : e)),
+      );
+      return { prev };
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(evidenceKey, ctx.prev);
+      reportError(e);
+    },
+    onSettled: () => {
+      if (qc.isMutating({ mutationKey: evidenceKey }) === 1) {
+        void qc.invalidateQueries({ queryKey: evidenceKey });
+      }
+    },
+  });
+  const transitionMut = useMutation<
+    EvidenceItem,
+    unknown,
+    { id: string; toStatus: EvidenceStatus; note?: string },
+    { prev?: EvidenceItem[] }
+  >({
+    mutationKey: evidenceKey,
+    mutationFn: ({ id, toStatus, note }) => evidenceRepo.transition(clientId, id, toStatus, note),
+    onMutate: async ({ id, toStatus, note }) => {
+      await qc.cancelQueries({ queryKey: evidenceKey });
+      const prev = qc.getQueryData<EvidenceItem[]>(evidenceKey);
+      qc.setQueryData<EvidenceItem[]>(evidenceKey, (old) =>
+        (old ?? []).map((e) =>
+          e.id === id ? { ...e, status: toStatus, notes: note ?? e.notes } : e,
+        ),
+      );
+      return { prev };
+    },
+    onError: (e, _vars, ctx) => {
+      if (ctx?.prev) qc.setQueryData(evidenceKey, ctx.prev);
+      reportError(e);
+    },
+    onSettled: () => {
+      if (qc.isMutating({ mutationKey: evidenceKey }) === 1) {
+        void qc.invalidateQueries({ queryKey: evidenceKey });
+      }
+    },
+  });
+
   const assessments = assessmentsQ.data ?? SEED_ASSESSMENTS;
   const intake = intakeQ.data ?? DEFAULT_INTAKE;
   const scope = scopeQ.data ?? DEFAULT_SCOPE;
+  const evidence = evidenceQ.data ?? [];
 
   const assessmentFor = useCallback(
     (controlId: string) => assessments.find((a) => a.controlId === controlId),
@@ -547,6 +691,20 @@ function useSupabaseEngine(
     [scopeMut],
   );
 
+  /* evidence helpers */
+  const requestEvidence = useCallback(
+    (input: EvidenceRequestInput) => requestMut.mutate(input),
+    [requestMut],
+  );
+  const updateEvidence = useCallback(
+    (id: string, patch: EvidencePatch) => updateEvidenceMut.mutate({ id, patch }),
+    [updateEvidenceMut],
+  );
+  const transitionEvidence = useCallback(
+    (id: string, toStatus: EvidenceStatus, note?: string) => transitionMut.mutate({ id, toStatus, note }),
+    [transitionMut],
+  );
+
   const slice = useMemo<DataSlice>(
     () => ({
       assessments,
@@ -564,6 +722,10 @@ function useSupabaseEngine(
       toggleAssetInScope,
       toggleAssetHandlesCui,
       resetScope,
+      evidence,
+      requestEvidence,
+      updateEvidence,
+      transitionEvidence,
     }),
     [
       assessments,
@@ -581,6 +743,10 @@ function useSupabaseEngine(
       toggleAssetInScope,
       toggleAssetHandlesCui,
       resetScope,
+      evidence,
+      requestEvidence,
+      updateEvidence,
+      transitionEvidence,
     ],
   );
 
@@ -588,12 +754,17 @@ function useSupabaseEngine(
     void assessmentsQ.refetch();
     void intakeQ.refetch();
     void scopeQ.refetch();
-  }, [assessmentsQ, intakeQ, scopeQ]);
+    void evidenceQ.refetch();
+  }, [assessmentsQ, intakeQ, scopeQ, evidenceQ]);
 
   return {
     slice,
-    isPending: enabled && (assessmentsQ.isPending || intakeQ.isPending || scopeQ.isPending),
-    isError: enabled && (assessmentsQ.isError || intakeQ.isError || scopeQ.isError),
+    isPending:
+      enabled &&
+      (assessmentsQ.isPending || intakeQ.isPending || scopeQ.isPending || evidenceQ.isPending),
+    isError:
+      enabled &&
+      (assessmentsQ.isError || intakeQ.isError || scopeQ.isError || evidenceQ.isError),
     retry,
   };
 }

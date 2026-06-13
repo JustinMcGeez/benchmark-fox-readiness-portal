@@ -14,9 +14,13 @@
 import { useMemo } from 'react';
 import { isSupabaseConfigured } from '../../lib/supabaseClient';
 import { useOptionalAuth } from '../../auth/AuthProvider';
-import { localClientsRepository, localRepository } from './localRepository';
-import { supabaseClientsRepository, supabaseRepository } from './supabaseRepository';
-import type { ClientDataRepository, ClientsRepository } from './types';
+import { localClientsRepository, localEvidenceRepository, localRepository } from './localRepository';
+import {
+  supabaseClientsRepository,
+  supabaseEvidenceRepository,
+  supabaseRepository,
+} from './supabaseRepository';
+import type { ClientDataRepository, ClientsRepository, EvidenceRepository } from './types';
 
 export type RepositoryMode = 'local' | 'supabase';
 
@@ -25,6 +29,8 @@ export interface RepositorySelection {
   repository: ClientDataRepository;
   /** Clients + assignments repository for the same mode. */
   clients: ClientsRepository;
+  /** Evidence lifecycle repository for the same mode (Task 08). */
+  evidence: EvidenceRepository;
 }
 
 export function useRepository(): RepositorySelection {
@@ -33,11 +39,21 @@ export function useRepository(): RepositorySelection {
   return useMemo<RepositorySelection>(
     () =>
       isSupabaseConfigured && authed
-        ? { mode: 'supabase', repository: supabaseRepository, clients: supabaseClientsRepository }
-        : { mode: 'local', repository: localRepository, clients: localClientsRepository },
+        ? {
+            mode: 'supabase',
+            repository: supabaseRepository,
+            clients: supabaseClientsRepository,
+            evidence: supabaseEvidenceRepository,
+          }
+        : {
+            mode: 'local',
+            repository: localRepository,
+            clients: localClientsRepository,
+            evidence: localEvidenceRepository,
+          },
     [authed],
   );
 }
 
-export type { ClientDataRepository, ClientsRepository } from './types';
+export type { ClientDataRepository, ClientsRepository, EvidenceRepository } from './types';
 export { RepositoryError, isRepositoryError } from './types';

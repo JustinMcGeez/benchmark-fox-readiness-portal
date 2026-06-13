@@ -6,10 +6,20 @@ import type {
   ClientControlAssessment,
   Control,
   EvidenceItem,
+  EvidenceStatus,
   PoamItem,
   RiskLevel,
   TaskItem,
 } from '../data/types';
+import { EVIDENCE_OPTIONS } from '../data/types';
+import { effectiveStatus } from './evidenceWorkflow';
+import {
+  controlObjectiveCoverage,
+  coveredObjectiveIdsForControl,
+  objectiveCoverageSummary,
+  type ControlObjectiveCoverage,
+  type ObjectiveCoverageSummary,
+} from './objectives';
 
 const POAM_OPEN = new Set<PoamItem['status']>(['Not Started', 'Ongoing', 'Blocked']);
 
@@ -27,6 +37,73 @@ export const missingEvidenceCount = (items: EvidenceItem[]): number =>
 
 export const weakEvidenceCount = (items: EvidenceItem[]): number =>
   items.filter((e) => e.quality === 'Weak' || e.quality === 'Missing' || e.quality === 'Outdated').length;
+
+/* ============================================================
+   Evidence selectors — the SINGLE source of truth for evidence coverage and
+   counts shared by the Evidence Hub, Control Detail, SSP Workspace, and Reports
+   (Task 08). Screens never filter the evidence list inline; they call these.
+   "Covered" means an objective is referenced by ACCEPTED evidence (expiry-aware
+   via effectiveStatus — Accepted-but-expired no longer counts).
+   ============================================================ */
+
+/** All evidence items mapped to one control. */
+export const evidenceForControl = (items: EvidenceItem[], controlId: string): EvidenceItem[] =>
+  items.filter((e) => e.controlId === controlId);
+
+/** Evidence whose effective (expiry-aware) status is Accepted. */
+export const acceptedEvidence = (items: EvidenceItem[], now: Date = new Date()): EvidenceItem[] =>
+  items.filter((e) => effectiveStatus(e, now) === 'Accepted');
+
+/** Objective coverage of one control by ACCEPTED evidence. */
+export function controlEvidenceCoverage(
+  control: Control | undefined,
+  items: EvidenceItem[],
+  now: Date = new Date(),
+): ControlObjectiveCoverage {
+  return controlObjectiveCoverage(
+    control,
+    coveredObjectiveIdsForControl(control?.id ?? '', acceptedEvidence(items, now)),
+  );
+}
+
+/** Aggregate objective coverage across controls, by ACCEPTED evidence (Reports). */
+export function evidenceObjectiveSummary(
+  controls: Control[],
+  items: EvidenceItem[],
+  topN = 5,
+  now: Date = new Date(),
+): ObjectiveCoverageSummary {
+  return objectiveCoverageSummary(controls, acceptedEvidence(items, now), topN);
+}
+
+/** Count of evidence items grouped by EFFECTIVE status (Evidence Hub board). */
+export function evidenceCountsByStatus(
+  items: EvidenceItem[],
+  now: Date = new Date(),
+): Record<EvidenceStatus, number> {
+  const counts = Object.fromEntries(EVIDENCE_OPTIONS.map((s) => [s, 0])) as Record<
+    EvidenceStatus,
+    number
+  >;
+  for (const e of items) counts[effectiveStatus(e, now)]++;
+  return counts;
+}
+
+/**
+ * Control ids that appear in the evidence list but have ZERO accepted evidence
+ * — drives the Evidence Hub "controls with zero accepted evidence" filter.
+ */
+export function controlIdsWithoutAcceptedEvidence(
+  items: EvidenceItem[],
+  now: Date = new Date(),
+): Set<string> {
+  const accepted = new Set(acceptedEvidence(items, now).map((e) => e.controlId).filter(Boolean));
+  const out = new Set<string>();
+  for (const e of items) {
+    if (e.controlId && !accepted.has(e.controlId)) out.add(e.controlId);
+  }
+  return out;
+}
 
 export const openTaskCount = (tasks: TaskItem[]): number =>
   tasks.filter((t) => t.status !== 'Done').length;

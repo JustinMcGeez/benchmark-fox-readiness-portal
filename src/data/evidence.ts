@@ -1,4 +1,6 @@
-/* Seed data — evidence items for the active client. */
+/* Seed data — evidence items for the demo client (Acme).
+   METADATA + external links only; no files are ever stored. The new-client
+   default starts with NO evidence (see localRepository.baseEvidenceFor). */
 import type { EvidenceItem } from './types';
 import { DEMO_CLIENT_ID } from './clients';
 
@@ -9,6 +11,7 @@ export const EVIDENCE_ITEMS: EvidenceItem[] = [
     title: 'MFA Configuration Screenshot',
     controlId: '3.5.3',
     assessmentObjective: '3.5.3[a]',
+    objectiveIds: ['3.5.3[a]'],
     owner: 'IT Lead',
     status: 'In Review',
     quality: 'Acceptable',
@@ -17,6 +20,9 @@ export const EVIDENCE_ITEMS: EvidenceItem[] = [
     poamId: 'PM-021',
     taskId: 'tk-1',
     method: 'Examine / Test',
+    description: 'Tenant MFA enforcement configuration for all privileged accounts.',
+    externalLink: 'https://contoso.sharepoint.us/sites/cmmc/evidence/mfa-config',
+    storageLocationNote: 'Client GCC High SharePoint — CMMC evidence library.',
     notes: 'Covers primary tenant; confirm coverage for CAD app.',
   },
   {
@@ -28,16 +34,21 @@ export const EVIDENCE_ITEMS: EvidenceItem[] = [
     status: 'Missing',
     quality: 'Missing',
     freshness: 'N/A',
+    description: 'Signed quarterly least-privilege access review for in-scope systems.',
+    dueDate: '2026-07-15',
   },
   {
     id: 'ev-3',
     clientId: DEMO_CLIENT_ID,
     title: 'Firewall Rules Export',
     controlId: '3.13.1',
+    objectiveIds: ['3.13.1[a]', '3.13.1[b]'],
     owner: 'MSP',
     status: 'Accepted',
     quality: 'Strong',
     freshness: 'Current',
+    externalLink: 'https://contoso.sharepoint.us/sites/cmmc/evidence/fw-rules',
+    expiresOn: '2027-01-31',
   },
   {
     id: 'ev-4',
@@ -48,28 +59,32 @@ export const EVIDENCE_ITEMS: EvidenceItem[] = [
     status: 'Requested',
     quality: 'Missing',
     freshness: 'N/A',
+    description: 'Documented audit log retention policy (≥ 90 days online, 1 year archive).',
+    dueDate: '2026-07-01',
   },
   {
     id: 'ev-5',
     clientId: DEMO_CLIENT_ID,
     title: 'Entra ID Group Export',
     controlId: '3.1.1',
+    objectiveIds: ['3.1.1[a]', '3.1.1[b]'],
     owner: 'IT Lead',
     status: 'Accepted',
     quality: 'Strong',
     freshness: 'Current',
+    externalLink: 'https://contoso.sharepoint.us/sites/cmmc/evidence/entra-groups',
+    expiresOn: '2027-03-01',
   },
   {
     id: 'ev-6',
     clientId: DEMO_CLIENT_ID,
     title: 'Intune Compliance Policy',
     controlId: '3.1.1',
+    objectiveIds: ['3.1.1[c]'],
     owner: 'IT Lead',
     status: 'In Review',
     quality: 'Acceptable',
     freshness: 'Current',
+    externalLink: 'https://contoso.sharepoint.us/sites/cmmc/evidence/intune-policy',
   },
 ];
-
-export const evidenceForControl = (controlId: string): EvidenceItem[] =>
-  EVIDENCE_ITEMS.filter((e) => e.controlId === controlId);

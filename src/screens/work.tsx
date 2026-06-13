@@ -2,7 +2,7 @@
    Screens — work: SSP, POA&M, Evidence, Tasks
    Data-driven from the assessment store + evidence/poam/tasks seeds.
    ============================================================ */
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import type { ScreenProps } from '../types';
 import {
   Badge,
@@ -10,6 +10,7 @@ import {
   Card,
   Check,
   Field,
+  InlineSelect,
   PageHead,
   Ph,
   RiskBadge,
@@ -22,16 +23,51 @@ import {
 } from '../components/primitives';
 import { useData } from '../data/store';
 import { useReference } from '../data/referenceStore';
-import {
-  controlObjectiveCoverage,
-  coveredObjectiveIdsForControl,
-} from '../lib/objectives';
+import { useAuth } from '../auth/AuthProvider';
 import { useCurrentClient } from '../data/clientsStore';
-import { EVIDENCE_ITEMS } from '../data/evidence';
+import {
+  controlEvidenceCoverage,
+  controlIdsWithoutAcceptedEvidence,
+  evidenceCountsByStatus,
+} from '../lib/selectors';
+import {
+  allowedNextStatuses,
+  effectiveFreshness,
+  effectiveStatus,
+} from '../lib/evidenceWorkflow';
 import { POAM_ITEMS } from '../data/poam';
 import { TASKS } from '../data/tasks';
-import type { ClientControlAssessment, SspStatus } from '../data/types';
+import {
+  EVIDENCE_OPTIONS,
+  type ClientControlAssessment,
+  type Control,
+  type EvidenceItem,
+  type EvidencePatch,
+  type EvidenceQuality,
+  type EvidenceRequestInput,
+  type EvidenceStatus,
+  type SspStatus,
+} from '../data/types';
 import { SourceRefs } from '../components/SourceRefs';
+
+const EVIDENCE_QUALITY_OPTIONS: EvidenceQuality[] = [
+  'Strong',
+  'Acceptable',
+  'Weak',
+  'Outdated',
+  'Not Relevant',
+  'Missing',
+];
+
+/* Evidence review (the In Review → Accepted/Needs Revision/Rejected transitions)
+   is consultant/admin only — hidden in the UI here and enforced server-side by
+   migration 007. Local Prototype mode (no auth) allows it so demos work. */
+function useCanReviewEvidence(): boolean {
+  const { isConfigured, role } = useAuth();
+  return !isConfigured || role === 'benchmark_fox_admin' || role === 'benchmark_fox_consultant';
+}
+
+const isHttpsLink = (v: string): boolean => /^https:\/\/\S+$/i.test(v.trim());
 
 const SSP_FILTERS: { label: string; value: SspStatus | 'All' }[] = [
   { label: 'All', value: 'All' },
@@ -49,7 +85,7 @@ const evSupports = (a: ClientControlAssessment) =>
 
 /* ---------- 12. SSP WORKSPACE ---------- */
 export function SSPScreen({ go }: ScreenProps) {
-  const { assessments, selectControl } = useData();
+  const { assessments, evidence, selectControl } = useData();
   // Control definitions (titles/families) from the reference-data provider.
   const { controlsById } = useReference();
   const currentClient = useCurrentClient();
@@ -111,10 +147,7 @@ export function SSPScreen({ go }: ScreenProps) {
             <tbody>
               {rows.map((a) => {
                 const c = controlsById[a.controlId];
-                const cov = controlObjectiveCoverage(
-                  c,
-                  coveredObjectiveIdsForControl(a.controlId, EVIDENCE_ITEMS),
-                );
+                const cov = controlEvidenceCoverage(c, evidence);
                 const covTone =
                   cov.status === 'addressed'
                     ? 'ok'
@@ -373,152 +406,557 @@ export function POAMScreen({ go }: ScreenProps) {
 
 /* ---------- 14. EVIDENCE HUB ---------- */
 export function EvidenceScreen(_: ScreenProps) {
-  const { controlsById } = useReference();
+  const { evidence, requestEvidence, updateEvidence, transitionEvidence } = useData();
+  const { controlsById, controls } = useReference();
   const currentClient = useCurrentClient();
-  // default to the first missing/needs-revision item, otherwise the first item
-  const defaultEvidence =
-    EVIDENCE_ITEMS.find((e) => e.status === 'Missing' || e.status === 'Needs Revision') ?? EVIDENCE_ITEMS[0];
+  const canReview = useCanReviewEvidence();
+
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const detail = (selectedId && EVIDENCE_ITEMS.find((e) => e.id === selectedId)) || defaultEvidence;
-  // Related control definition from reference data (graceful fallback to ID only).
-  const detailControl = controlsById[detail.controlId];
+  const [statusFilter, setStatusFilter] = useState<EvidenceStatus | 'All'>('All');
+  const [zeroAcceptedOnly, setZeroAcceptedOnly] = useState(false);
+  const [requesting, setRequesting] = useState(false);
+
+  const counts = useMemo(() => evidenceCountsByStatus(evidence), [evidence]);
+  const gapControlIds = useMemo(() => controlIdsWithoutAcceptedEvidence(evidence), [evidence]);
+
+  const visible = useMemo(
+    () =>
+      evidence.filter((e) => {
+        if (statusFilter !== 'All' && effectiveStatus(e) !== statusFilter) return false;
+        if (zeroAcceptedOnly && !(e.controlId && gapControlIds.has(e.controlId))) return false;
+        return true;
+      }),
+    [evidence, statusFilter, zeroAcceptedOnly, gapControlIds],
+  );
+
+  // Group the visible items by EFFECTIVE status, in canonical order.
+  const groups = useMemo(() => {
+    const byStatus = new Map<EvidenceStatus, EvidenceItem[]>();
+    for (const e of visible) {
+      const s = effectiveStatus(e);
+      const arr = byStatus.get(s) ?? [];
+      arr.push(e);
+      byStatus.set(s, arr);
+    }
+    return EVIDENCE_OPTIONS.filter((s) => byStatus.has(s)).map(
+      (s) => [s, byStatus.get(s)!] as const,
+    );
+  }, [visible]);
+
+  const detail = (selectedId && evidence.find((e) => e.id === selectedId)) || null;
+
   return (
     <div className="col">
       <PageHead
         title={`Evidence Hub — ${currentClient?.name ?? 'Client'}`}
         sub="Request, review, and map evidence to controls."
-        actions={<Btn primary>+ Request Evidence</Btn>}
+        actions={
+          <Btn primary onClick={() => setRequesting(true)}>
+            + Request Evidence
+          </Btn>
+        }
       />
-      <Toolbar search="Search evidence…" filters={['Status', 'Control', 'Owner', 'Freshness']} />
       <WarnBanner tone="bad">
-        Do not upload CUI unless the approved handling environment and secure transfer method have been
-        confirmed.
+        Metadata + approved secure links only. Never upload CUI or evidence files here — the artifact
+        stays in the client's secure store; record where it lives and link to it.
       </WarnBanner>
+
+      {/* status filter chips with per-status counts + the zero-coverage filter */}
+      <Card style={{ padding: '6px 6px' }}>
+        <div className="row wrap gap-sm" style={{ padding: '8px 10px', alignItems: 'center' }}>
+          <button
+            className={'w-btn sm' + (statusFilter === 'All' ? ' primary' : ' ghost')}
+            onClick={() => setStatusFilter('All')}
+          >
+            All ({evidence.length})
+          </button>
+          {EVIDENCE_OPTIONS.map((s) => (
+            <button
+              key={s}
+              className={'w-btn sm' + (statusFilter === s ? ' primary' : ' ghost')}
+              onClick={() => setStatusFilter(s)}
+            >
+              {s} ({counts[s]})
+            </button>
+          ))}
+          <div className="grow" />
+          <button
+            className={'w-btn sm' + (zeroAcceptedOnly ? ' primary' : ' ghost')}
+            title="Show only items whose control has no accepted evidence yet"
+            onClick={() => setZeroAcceptedOnly((v) => !v)}
+          >
+            ⚠ Controls w/ 0 accepted evidence ({gapControlIds.size})
+          </button>
+        </div>
+      </Card>
+
       <div className="grid-2" style={{ alignItems: 'start' }}>
         <Card style={{ padding: '6px 6px' }}>
-          <table className="w-table">
-            <thead>
-              <tr>
-                <th>Evidence Item</th>
-                <th>Control</th>
-                <th>Owner</th>
-                <th>Status</th>
-                <th>Quality</th>
-              </tr>
-            </thead>
-            <tbody>
-              {EVIDENCE_ITEMS.map((e) => (
-                <tr
-                  key={e.id}
-                  onClick={() => setSelectedId(e.id)}
-                  style={{ background: e.id === detail.id ? 'var(--surface-2)' : undefined }}
-                >
-                  <td style={{ fontWeight: 700 }}>{e.title}</td>
-                  <td className="mono">{e.controlId}</td>
-                  <td className="muted">{e.owner}</td>
-                  <td>
-                    <Status s={e.status} />
-                  </td>
-                  <td>
-                    <Status s={e.quality} />
-                  </td>
+          {visible.length === 0 ? (
+            <p className="muted" style={{ padding: '14px 12px', margin: 0 }}>
+              {evidence.length === 0
+                ? 'No evidence yet. Use “Request Evidence” to start the workflow.'
+                : 'No evidence matches the current filter.'}
+            </p>
+          ) : (
+            <table className="w-table">
+              <thead>
+                <tr>
+                  <th>Evidence Item</th>
+                  <th>Control</th>
+                  <th>Owner</th>
+                  <th>Status</th>
+                  <th>Quality</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </Card>
-        <Card title="Evidence Detail">
-          <div className="col" style={{ gap: 12 }}>
-            <div className="between">
-              <span className="w-label">TITLE</span>
-              <strong>{detail.title}</strong>
-            </div>
-            <div className="between">
-              <span className="w-label">RELATED CONTROL</span>
-              <span className="mono" style={{ textAlign: 'right' }}>
-                {detail.controlId}
-                {detailControl && (
-                  <span className="muted" style={{ display: 'block', fontSize: '.82em' }}>
-                    {detailControl.title} · {detailControl.familyCode}
-                  </span>
-                )}
-              </span>
-            </div>
-            {detailControl && detailControl.assessmentObjectives.length > 0 && (
-              <div className="w-box" style={{ padding: '8px 12px' }}>
-                <span className="w-label">OBJECTIVE COVERAGE (NIST SP 800-171A)</span>
-                {(() => {
-                  const cov = controlObjectiveCoverage(
-                    detailControl,
-                    new Set(detail.objectiveIds ?? []),
-                  );
-                  return (
-                    <div className="col" style={{ gap: 4, marginTop: 6, fontSize: '.85em' }}>
-                      <div className="row gap-sm">
-                        <Badge tone={cov.coveredIds.length ? 'ok' : 'none'}>
-                          {cov.coveredIds.length}/{cov.total} objectives covered
-                        </Badge>
-                        {cov.methodsCovered.map((mth) => (
-                          <Badge key={mth} tone="none">
-                            {mth.charAt(0).toUpperCase() + mth.slice(1)}
-                          </Badge>
-                        ))}
-                      </div>
-                      {cov.coveredIds.length === 0 ? (
-                        <span className="faint">
-                          No specific objectives selected — this evidence maps to the control overall.
+              </thead>
+              <tbody>
+                {groups.map(([status, items]) => (
+                  <Fragment key={status}>
+                    <tr>
+                      <td colSpan={5} style={{ background: 'var(--fill)', padding: '6px 10px' }}>
+                        <span className="row gap-sm" style={{ alignItems: 'center' }}>
+                          <Status s={status} />
+                          <span className="faint mono" style={{ fontSize: '.78em' }}>
+                            {items.length}
+                          </span>
                         </span>
-                      ) : (
-                        cov.uncoveredIds.length > 0 && (
-                          <span className="faint">Uncovered: {cov.uncoveredIds.join(', ')}</span>
-                        )
-                      )}
-                    </div>
-                  );
-                })()}
-              </div>
+                      </td>
+                    </tr>
+                    {items.map((e) => (
+                      <tr
+                        key={e.id}
+                        onClick={() => setSelectedId(e.id)}
+                        style={{ background: e.id === detail?.id ? 'var(--surface-2)' : undefined }}
+                      >
+                        <td style={{ fontWeight: 700 }}>{e.title}</td>
+                        <td className="mono">{e.controlId || '—'}</td>
+                        <td className="muted">{e.owner}</td>
+                        <td>
+                          <Status s={effectiveStatus(e)} />
+                        </td>
+                        <td>
+                          <Status s={e.quality} />
+                        </td>
+                      </tr>
+                    ))}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </Card>
+
+        {detail ? (
+          <EvidenceDetail
+            key={detail.id}
+            item={detail}
+            control={controlsById[detail.controlId]}
+            evidence={evidence}
+            canReview={canReview}
+            onUpdate={updateEvidence}
+            onTransition={transitionEvidence}
+          />
+        ) : (
+          <Card title="Evidence Detail">
+            <p className="muted" style={{ margin: 0 }}>
+              Select an evidence item to review it, or request new evidence.
+            </p>
+          </Card>
+        )}
+      </div>
+
+      {requesting && (
+        <RequestEvidenceModal
+          controls={controls}
+          onClose={() => setRequesting(false)}
+          onSubmit={(input) => {
+            requestEvidence(input);
+            setRequesting(false);
+          }}
+        />
+      )}
+      <SourceRefs ids={['nist-sp-800-171a', 'bf-evidence-guidance']} />
+    </div>
+  );
+}
+
+/* Human label for each transition button (driven by the legal next status). */
+const TRANSITION_LABEL: Record<EvidenceStatus, string> = {
+  'Not Requested': 'Mark Not Requested',
+  Requested: 'Re-request',
+  Uploaded: 'Mark Uploaded',
+  'In Review': 'Start Review',
+  Accepted: 'Accept',
+  'Needs Revision': 'Needs Revision',
+  Rejected: 'Reject',
+  Missing: 'Mark Missing',
+  Expired: 'Mark Expired',
+};
+
+function EvidenceDetail({
+  item,
+  control,
+  evidence,
+  canReview,
+  onUpdate,
+  onTransition,
+}: {
+  item: EvidenceItem;
+  control: Control | undefined;
+  evidence: EvidenceItem[];
+  canReview: boolean;
+  onUpdate: (id: string, patch: EvidencePatch) => void;
+  onTransition: (id: string, toStatus: EvidenceStatus, note?: string) => void;
+}) {
+  const [link, setLink] = useState(item.externalLink ?? '');
+  const [note, setNote] = useState('');
+  const linkTrimmed = link.trim();
+  const linkValid = linkTrimmed === '' || isHttpsLink(linkTrimmed);
+  const linkChanged = linkTrimmed !== (item.externalLink ?? '');
+
+  const eff = effectiveStatus(item);
+  const fresh = effectiveFreshness(item);
+  const cov = controlEvidenceCoverage(control, evidence);
+  // Transitions act on the STORED status; only the user's allowed moves are shown.
+  const nexts = allowedNextStatuses(item.status, canReview);
+
+  return (
+    <Card title="Evidence Detail">
+      <div className="col" style={{ gap: 12 }}>
+        <div className="between">
+          <span className="w-label">TITLE</span>
+          <strong>{item.title}</strong>
+        </div>
+        <div className="between">
+          <span className="w-label">RELATED CONTROL</span>
+          <span className="mono" style={{ textAlign: 'right' }}>
+            {item.controlId || '—'}
+            {control && (
+              <span className="muted" style={{ display: 'block', fontSize: '.82em' }}>
+                {control.title} · {control.familyCode}
+              </span>
             )}
-            <div className="between">
-              <span className="w-label">ASSESSMENT OBJECTIVE</span>
-              <span className="mono">{detail.assessmentObjective ?? '—'}</span>
-            </div>
-            <div className="between">
-              <span className="w-label">METHOD</span>
-              <span>{detail.method ?? '—'}</span>
-            </div>
-            <div className="between">
-              <span className="w-label">STATUS</span>
-              <Status s={detail.status} />
-            </div>
-            <div className="between">
-              <span className="w-label">QUALITY</span>
-              <Status s={detail.quality} />
-            </div>
-            <Ph h={110}>[ uploaded file preview / secure link ]</Ph>
-            <Field label="CONSULTANT REVIEW NOTES" value={detail.notes ?? ''} placeholder="Quality, gaps, follow-ups…" area />
-            <div className="between">
-              <span className="w-label">SUPPORTS SSP STATEMENT?</span>
+          </span>
+        </div>
+        {item.description && (
+          <div className="between">
+            <span className="w-label">WHAT'S NEEDED</span>
+            <span style={{ textAlign: 'right', maxWidth: '70%' }}>{item.description}</span>
+          </div>
+        )}
+
+        {control && control.assessmentObjectives.length > 0 && (
+          <div className="w-box" style={{ padding: '8px 12px' }}>
+            <span className="w-label">OBJECTIVE COVERAGE (NIST SP 800-171A) — accepted evidence</span>
+            <div className="col" style={{ gap: 4, marginTop: 6, fontSize: '.85em' }}>
               <div className="row gap-sm">
-                {(['Yes', 'Partial', 'No'] as const).map((s) => (
-                  <Check key={s} label={s} on={(detail.sspSupported ?? 'Partial') === s} radio />
+                <Badge tone={cov.status === 'addressed' ? 'ok' : cov.coveredIds.length ? 'warn' : 'none'}>
+                  {cov.coveredIds.length}/{cov.total} objectives covered
+                </Badge>
+                {cov.methodsCovered.map((mth) => (
+                  <Badge key={mth} tone="none">
+                    {mth.charAt(0).toUpperCase() + mth.slice(1)}
+                  </Badge>
                 ))}
               </div>
-            </div>
-            <div className="row wrap gap-sm" style={{ fontSize: '.82rem' }}>
-              <span className="muted">Linked:</span>
-              {detail.poamId ? <Badge tone="none">POA&M {detail.poamId}</Badge> : null}
-              {detail.taskId ? <Badge tone="none">Task {detail.taskId}</Badge> : null}
-              {!detail.poamId && !detail.taskId && <span className="faint">none</span>}
-            </div>
-            <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
-              <Btn ghost>Reject</Btn>
-              <Btn>Needs Revision</Btn>
-              <Btn primary>Accept Evidence</Btn>
+              {cov.coveredIds.length === 0 ? (
+                <span className="faint">No accepted evidence covers this control's objectives yet.</span>
+              ) : (
+                cov.uncoveredIds.length > 0 && (
+                  <span className="faint">Uncovered: {cov.uncoveredIds.join(', ')}</span>
+                )
+              )}
             </div>
           </div>
-        </Card>
+        )}
+
+        {/* external secure link — https only, with the standing warning */}
+        <div className="w-field">
+          <span className="w-label">SECURE EXTERNAL LINK</span>
+          <input
+            className="w-input"
+            type="url"
+            placeholder="https://… (link to the artifact in the client's secure store)"
+            value={link}
+            aria-label="Secure external link"
+            onChange={(e) => setLink(e.target.value)}
+          />
+          {!linkValid && (
+            <span className="faint" style={{ color: 'var(--bad, #b4232a)', fontSize: '.8em' }}>
+              Enter an https:// link. The artifact itself is never uploaded — only a secure link.
+            </span>
+          )}
+          <p className="annot" style={{ margin: '4px 0 0' }}>
+            The artifact stays in the client's secure store; this records a pointer only.
+          </p>
+          <div className="row gap-sm mt" style={{ justifyContent: 'flex-end' }}>
+            <Btn
+              sm
+              primary
+              disabled={!linkValid || !linkChanged}
+              onClick={() => onUpdate(item.id, { externalLink: linkTrimmed })}
+            >
+              Save Link
+            </Btn>
+          </div>
+        </div>
+        {item.storageLocationNote && (
+          <div className="between">
+            <span className="w-label">STORAGE LOCATION</span>
+            <span className="muted" style={{ textAlign: 'right', maxWidth: '70%' }}>
+              {item.storageLocationNote}
+            </span>
+          </div>
+        )}
+
+        <div className="between">
+          <span className="w-label">QUALITY</span>
+          <InlineSelect
+            ariaLabel="Evidence quality"
+            value={item.quality}
+            options={EVIDENCE_QUALITY_OPTIONS}
+            onChange={(q) => onUpdate(item.id, { quality: q })}
+          />
+        </div>
+        <div className="between">
+          <span className="w-label">FRESHNESS</span>
+          <span className="row gap-sm" style={{ alignItems: 'center' }}>
+            <Status s={fresh} />
+            <span className="mono faint" style={{ fontSize: '.82em' }}>
+              {item.expiresOn ? `expires ${item.expiresOn}` : 'no expiry set'}
+            </span>
+          </span>
+        </div>
+        {item.status === 'Accepted' && fresh === 'Expired' && (
+          <WarnBanner tone="warn">
+            This accepted evidence is past its expiry date — re-collect it (Mark Expired → Re-request).
+          </WarnBanner>
+        )}
+
+        <div className="between">
+          <span className="w-label">CURRENT STATUS</span>
+          <Status s={eff} />
+        </div>
+
+        <Field
+          label="REVIEW / TRANSITION NOTE"
+          area
+          value={note}
+          onChange={setNote}
+          placeholder="Optional note recorded with the next status change…"
+        />
+        {item.notes && (
+          <div className="w-box muted" style={{ padding: '8px 12px', fontSize: '.88em' }}>
+            <span className="w-eyebrow">Last note</span>
+            <p style={{ margin: '4px 0 0' }}>{item.notes}</p>
+          </div>
+        )}
+
+        <div className="between">
+          <span className="w-label">SUPPORTS SSP STATEMENT?</span>
+          <div className="row gap-sm">
+            {(['Yes', 'Partial', 'No'] as const).map((s) => (
+              <button
+                key={s}
+                className={'w-check' + ((item.sspSupported ?? 'Partial') === s ? ' on radio' : ' radio')}
+                onClick={() => onUpdate(item.id, { sspSupported: s })}
+              >
+                <span className="bx" /> <span>{s}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <hr className="w-hr" style={{ margin: '4px 0' }} />
+        <span className="w-label">NEXT STATUS</span>
+        {nexts.length === 0 ? (
+          <p className="faint" style={{ margin: 0, fontSize: '.85em' }}>
+            {canReview
+              ? 'No further transitions from this status.'
+              : 'No actions available — review transitions are handled by your Benchmark Fox consultant.'}
+          </p>
+        ) : (
+          <div className="row wrap gap-sm" style={{ justifyContent: 'flex-end' }}>
+            {nexts.map((s) => (
+              <Btn
+                key={s}
+                primary={s === 'Accepted' || s === 'Uploaded'}
+                ghost={s === 'Rejected'}
+                onClick={() => onTransition(item.id, s, note.trim() || undefined)}
+              >
+                {TRANSITION_LABEL[s]}
+              </Btn>
+            ))}
+          </div>
+        )}
+
+        <div className="row wrap gap-sm" style={{ fontSize: '.82rem' }}>
+          <span className="muted">Linked:</span>
+          {item.poamId ? <Badge tone="none">POA&M {item.poamId}</Badge> : null}
+          {item.taskId ? <Badge tone="none">Task {item.taskId}</Badge> : null}
+          {!item.poamId && !item.taskId && <span className="faint">none</span>}
+        </div>
       </div>
-      <SourceRefs ids={['nist-sp-800-171a', 'bf-evidence-guidance']} />
+    </Card>
+  );
+}
+
+function RequestEvidenceModal({
+  controls,
+  onClose,
+  onSubmit,
+}: {
+  controls: Control[];
+  onClose: () => void;
+  onSubmit: (input: EvidenceRequestInput) => void;
+}) {
+  const [controlId, setControlId] = useState(controls[0]?.id ?? '');
+  const [title, setTitle] = useState('');
+  const [wholeControl, setWholeControl] = useState(true);
+  const [objectiveIds, setObjectiveIds] = useState<string[]>([]);
+  const [description, setDescription] = useState('');
+  const [owner, setOwner] = useState('');
+  const [dueDate, setDueDate] = useState('');
+
+  const control = controls.find((c) => c.id === controlId);
+  const objectives = control?.assessmentObjectives ?? [];
+  const canSubmit = controlId !== '' && title.trim() !== '';
+
+  const toggleObjective = (oid: string) =>
+    setObjectiveIds((prev) => (prev.includes(oid) ? prev.filter((x) => x !== oid) : [...prev, oid]));
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 1001,
+        background: 'rgba(30,28,24,.45)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-card"
+        style={{ width: 'min(620px, 96vw)', maxHeight: '88vh', overflow: 'auto', padding: 24 }}
+      >
+        <div className="between" style={{ marginBottom: 14 }}>
+          <h2 className="w-h2">Request Evidence</h2>
+          <Btn onClick={onClose}>✕ Close</Btn>
+        </div>
+        <div className="col" style={{ gap: 12 }}>
+          <div className="w-field">
+            <span className="w-label">CONTROL</span>
+            <select
+              className="w-input"
+              aria-label="Control"
+              value={controlId}
+              onChange={(e) => {
+                setControlId(e.target.value);
+                setObjectiveIds([]);
+              }}
+            >
+              {controls.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.id} — {c.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <Field
+            label="EVIDENCE TITLE"
+            value={title}
+            onChange={setTitle}
+            placeholder="e.g. MFA enforcement configuration export"
+          />
+
+          <div className="w-field">
+            <span className="w-label">OBJECTIVES (NIST SP 800-171A)</span>
+            <button
+              className={'w-check' + (wholeControl ? ' on radio' : ' radio')}
+              onClick={() => setWholeControl(true)}
+              style={{ marginBottom: 6 }}
+            >
+              <span className="bx" /> <span>Whole control</span>
+            </button>
+            <button
+              className={'w-check' + (!wholeControl ? ' on radio' : ' radio')}
+              onClick={() => setWholeControl(false)}
+            >
+              <span className="bx" /> <span>Specific objectives</span>
+            </button>
+            {!wholeControl && (
+              <div className="col" style={{ gap: 4, marginTop: 8 }}>
+                {objectives.length === 0 ? (
+                  <span className="faint">This control has no listed objectives — request the whole control.</span>
+                ) : (
+                  objectives.map((o) => (
+                    <button
+                      key={o.objectiveId}
+                      className={'w-check' + (objectiveIds.includes(o.objectiveId) ? ' on' : '')}
+                      onClick={() => toggleObjective(o.objectiveId)}
+                      style={{ textAlign: 'left' }}
+                    >
+                      <span className="bx" />{' '}
+                      <span>
+                        <span className="mono">{o.objectiveId}</span> {o.objectiveText}
+                      </span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          <Field
+            label="WHAT'S NEEDED"
+            area
+            value={description}
+            onChange={setDescription}
+            placeholder="Describe the artifact you need from the client…"
+          />
+          <div className="grid-2">
+            <Field label="ASSIGNEE" value={owner} onChange={setOwner} placeholder="e.g. IT Lead" />
+            <div className="w-field">
+              <span className="w-label">DUE DATE</span>
+              <input
+                className="w-input"
+                type="date"
+                aria-label="Due date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+              />
+            </div>
+          </div>
+
+          <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
+            <Btn ghost onClick={onClose}>
+              Cancel
+            </Btn>
+            <Btn
+              primary
+              disabled={!canSubmit}
+              onClick={() =>
+                onSubmit({
+                  controlId,
+                  title: title.trim(),
+                  objectiveIds: wholeControl ? [] : objectiveIds,
+                  description: description.trim() || undefined,
+                  owner: owner.trim() || undefined,
+                  dueDate: dueDate || undefined,
+                })
+              }
+            >
+              Request Evidence
+            </Btn>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

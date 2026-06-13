@@ -26,7 +26,6 @@ import { useReference } from '../data/referenceStore';
 import { INTAKE_SUMMARY_FIELDS, PATH_RECOMMENDATION } from '../data/intake';
 import { ASSET_CATEGORIES } from '../data/scope';
 import { POAM_ITEMS } from '../data/poam';
-import { EVIDENCE_ITEMS } from '../data/evidence';
 import { TASKS } from '../data/tasks';
 import {
   estimateSprs,
@@ -49,7 +48,7 @@ import {
 
 /* ---------- 5. CLIENT DASHBOARD ---------- */
 export function ClientDashboardScreen({ go }: ScreenProps) {
-  const { assessments } = useData();
+  const { assessments, evidence } = useData();
   // Control definitions for scoring come from the reference-data provider.
   const { controlsById } = useReference();
 
@@ -63,7 +62,7 @@ export function ClientDashboardScreen({ go }: ScreenProps) {
 
   const openPoam = openPoamItems(POAM_ITEMS);
   const blockers = blockerItems(POAM_ITEMS);
-  const missingEvidence = missingEvidenceCount(EVIDENCE_ITEMS);
+  const missingEvidence = missingEvidenceCount(evidence);
   const topBlockers = selTopBlockers(POAM_ITEMS);
   const nextActions = selNextActions(TASKS);
 

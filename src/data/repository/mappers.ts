@@ -20,6 +20,11 @@ import type {
   ClientStatus,
   CmmcPathValue,
   DibRole,
+  EvidenceItem,
+  EvidencePatch,
+  EvidenceQuality,
+  EvidenceRequestInput,
+  EvidenceStatus,
   RiskLevel,
 } from '../types';
 import { DEFAULT_INTAKE, type ChoiceOption, type IntakeState } from '../intake';
@@ -39,6 +44,8 @@ export type ScopeRow = Tables['scope_records']['Row'];
 export type ScopeAssetRow = Tables['scope_assets']['Row'];
 export type ClientRow = Tables['clients']['Row'];
 export type ClientUpdatePayload = Tables['clients']['Update'];
+export type EvidenceRow = Tables['evidence_items']['Row'];
+export type EvidenceUpdatePayload = Tables['evidence_items']['Update'];
 
 /* ---- clients (Task 07) ---- */
 
@@ -343,4 +350,103 @@ export function scopeAssetToRowPayload(asset: ScopeAsset, scopeRecordId: string)
     in_scope: asset.inScope,
     owner_name: asset.owner,
   };
+}
+
+/* ---- evidence (Task 08) ---- */
+
+const EVIDENCE_QUALITIES: EvidenceQuality[] = [
+  'Strong',
+  'Acceptable',
+  'Weak',
+  'Missing',
+  'Not Relevant',
+  'Outdated',
+];
+const EVIDENCE_FRESHNESS: EvidenceItem['freshness'][] = ['Current', 'Expired', 'N/A'];
+const SSP_SUPPORT: NonNullable<EvidenceItem['sspSupported']>[] = ['Yes', 'Partial', 'No'];
+
+/**
+ * Map an evidence_items row to the domain shape. `controlId` is the control's
+ * natural id ('3.1.1'), resolved by the repository from the row's control_id
+ * uuid (null → '' so the item still lists). METADATA + external link only.
+ */
+export function evidenceRowToDomain(row: EvidenceRow, controlId: string): EvidenceItem {
+  return {
+    id: row.id,
+    clientId: row.client_id,
+    title: row.title,
+    controlId,
+    objectiveIds: parseStringArray(row.objective_ids),
+    owner: row.owner_name ?? 'Unassigned',
+    status: row.status,
+    quality: asEnum<EvidenceQuality>(row.quality, EVIDENCE_QUALITIES, 'Missing'),
+    freshness: asEnum<EvidenceItem['freshness']>(row.freshness_status, EVIDENCE_FRESHNESS, 'N/A'),
+    sspSupported:
+      row.supports_ssp !== null && (SSP_SUPPORT as string[]).includes(row.supports_ssp)
+        ? (row.supports_ssp as EvidenceItem['sspSupported'])
+        : undefined,
+    method: row.evidence_type ?? undefined,
+    notes: row.notes ?? undefined,
+    externalLink: row.external_link ?? undefined,
+    storageLocationNote: row.storage_location_note ?? undefined,
+    description: row.description ?? undefined,
+    dueDate: row.due_date ?? undefined,
+    expiresOn: row.expires_on ?? undefined,
+  };
+}
+
+/** Columns written when creating a requested evidence item (ids added by caller). */
+export interface EvidenceCreatePayload {
+  client_id: string;
+  control_id: string | null;
+  title: string;
+  status: EvidenceStatus;
+  objective_ids: Json;
+  owner_name: string | null;
+  description: string | null;
+  due_date: string | null;
+}
+
+export function evidenceCreateToRowPayload(
+  input: EvidenceRequestInput,
+  ids: { clientUuid: string; controlUuid: string | null },
+): EvidenceCreatePayload {
+  return {
+    client_id: ids.clientUuid,
+    control_id: ids.controlUuid,
+    title: input.title.trim(),
+    status: 'Requested',
+    objective_ids: input.objectiveIds ?? [],
+    owner_name: input.owner?.trim() || null,
+    description: input.description?.trim() || null,
+    due_date: input.dueDate || null,
+  };
+}
+
+/** Map an EvidencePatch onto the DB column names it touches (status excluded). */
+export function evidencePatchToRowPayload(patch: EvidencePatch): EvidenceUpdatePayload {
+  const out: Record<string, Json> = {};
+  if (patch.title !== undefined) out.title = patch.title.trim();
+  if (patch.owner !== undefined) out.owner_name = patch.owner || null;
+  if (patch.externalLink !== undefined) out.external_link = patch.externalLink?.trim() || null;
+  if (patch.storageLocationNote !== undefined) out.storage_location_note = patch.storageLocationNote || null;
+  if (patch.quality !== undefined) out.quality = patch.quality;
+  if (patch.notes !== undefined) out.notes = patch.notes || null;
+  if (patch.objectiveIds !== undefined) out.objective_ids = patch.objectiveIds;
+  if (patch.description !== undefined) out.description = patch.description || null;
+  if (patch.dueDate !== undefined) out.due_date = patch.dueDate || null;
+  if (patch.expiresOn !== undefined) out.expires_on = patch.expiresOn || null;
+  if (patch.sspSupported !== undefined) out.supports_ssp = patch.sspSupported ?? null;
+  if (patch.method !== undefined) out.evidence_type = patch.method || null;
+  return out as unknown as EvidenceUpdatePayload;
+}
+
+/** Build the status-transition update payload (status + optional note). */
+export function evidenceTransitionToRowPayload(
+  toStatus: EvidenceStatus,
+  note?: string,
+): EvidenceUpdatePayload {
+  const out: Record<string, Json> = { status: toStatus };
+  if (note !== undefined) out.notes = note || null;
+  return out as unknown as EvidenceUpdatePayload;
 }

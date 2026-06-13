@@ -13,7 +13,13 @@ import type {
   TaskItem,
 } from '../data/types';
 import {
+  acceptedEvidence,
   blockerItems,
+  controlEvidenceCoverage,
+  controlIdsWithoutAcceptedEvidence,
+  evidenceCountsByStatus,
+  evidenceForControl,
+  evidenceObjectiveSummary,
   missingEvidenceCount,
   nextActions,
   openPoamItems,
@@ -159,6 +165,89 @@ describe('evidence + task counts', () => {
     expect(priorityRank('High')).toBeGreaterThan(priorityRank('Medium'));
     expect(priorityRank('Medium')).toBeGreaterThan(priorityRank('Low'));
     expect(priorityRank('Unknown')).toBe(0);
+  });
+});
+
+describe('evidence coverage selectors — single source of truth (Task 08)', () => {
+  // 3.1.1 has multiple official 800-171A objectives; use its real ids.
+  const control = CONTROLS_BY_ID['3.1.1'];
+  const objIds = control.assessmentObjectives.map((o) => o.objectiveId);
+  const now = new Date('2026-06-13T12:00:00Z');
+
+  it('acceptedEvidence keeps only items whose EFFECTIVE status is Accepted', () => {
+    const items = [
+      evidence({ status: 'Accepted', expiresOn: '2027-01-01' }), // current accepted
+      evidence({ status: 'Accepted', expiresOn: '2020-01-01' }), // expired → excluded
+      evidence({ status: 'In Review' }),
+    ];
+    expect(acceptedEvidence(items, now)).toHaveLength(1);
+  });
+
+  it('controlEvidenceCoverage counts only objectives covered by ACCEPTED evidence', () => {
+    const items = [
+      // accepted, covers the first objective
+      evidence({ controlId: '3.1.1', status: 'Accepted', objectiveIds: [objIds[0]] }),
+      // in review (not accepted) covering the rest → must NOT count
+      evidence({ controlId: '3.1.1', status: 'In Review', objectiveIds: objIds.slice(1) }),
+    ];
+    const cov = controlEvidenceCoverage(control, items, now);
+    expect(cov.total).toBe(objIds.length);
+    expect(cov.coveredIds).toEqual([objIds[0]]);
+    expect(cov.status).toBe(objIds.length === 1 ? 'addressed' : 'partial');
+  });
+
+  it('controlEvidenceCoverage reports addressed when accepted evidence covers all objectives', () => {
+    const items = [evidence({ controlId: '3.1.1', status: 'Accepted', objectiveIds: objIds })];
+    const cov = controlEvidenceCoverage(control, items, now);
+    expect(cov.status).toBe('addressed');
+    expect(cov.uncoveredIds).toEqual([]);
+  });
+
+  it('evidenceCountsByStatus groups by EFFECTIVE status (expired Accepted counts as Expired)', () => {
+    const items = [
+      evidence({ status: 'Accepted', expiresOn: '2027-01-01' }),
+      evidence({ status: 'Accepted', expiresOn: '2020-01-01' }), // → Expired
+      evidence({ status: 'Requested' }),
+      evidence({ status: 'Requested' }),
+    ];
+    const counts = evidenceCountsByStatus(items, now);
+    expect(counts.Accepted).toBe(1);
+    expect(counts.Expired).toBe(1);
+    expect(counts.Requested).toBe(2);
+    expect(counts['In Review']).toBe(0);
+  });
+
+  it('controlIdsWithoutAcceptedEvidence flags controls in the list with no accepted evidence', () => {
+    const items = [
+      evidence({ controlId: '3.1.1', status: 'Accepted', objectiveIds: objIds }),
+      evidence({ controlId: '3.5.3', status: 'In Review' }),
+      evidence({ controlId: '3.3.1', status: 'Requested' }),
+    ];
+    const gaps = controlIdsWithoutAcceptedEvidence(items, now);
+    expect(gaps.has('3.1.1')).toBe(false); // has accepted evidence
+    expect(gaps.has('3.5.3')).toBe(true);
+    expect(gaps.has('3.3.1')).toBe(true);
+  });
+
+  it('evidenceForControl filters by controlId', () => {
+    const items = [
+      evidence({ controlId: '3.1.1' }),
+      evidence({ controlId: '3.1.1' }),
+      evidence({ controlId: '3.5.3' }),
+    ];
+    expect(evidenceForControl(items, '3.1.1')).toHaveLength(2);
+    expect(evidenceForControl(items, '3.5.3')).toHaveLength(1);
+  });
+
+  it('evidenceObjectiveSummary aggregates coverage from accepted evidence only', () => {
+    const items = [
+      evidence({ controlId: '3.1.1', status: 'Accepted', objectiveIds: objIds }),
+      evidence({ controlId: '3.5.3', status: 'In Review', objectiveIds: ['3.5.3[a]'] }),
+    ];
+    const summary = evidenceObjectiveSummary([control, CONTROLS_BY_ID['3.5.3']], items, 5, now);
+    // 3.1.1 fully covered by accepted evidence; 3.5.3 has only In Review → not covered.
+    expect(summary.controlsFullyCovered).toBe(1);
+    expect(summary.coveredObjectives).toBe(objIds.length);
   });
 });
 

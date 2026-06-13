@@ -229,6 +229,11 @@ export interface Database {
         related_poam_id: string | null;
         related_task_id: string | null;
         notes: string | null;
+        /** Added by 007_evidence_workflow.sql. */
+        objective_ids: Json;
+        description: string | null;
+        due_date: string | null;
+        expires_on: string | null;
         created_at: string;
         updated_at: string;
         deleted_at: string | null;

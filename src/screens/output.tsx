@@ -28,7 +28,6 @@ import {
 import { auditDiffLines, humanizeAuditAction, type AuditLogEntry } from '../lib/auditLog';
 import { KNOWLEDGE } from '../data/knowledge';
 import { POAM_ITEMS } from '../data/poam';
-import { EVIDENCE_ITEMS } from '../data/evidence';
 import { TASKS } from '../data/tasks';
 import { useData } from '../data/store';
 import { EXPECTED_CONTROL_COUNT } from '../data/controls';
@@ -40,8 +39,13 @@ import {
   scoringFinalized,
   topDeductionDrivers,
 } from '../lib/scoring';
-import { blockerItems, missingEvidenceCount, openTaskCount, topFindings } from '../lib/selectors';
-import { objectiveCoverageSummary } from '../lib/objectives';
+import {
+  blockerItems,
+  evidenceObjectiveSummary,
+  missingEvidenceCount,
+  openTaskCount,
+  topFindings,
+} from '../lib/selectors';
 import { SourceRefs } from '../components/SourceRefs';
 import { ScoringWarning } from '../components/ScoringWarning';
 
@@ -109,15 +113,15 @@ export function ReportsScreen({ go }: ScreenProps) {
 
 /* ---------- 17. REPORT PREVIEW ---------- */
 export function ReportPreviewScreen({ go }: ScreenProps) {
-  const { assessments } = useData();
+  const { assessments, evidence } = useData();
   const { controlsById, controls } = useReference();
   const currentClient = useCurrentClient();
   const readiness = readinessPct(assessments);
   const sprs = estimateSprs(assessments, controlsById);
   const drivers = topDeductionDrivers(assessments, controlsById, 5);
-  const objCoverage = objectiveCoverageSummary(controls, EVIDENCE_ITEMS, 5);
+  const objCoverage = evidenceObjectiveSummary(controls, evidence, 5);
   const risk = readiness >= 80 ? 'Low' : readiness >= 60 ? 'Medium' : 'High';
-  const findings = topFindings(assessments, POAM_ITEMS, EVIDENCE_ITEMS, controlsById, 5);
+  const findings = topFindings(assessments, POAM_ITEMS, evidence, controlsById, 5);
   return (
     <div className="col">
       <PageHead
@@ -542,14 +546,14 @@ export function SettingsScreen(_: ScreenProps) {
 
 /* ---------- 21. MOBILE DIRECTION ---------- */
 export function MobileScreen(_: ScreenProps) {
-  const { assessments, currentClientId } = useData();
+  const { assessments, currentClientId, evidence } = useData();
   const { clients } = useClients();
   const { controlsById } = useReference();
   const clientName = clients.find((c) => c.id === currentClientId)?.name ?? 'Client';
   const readiness = readinessPct(assessments);
   const sprs = estimateSprs(assessments, controlsById);
   const blockers = blockerItems(POAM_ITEMS).length;
-  const missingEvidence = missingEvidenceCount(EVIDENCE_ITEMS);
+  const missingEvidence = missingEvidenceCount(evidence);
   const openTasks = openTaskCount(TASKS);
   const mobileSupports: [string, Tone][] = [
     ['Dashboard viewing', 'ok'],

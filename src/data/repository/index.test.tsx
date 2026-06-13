@@ -23,8 +23,8 @@ vi.mock('../../auth/AuthProvider', () => ({
 }));
 
 const { useRepository } = await import('./index');
-const { localRepository } = await import('./localRepository');
-const { supabaseRepository } = await import('./supabaseRepository');
+const { localRepository, localEvidenceRepository } = await import('./localRepository');
+const { supabaseRepository, supabaseEvidenceRepository } = await import('./supabaseRepository');
 
 function select(configured: boolean, session: unknown) {
   cfg.configured = configured;
@@ -44,12 +44,14 @@ describe('useRepository selection', () => {
     const sel = select(true, A_SESSION);
     expect(sel.mode).toBe('supabase');
     expect(sel.repository).toBe(supabaseRepository);
+    expect(sel.evidence).toBe(supabaseEvidenceRepository);
   });
 
   it('falls back to local when configured but not authenticated', () => {
     const sel = select(true, null);
     expect(sel.mode).toBe('local');
     expect(sel.repository).toBe(localRepository);
+    expect(sel.evidence).toBe(localEvidenceRepository);
   });
 
   it('falls back to local when authenticated but not configured', () => {

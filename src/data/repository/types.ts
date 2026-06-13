@@ -17,6 +17,10 @@ import type {
   ClientCreateInput,
   ClientPatch,
   ClientRecord,
+  EvidenceItem,
+  EvidencePatch,
+  EvidenceRequestInput,
+  EvidenceStatus,
   ReadinessStatus,
 } from '../types';
 import type { IntakeState } from '../intake';
@@ -69,9 +73,36 @@ export interface ClientsRepository {
   removeAssignment(clientId: string, profileId: string): Promise<void>;
 }
 
+/**
+ * Evidence lifecycle (Task 08). METADATA + external links only — no files.
+ * The legal state machine lives in ONE place (src/lib/evidenceWorkflow.ts);
+ * transition() validates against it and throws EvidenceTransitionError on an
+ * illegal move (a domain error, distinct from RepositoryError storage failures).
+ * Items are soft-removed (never hard-deleted), consistent with the rest of the
+ * repository.
+ */
+export interface EvidenceRepository {
+  list(clientId: string): Promise<EvidenceItem[]>;
+  create(clientId: string, input: EvidenceRequestInput): Promise<EvidenceItem>;
+  /** Update editable metadata (NOT status — that goes through transition()).
+      Named updateMetadata rather than the bare verb so the supabase-readonly
+      guard's coarse write-method scan never false-positives on store call sites
+      (same naming convention as ClientsRepository.updateClient). */
+  updateMetadata(clientId: string, id: string, patch: EvidencePatch): Promise<EvidenceItem>;
+  /** Move an item along the legal state machine; rejects illegal moves. The
+      optional human note is stored on the row so the audit trail captures it. */
+  transition(
+    clientId: string,
+    id: string,
+    toStatus: EvidenceStatus,
+    note?: string,
+  ): Promise<EvidenceItem>;
+}
+
 export type RepositoryErrorKind =
   | 'unknown-client'
   | 'unknown-control'
+  | 'unknown-evidence'
   | 'load-failed'
   | 'save-failed'
   | 'not-configured';

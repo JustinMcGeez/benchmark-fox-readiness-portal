@@ -24,10 +24,15 @@ import type {
   ClientCreateInput,
   ClientPatch,
   ClientRecord,
+  EvidenceItem,
+  EvidencePatch,
+  EvidenceRequestInput,
+  EvidenceStatus,
 } from '../types';
 import { SEED_ASSESSMENTS } from '../controls';
 import { DEFAULT_INTAKE, type IntakeState } from '../intake';
 import { DEFAULT_SCOPE, type ScopeState } from '../scope';
+import { assertTransition } from '../../lib/evidenceWorkflow';
 import {
   auditRowToEntry,
   type AuditEventRow,
@@ -40,6 +45,10 @@ import {
   clientCreateToRowPayload,
   clientPatchToRowPayload,
   clientRowToDomain,
+  evidenceCreateToRowPayload,
+  evidencePatchToRowPayload,
+  evidenceRowToDomain,
+  evidenceTransitionToRowPayload,
   intakeRowToDomain,
   intakeToRowPayload,
   scopeAssetRowToDomain,
@@ -54,12 +63,14 @@ import {
   type ClientAssessmentStatus,
   type ClientDataRepository,
   type ClientsRepository,
+  type EvidenceRepository,
 } from './types';
 
 const ASSESSMENTS = 'client_control_assessments';
 const INTAKE = 'intake_records';
 const SCOPE = 'scope_records';
 const SCOPE_ASSETS = 'scope_assets';
+const EVIDENCE = 'evidence_items';
 const AUDIT = 'audit_events';
 const CLIENTS = 'clients';
 const CLIENT_ASSIGNMENTS = 'client_assignments';
@@ -478,6 +489,120 @@ export const supabaseRepository: ClientDataRepository = {
   saveIntake,
   getScope,
   saveScope,
+};
+
+/* ============================================================
+   EVIDENCE (Task 08) — METADATA + external links only. The legal state
+   machine lives in src/lib/evidenceWorkflow.ts; transition() validates against
+   it (throwing EvidenceTransitionError on an illegal move) BEFORE writing, and
+   migration 007's DB guard backstops the role boundary (uploaders cannot make
+   review transitions). Status changes are captured by the 005 audit trigger
+   (evidence.status_changed) — the human note is stored on the row so the trail
+   captures it. Items are soft-removed elsewhere; this never hard-deletes.
+   ============================================================ */
+
+async function listEvidence(clientId: string): Promise<EvidenceItem[]> {
+  return guard('load-failed', 'Could not load evidence from the cloud workspace.', async () => {
+    const clientUuid = resolveClientUuid(clientId);
+    const maps = await getControlIdMaps();
+    const { data, error } = await getSupabase()
+      .from(EVIDENCE)
+      .select('*')
+      .eq('client_id', clientUuid)
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true });
+    if (error) throw new RepositoryError('load-failed', 'Could not load evidence.', { cause: error });
+    return (data ?? []).map((row) =>
+      evidenceRowToDomain(row, row.control_id ? maps.byUuid.get(row.control_id) ?? '' : ''),
+    );
+  });
+}
+
+async function createEvidence(clientId: string, input: EvidenceRequestInput): Promise<EvidenceItem> {
+  return guard('save-failed', 'Could not request the evidence item.', async () => {
+    const clientUuid = resolveClientUuid(clientId);
+    const maps = await getControlIdMaps();
+    const controlUuid = input.controlId ? controlUuidOrThrow(maps, input.controlId) : null;
+    const { data, error } = await getSupabase()
+      .from(EVIDENCE)
+      .insert(evidenceCreateToRowPayload(input, { clientUuid, controlUuid }))
+      .select('*')
+      .single();
+    if (error || !data) {
+      throw new RepositoryError('save-failed', 'Could not request the evidence item.', { cause: error });
+    }
+    return evidenceRowToDomain(data, data.control_id ? maps.byUuid.get(data.control_id) ?? '' : '');
+  });
+}
+
+async function updateEvidence(
+  clientId: string,
+  id: string,
+  patch: EvidencePatch,
+): Promise<EvidenceItem> {
+  return guard('save-failed', 'Could not save your evidence changes.', async () => {
+    const clientUuid = resolveClientUuid(clientId);
+    const maps = await getControlIdMaps();
+    const { data, error } = await getSupabase()
+      .from(EVIDENCE)
+      .update(evidencePatchToRowPayload(patch))
+      .eq('id', id)
+      .eq('client_id', clientUuid)
+      .select('*')
+      .single();
+    if (error || !data) {
+      throw new RepositoryError('save-failed', 'Could not save your evidence changes.', { cause: error });
+    }
+    return evidenceRowToDomain(data, data.control_id ? maps.byUuid.get(data.control_id) ?? '' : '');
+  });
+}
+
+async function transitionEvidence(
+  clientId: string,
+  id: string,
+  toStatus: EvidenceStatus,
+  note?: string,
+): Promise<EvidenceItem> {
+  return guard('save-failed', 'Could not update the evidence status.', async () => {
+    const clientUuid = resolveClientUuid(clientId);
+    const maps = await getControlIdMaps();
+    const sb = getSupabase();
+
+    const { data: existing, error: readError } = await sb
+      .from(EVIDENCE)
+      .select('status')
+      .eq('id', id)
+      .eq('client_id', clientUuid)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (readError) {
+      throw new RepositoryError('save-failed', 'Could not update the evidence status.', { cause: readError });
+    }
+    if (!existing) throw new RepositoryError('unknown-evidence', 'That evidence item no longer exists.');
+
+    // Validate against the single source of truth BEFORE any write (throws
+    // EvidenceTransitionError on an illegal move). The DB guard backstops roles.
+    assertTransition(existing.status, toStatus);
+
+    const { data, error } = await sb
+      .from(EVIDENCE)
+      .update(evidenceTransitionToRowPayload(toStatus, note))
+      .eq('id', id)
+      .eq('client_id', clientUuid)
+      .select('*')
+      .single();
+    if (error || !data) {
+      throw new RepositoryError('save-failed', 'Could not update the evidence status.', { cause: error });
+    }
+    return evidenceRowToDomain(data, data.control_id ? maps.byUuid.get(data.control_id) ?? '' : '');
+  });
+}
+
+export const supabaseEvidenceRepository: EvidenceRepository = {
+  list: listEvidence,
+  create: createEvidence,
+  updateMetadata: updateEvidence,
+  transition: transitionEvidence,
 };
 
 /* ============================================================

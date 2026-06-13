@@ -14,6 +14,10 @@ import type {
   ClientCreateInput,
   ClientPatch,
   ClientRecord,
+  EvidenceItem,
+  EvidencePatch,
+  EvidenceRequestInput,
+  EvidenceStatus,
 } from '../types';
 import { SEED_ASSESSMENTS } from '../controls';
 import {
@@ -21,10 +25,19 @@ import {
   SEED_ASSIGNABLE_CONSULTANTS,
   SEED_CLIENT_RECORDS,
 } from '../clients';
+import { EVIDENCE_ITEMS } from '../evidence';
 import { DEFAULT_INTAKE, type IntakeState } from '../intake';
 import { DEFAULT_SCOPE, type ScopeState } from '../scope';
+import { assertTransition } from '../../lib/evidenceWorkflow';
 import { cmmcLevelForPath } from './mappers';
-import { RepositoryError, type AssessmentPatch, type ClientAssessmentStatus, type ClientDataRepository, type ClientsRepository } from './types';
+import {
+  RepositoryError,
+  type AssessmentPatch,
+  type ClientAssessmentStatus,
+  type ClientDataRepository,
+  type ClientsRepository,
+  type EvidenceRepository,
+} from './types';
 
 export const LS_ASSESS = 'bf_assessments_v1';
 export const LS_INTAKE = 'bf_intake_v1';
@@ -32,6 +45,7 @@ export const LS_SCOPE = 'bf_scope_v1';
 export const LS_MIGRATED = 'bf_migrated_v1';
 export const LS_CLIENTS = 'bf_clients_v1';
 export const LS_ASSIGNMENTS = 'bf_client_assignments_v1';
+export const LS_EVIDENCE = 'bf_evidence_v1';
 
 export function loadJson<T>(key: string, fallback: T): T {
   try {
@@ -340,5 +354,92 @@ export const localClientsRepository: ClientsRepository = {
     const next = (map[clientId] ?? []).filter((a) => a.profileId !== profileId);
     saveJson(LS_ASSIGNMENTS, { ...map, [clientId]: next });
     return Promise.resolve();
+  },
+};
+
+/* ============================================================
+   Local evidence (Task 08) — bf_evidence_v1, a { clientId: EvidenceItem[] }
+   map. The demo client (Acme) seeds from EVIDENCE_ITEMS; every other client
+   starts with NO evidence (a fresh engagement). Items are soft-removed in
+   Supabase mode — local mode simply replaces the client's array.
+   ============================================================ */
+
+type EvidenceMap = Record<string, EvidenceItem[]>;
+
+/** The base evidence set for a client before any local edits. */
+function baseEvidenceFor(clientId: string): EvidenceItem[] {
+  if (clientId === DEMO_CLIENT_ID) return EVIDENCE_ITEMS.map((e) => ({ ...e }));
+  return [];
+}
+
+function loadEvidenceMap(): EvidenceMap {
+  try {
+    const raw = localStorage.getItem(LS_EVIDENCE);
+    return raw ? (JSON.parse(raw) as EvidenceMap) : {};
+  } catch {
+    return {};
+  }
+}
+
+/** Synchronous read for the store's local engine: stored edits or the seed. */
+export function readLocalEvidence(clientId: string): EvidenceItem[] {
+  const map = loadEvidenceMap();
+  return map[clientId] ?? baseEvidenceFor(clientId);
+}
+
+function saveLocalEvidence(clientId: string, items: EvidenceItem[]) {
+  saveJson(LS_EVIDENCE, { ...loadEvidenceMap(), [clientId]: items });
+}
+
+function findEvidenceOrThrow(items: EvidenceItem[], id: string): EvidenceItem {
+  const item = items.find((e) => e.id === id);
+  if (!item) throw new RepositoryError('unknown-evidence', 'That evidence item no longer exists.');
+  return item;
+}
+
+export const localEvidenceRepository: EvidenceRepository = {
+  // async methods so a thrown validation error becomes a REJECTED promise
+  // (honoring the Promise-returning contract — never a synchronous throw).
+  async list(clientId: string) {
+    return readLocalEvidence(clientId);
+  },
+
+  async create(clientId: string, input: EvidenceRequestInput) {
+    const items = readLocalEvidence(clientId);
+    const item: EvidenceItem = {
+      id: crypto.randomUUID(),
+      clientId,
+      title: input.title.trim(),
+      controlId: input.controlId,
+      objectiveIds: input.objectiveIds ?? [],
+      owner: input.owner?.trim() || 'Unassigned',
+      status: 'Requested',
+      quality: 'Missing',
+      freshness: 'N/A',
+      description: input.description?.trim() || undefined,
+      dueDate: input.dueDate || undefined,
+    };
+    saveLocalEvidence(clientId, [...items, item]);
+    return item;
+  },
+
+  async updateMetadata(clientId: string, id: string, patch: EvidencePatch) {
+    const items = readLocalEvidence(clientId);
+    findEvidenceOrThrow(items, id);
+    const next = items.map((e) => (e.id === id ? { ...e, ...patch } : e));
+    saveLocalEvidence(clientId, next);
+    return next.find((e) => e.id === id)!;
+  },
+
+  async transition(clientId: string, id: string, toStatus: EvidenceStatus, note?: string) {
+    const items = readLocalEvidence(clientId);
+    const current = findEvidenceOrThrow(items, id);
+    // Validate against the single source of truth — rejects on an illegal move.
+    assertTransition(current.status, toStatus);
+    const next = items.map((e) =>
+      e.id === id ? { ...e, status: toStatus, notes: note ?? e.notes } : e,
+    );
+    saveLocalEvidence(clientId, next);
+    return next.find((e) => e.id === id)!;
   },
 };
