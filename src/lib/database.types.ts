@@ -42,6 +42,7 @@ export type AppRoleEnum =
   | 'evidence_uploader'
   | 'readonly_viewer';
 export type ReadinessStatusEnum = 'Met' | 'Partial' | 'Not Met' | 'Not Reviewed' | 'Not Applicable';
+export type SspStatusEnum = 'Complete' | 'Needs Fix' | 'Missing' | 'Mismatch' | 'Not Reviewed';
 export type EvidenceStatusEnum =
   | 'Not Requested'
   | 'Requested'
@@ -113,7 +114,7 @@ export interface Database {
         control_id: string;
         readiness_status: ReadinessStatusEnum;
         implementation_status: string;
-        ssp_status: string;
+        ssp_status: SspStatusEnum;
         evidence_status: EvidenceStatusEnum;
         poam_status: PoamStatusEnum;
         risk_rating: RiskLevelEnum | null;
@@ -123,10 +124,71 @@ export interface Database {
         consultant_notes: string | null;
         client_notes: string | null;
         validation_method: string | null;
+        /** Added by 003_assessment_ssp_statement.sql. */
+        ssp_statement: string | null;
         last_reviewed_at: string | null;
         reviewed_by: string | null;
         created_at: string;
         updated_at: string;
+      }>;
+      controls: TableShape<{
+        id: string;
+        natural_id: string;
+        code: string;
+        family_id: string;
+        level: string;
+        title: string;
+        summary: string;
+        requirement: string;
+        explanation: string | null;
+        score_value: number | null;
+        score_source: string;
+        ssp_guidance: string | null;
+        poam_guidance: string | null;
+        created_at: string;
+        updated_at: string;
+      }>;
+      intake_records: TableShape<{
+        id: string;
+        client_id: string;
+        likely_cmmc_path: string | null;
+        estimated_scope: string | null;
+        likely_data_type: string | null;
+        initial_risk_rating: string | null;
+        recommended_next_step: string | null;
+        proposed_engagement: string | null;
+        contract_clauses: Json;
+        data_handling_types: Json;
+        notes: string | null;
+        created_at: string;
+        updated_at: string;
+        deleted_at: string | null;
+      }>;
+      scope_records: TableShape<{
+        id: string;
+        client_id: string;
+        assessment_boundary: string | null;
+        cui_strategy: string | null;
+        msp_esp_involved: string | null;
+        cloud_services: string | null;
+        scope_notes: string | null;
+        created_at: string;
+        updated_at: string;
+        deleted_at: string | null;
+      }>;
+      scope_assets: TableShape<{
+        id: string;
+        scope_record_id: string;
+        asset_name: string;
+        asset_type: string | null;
+        asset_category: string | null;
+        handles_cui: boolean;
+        in_scope: boolean;
+        owner_name: string | null;
+        notes: string | null;
+        created_at: string;
+        updated_at: string;
+        deleted_at: string | null;
       }>;
       evidence_items: TableShape<{
         id: string;
@@ -168,8 +230,7 @@ export interface Database {
         created_at: string;
       }>;
       // Other tables (organizations, user_roles, client_assignments,
-      // control_families, controls, source_references,
-      // control_source_references, intake_records, scope_records, scope_assets,
+      // control_families, source_references, control_source_references,
       // poam_items, tasks, reports) are defined in the migrations and will appear
       // here once `supabase gen types typescript` is run. Until then the index
       // signature below keeps the build green.
