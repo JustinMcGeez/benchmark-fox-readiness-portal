@@ -12,7 +12,7 @@ import { DataProvider } from './data/store';
 import { SCREEN_ROUTES, screenKeyFromPath, screenPath } from './routes';
 import type { ScreenKey } from './types';
 
-/* expected path for every legacy key (acme = CURRENT_CLIENT_ID) */
+/* expected path for every legacy key (acme = DEMO_CLIENT_ID) */
 const EXPECTED: Record<ScreenKey, string> = {
   login: '/login',
   dashboard: '/dashboard',

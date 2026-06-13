@@ -22,7 +22,7 @@ import { SourceRefs } from '../components/SourceRefs';
 import { ScoringWarning } from '../components/ScoringWarning';
 import { useData } from '../data/store';
 import { useReference } from '../data/referenceStore';
-import { CURRENT_CLIENT } from '../data/clients';
+import { useCurrentClient } from '../data/clientsStore';
 import { CONTROLS_BY_ID, EXPECTED_CONTROL_COUNT } from '../data/controls';
 import { evidenceForControl } from '../data/evidence';
 import { poamForControl } from '../data/poam';
@@ -149,6 +149,7 @@ const ALL = 'All';
 
 export function ControlMatrixScreen({ go }: ScreenProps) {
   const { assessments, updateAssessment, selectControl } = useData();
+  const currentClient = useCurrentClient();
   // Control definitions from the reference-data provider (Supabase or local).
   const { controls, controlsById, controlFamilies } = useReference();
   const [q, setQ] = useState('');
@@ -182,7 +183,7 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
   return (
     <div className="col">
       <PageHead
-        title={`Controls — ${CURRENT_CLIENT.name}`}
+        title={`Controls — ${currentClient?.name ?? 'Client'}`}
         sub="Track readiness, SSP, evidence, POA&M, score impact, and ownership."
       />
       {!libraryComplete && (

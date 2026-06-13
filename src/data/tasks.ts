@@ -1,11 +1,11 @@
 /* Seed data — remediation tasks for the active client. */
 import type { TaskItem } from './types';
-import { CURRENT_CLIENT_ID } from './clients';
+import { DEMO_CLIENT_ID } from './clients';
 
 export const TASKS: TaskItem[] = [
   {
     id: 'tk-1',
-    clientId: CURRENT_CLIENT_ID,
+    clientId: DEMO_CLIENT_ID,
     title: 'Upload MFA evidence',
     owner: 'IT Lead',
     priority: 'High',
@@ -15,7 +15,7 @@ export const TASKS: TaskItem[] = [
   },
   {
     id: 'tk-2',
-    clientId: CURRENT_CLIENT_ID,
+    clientId: DEMO_CLIENT_ID,
     title: 'Update SSP for AC controls',
     owner: 'CIO',
     priority: 'High',
@@ -25,7 +25,7 @@ export const TASKS: TaskItem[] = [
   },
   {
     id: 'tk-3',
-    clientId: CURRENT_CLIENT_ID,
+    clientId: DEMO_CLIENT_ID,
     title: 'Provide CUI data flow diagram',
     owner: 'MSP',
     priority: 'Critical',
@@ -38,7 +38,7 @@ export const TASKS: TaskItem[] = [
   },
   {
     id: 'tk-4',
-    clientId: CURRENT_CLIENT_ID,
+    clientId: DEMO_CLIENT_ID,
     title: 'Configure audit log retention',
     owner: 'MSP',
     priority: 'High',
@@ -48,7 +48,7 @@ export const TASKS: TaskItem[] = [
   },
   {
     id: 'tk-5',
-    clientId: CURRENT_CLIENT_ID,
+    clientId: DEMO_CLIENT_ID,
     title: 'Quarterly access review export',
     owner: 'HR / IT',
     priority: 'Medium',

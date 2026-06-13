@@ -22,7 +22,9 @@ import type { AppRoleEnum } from './lib/database.types';
 import { useAuth } from './auth/AuthProvider';
 import { Shell } from './components/Shell';
 import { useData } from './data/store';
-import { clientById, CURRENT_CLIENT_ID } from './data/clients';
+import { useClients } from './data/clientsStore';
+import { DEMO_CLIENT_ID } from './data/clients';
+import { clientIdFromPathname } from './data/clientRoute';
 import {
   LoginScreen,
   DashboardScreen,
@@ -105,7 +107,7 @@ export function screenPath(
   ctx: { clientId?: string; controlId?: string } = {},
 ): string {
   return generatePath(SCREEN_ROUTES[key], {
-    clientId: ctx.clientId ?? CURRENT_CLIENT_ID,
+    clientId: ctx.clientId ?? DEMO_CLIENT_ID,
     controlId: ctx.controlId ?? loadSelectedControlId(),
   });
 }
@@ -118,12 +120,11 @@ export function screenKeyFromPath(pathname: string): ScreenKey | null {
   return null;
 }
 
-/* clientId of the route we're on (only if it names a known client). */
+/* clientId of the route we're on (the demo client when not client-scoped). The
+   live <ClientScope> guard validates the id against the clients list; `go`
+   only needs the segment to keep navigation in the current client's context. */
 function clientIdFromPath(pathname: string): string {
-  const m =
-    matchPath('/clients/:clientId/*', pathname) ?? matchPath('/clients/:clientId', pathname);
-  const id = m?.params.clientId;
-  return id && clientById(id) ? id : CURRENT_CLIENT_ID;
+  return clientIdFromPathname(pathname) ?? DEMO_CLIENT_ID;
 }
 
 /* ------------------------------------------------------------
@@ -284,10 +285,14 @@ function ScreenRoute({ component: C }: { component: ComponentType<ScreenProps> }
   return <C go={go} />;
 }
 
-/* Validates :clientId against the seed clients; unknown ids → /clients. */
+/* Validates :clientId against the live clients list; unknown ids → /clients.
+   While the list loads (Supabase mode), show the pending screen rather than
+   mis-redirecting a valid client. */
 function ClientScope() {
   const { clientId } = useParams();
-  if (!clientId || !clientById(clientId)) return <Navigate to="/clients" replace />;
+  const { clients, loading } = useClients();
+  if (loading) return <AuthPendingScreen />;
+  if (!clientId || !clients.some((c) => c.id === clientId)) return <Navigate to="/clients" replace />;
   return <Outlet />;
 }
 
@@ -348,7 +353,14 @@ export function AppRoutes({ navStyle }: { navStyle: NavStyle }) {
         <Route element={<ShellLayout navStyle={navStyle} />}>
           <Route path="/dashboard" element={<ScreenRoute component={DashboardScreen} />} />
           <Route path="/clients" element={<ScreenRoute component={ClientsScreen} />} />
-          <Route path="/clients/new" element={<ScreenRoute component={CreateClientScreen} />} />
+          <Route
+            path="/clients/new"
+            element={
+              <RequireRole roles={['benchmark_fox_admin']}>
+                <ScreenRoute component={CreateClientScreen} />
+              </RequireRole>
+            }
+          />
           <Route path="/clients/:clientId" element={<ClientScope />}>
             <Route index element={<ScreenRoute component={ClientDashboardScreen} />} />
             <Route path="intake" element={<ScreenRoute component={IntakeScreen} />} />

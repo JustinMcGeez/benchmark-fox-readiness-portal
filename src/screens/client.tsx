@@ -21,7 +21,7 @@ import {
   WarnBanner,
 } from '../components/primitives';
 import { useData } from '../data/store';
-import { CURRENT_CLIENT } from '../data/clients';
+import { useCurrentClient } from '../data/clientsStore';
 import { useReference } from '../data/referenceStore';
 import { INTAKE_SUMMARY_FIELDS, PATH_RECOMMENDATION } from '../data/intake';
 import { ASSET_CATEGORIES } from '../data/scope';
@@ -187,6 +187,7 @@ const INTAKE_STEPS = [
 
 export function IntakeScreen({ go }: ScreenProps) {
   const { intake, updateIntake, toggleContractClause, toggleDataHandling, resetIntake } = useData();
+  const currentClient = useCurrentClient();
   const [step, setStep] = useState(0);
   const last = step === INTAKE_STEPS.length - 1;
   return (
@@ -217,7 +218,7 @@ export function IntakeScreen({ go }: ScreenProps) {
 
         {step === 0 && (
           <div className="grid-2">
-            <Field label="LEGAL COMPANY NAME" value={`${CURRENT_CLIENT.name}, LLC`} />
+            <Field label="LEGAL COMPANY NAME" value={`${currentClient?.name ?? 'Client'}, LLC`} />
             <Select label="BUSINESS TYPE" value="Prime Contractor" />
             <Field label="APPROX. COMPANY SIZE" placeholder="e.g. 120 employees" />
             <Field label="PRIMARY LOCATIONS" placeholder="Huntsville, AL · 2 sites" />

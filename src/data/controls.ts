@@ -29,7 +29,7 @@ import type {
   RiskLevel,
   SspStatus,
 } from './types';
-import { CURRENT_CLIENT_ID } from './clients';
+import { DEMO_CLIENT_ID } from './clients';
 import { CONTROL_FAMILIES } from './controlFamilies';
 import { GENERATED_CONTROLS } from './generated/controls.generated';
 
@@ -2229,7 +2229,7 @@ export const SEED_ASSESSMENTS: ClientControlAssessment[] = CONTROL_LIBRARY.map((
   if (w) {
     const [, status, sspStatus, evidenceStatus, poamStatus, risk, owner] = w;
     return {
-      clientId: CURRENT_CLIENT_ID,
+      clientId: DEMO_CLIENT_ID,
       controlId: c.id,
       status,
       sspStatus,
@@ -2246,7 +2246,7 @@ export const SEED_ASSESSMENTS: ClientControlAssessment[] = CONTROL_LIBRARY.map((
   }
   // default: not yet reviewed
   return {
-    clientId: CURRENT_CLIENT_ID,
+    clientId: DEMO_CLIENT_ID,
     controlId: c.id,
     status: 'Not Reviewed',
     sspStatus: 'Not Reviewed',

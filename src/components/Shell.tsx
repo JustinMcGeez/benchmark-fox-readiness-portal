@@ -24,7 +24,7 @@ import type { Go, NavStyle, ScreenKey } from '../types';
 import { ROLE_LABELS, useAuth } from '../auth/AuthProvider';
 import { Badge, Btn, RiskBadge } from './primitives';
 import { BrandLockup, BrandMark } from './Brand';
-import { CURRENT_CLIENT } from '../data/clients';
+import { useCurrentClient } from '../data/clientsStore';
 
 const PRIMARY_NAV: [ScreenKey, string, LucideIcon][] = [
   ['dashboard', 'Dashboard', LayoutGrid],
@@ -230,6 +230,7 @@ export function Shell({
   children: ReactNode;
 }) {
   const inClient = CLIENT_SCREENS.includes(screen);
+  const currentClient = useCurrentClient();
 
   const primaryActive = (key: ScreenKey) => {
     if (key === 'clients' && inClient) return true;
@@ -444,19 +445,19 @@ export function Shell({
             </a>
             <ChevronRight size={13} strokeWidth={2} className="faint" />
             <span className="w-h2" style={{ fontSize: '1.1rem' }}>
-              {CURRENT_CLIENT.name}
+              {currentClient?.name ?? 'Client'}
             </span>
           </div>
           <div
             className="center mono"
             style={{ gap: 16, fontSize: '.72rem', color: 'var(--ink-faint)', marginTop: 5 }}
           >
-            <span>{CURRENT_CLIENT.cmmcPath.toUpperCase()}</span>
-            {CURRENT_CLIENT.deadline && <span>DEADLINE {CURRENT_CLIENT.deadline.toUpperCase()}</span>}
-            <span>OWNER: {CURRENT_CLIENT.owner.toUpperCase()}</span>
+            <span>{(currentClient?.cmmcPath ?? 'Undetermined').toUpperCase()}</span>
+            {currentClient?.deadline && <span>DEADLINE {currentClient.deadline.toUpperCase()}</span>}
+            <span>OWNER: {(currentClient?.owner ?? 'Unassigned').toUpperCase()}</span>
           </div>
         </div>
-        <RiskBadge level={CURRENT_CLIENT.riskRating} />
+        {currentClient?.riskRating && <RiskBadge level={currentClient.riskRating} />}
       </div>
       <div className="w-tabs">
         {CLIENT_TAB.map(([k, label]) => {

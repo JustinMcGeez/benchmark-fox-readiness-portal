@@ -8,16 +8,30 @@
    (the store tests assert localStorage state on the same tick);
    the async ClientDataRepository wrappers resolve immediately.
    ============================================================ */
-import type { ClientControlAssessment } from '../types';
+import type {
+  ClientAssignment,
+  ClientControlAssessment,
+  ClientCreateInput,
+  ClientPatch,
+  ClientRecord,
+} from '../types';
 import { SEED_ASSESSMENTS } from '../controls';
+import {
+  DEMO_CLIENT_ID,
+  SEED_ASSIGNABLE_CONSULTANTS,
+  SEED_CLIENT_RECORDS,
+} from '../clients';
 import { DEFAULT_INTAKE, type IntakeState } from '../intake';
 import { DEFAULT_SCOPE, type ScopeState } from '../scope';
-import type { AssessmentPatch, ClientDataRepository } from './types';
+import { cmmcLevelForPath } from './mappers';
+import { RepositoryError, type AssessmentPatch, type ClientAssessmentStatus, type ClientDataRepository, type ClientsRepository } from './types';
 
 export const LS_ASSESS = 'bf_assessments_v1';
 export const LS_INTAKE = 'bf_intake_v1';
 export const LS_SCOPE = 'bf_scope_v1';
 export const LS_MIGRATED = 'bf_migrated_v1';
+export const LS_CLIENTS = 'bf_clients_v1';
+export const LS_ASSIGNMENTS = 'bf_client_assignments_v1';
 
 export function loadJson<T>(key: string, fallback: T): T {
   try {
@@ -53,6 +67,37 @@ export function loadOverrides(): Overrides {
 export function mergeAssessments(overrides: Overrides): ClientControlAssessment[] {
   return SEED_ASSESSMENTS.map((a) => {
     const ov = overrides[overrideKey(a.clientId, a.controlId)];
+    return ov ? { ...a, ...ov } : a;
+  });
+}
+
+/**
+ * The base assessment set for a client BEFORE local overrides:
+ *  - the demo client carries the bundled worked seed (Acme).
+ *  - every other client starts as 110 'Not Reviewed' rows (a fresh engagement).
+ * This is what makes Local Prototype mode genuinely multi-client.
+ */
+export function baseAssessmentsFor(clientId: string): ClientControlAssessment[] {
+  if (clientId === DEMO_CLIENT_ID) return SEED_ASSESSMENTS;
+  return SEED_ASSESSMENTS.map((a) => ({
+    clientId,
+    controlId: a.controlId,
+    status: 'Not Reviewed',
+    sspStatus: 'Not Reviewed',
+    evidenceStatus: 'Not Requested',
+    poamStatus: 'None',
+    risk: 'Medium',
+    owner: 'Unassigned',
+  }));
+}
+
+/** Merge the stored overrides for ONE client onto its base assessment set. */
+export function mergeAssessmentsFor(
+  clientId: string,
+  overrides: Overrides,
+): ClientControlAssessment[] {
+  return baseAssessmentsFor(clientId).map((a) => {
+    const ov = overrides[overrideKey(clientId, a.controlId)];
     return ov ? { ...a, ...ov } : a;
   });
 }
@@ -103,8 +148,7 @@ export function readLocalSnapshot(clientId: string): LocalSnapshot {
 
 export const localRepository: ClientDataRepository = {
   getAssessments(clientId: string) {
-    void clientId; // overrides are already keyed per client; seeds carry the demo client
-    return Promise.resolve(mergeAssessments(loadOverrides()));
+    return Promise.resolve(mergeAssessmentsFor(clientId, loadOverrides()));
   },
   patchAssessment(clientId: string, controlId: string, patch: AssessmentPatch) {
     const overrides = loadOverrides();
@@ -124,6 +168,177 @@ export const localRepository: ClientDataRepository = {
   },
   saveScope(_clientId: string, scope: ScopeState) {
     saveJson(LS_SCOPE, scope);
+    return Promise.resolve();
+  },
+};
+
+/* ============================================================
+   Local clients + assignments (Task 07) — bf_clients_v1 /
+   bf_client_assignments_v1. Seeded once from SEED_CLIENT_RECORDS so a
+   fresh browser shows the demo engagements. Engagements are records:
+   archiveClient sets status 'Closed' and NEVER removes a row.
+   ============================================================ */
+
+function loadClientList(): ClientRecord[] {
+  try {
+    const raw = localStorage.getItem(LS_CLIENTS);
+    if (raw) return JSON.parse(raw) as ClientRecord[];
+  } catch {
+    /* fall through to seed */
+  }
+  // First run: persist the seed so subsequent reads + writes are stable.
+  saveJson(LS_CLIENTS, SEED_CLIENT_RECORDS);
+  return SEED_CLIENT_RECORDS.map((c) => ({ ...c }));
+}
+
+function saveClientList(list: ClientRecord[]) {
+  saveJson(LS_CLIENTS, list);
+}
+
+/** Synchronous reads for the clients provider's local engine (no async tick,
+    so the route's <ClientScope> can validate a clientId on first render). */
+export function readLocalClients(): ClientRecord[] {
+  return loadClientList();
+}
+
+export function readLocalAssessmentStatuses(): ClientAssessmentStatus[] {
+  const overrides = loadOverrides();
+  const rows: ClientAssessmentStatus[] = [];
+  for (const client of loadClientList()) {
+    for (const a of mergeAssessmentsFor(client.id, overrides)) {
+      rows.push({ clientId: client.id, controlId: a.controlId, status: a.status });
+    }
+  }
+  return rows;
+}
+
+type AssignmentMap = Record<string, ClientAssignment[]>;
+
+function loadAssignmentMap(): AssignmentMap {
+  try {
+    const raw = localStorage.getItem(LS_ASSIGNMENTS);
+    return raw ? (JSON.parse(raw) as AssignmentMap) : {};
+  } catch {
+    return {};
+  }
+}
+
+function consultantName(profileId: string): string | undefined {
+  return SEED_ASSIGNABLE_CONSULTANTS.find((c) => c.id === profileId)?.name;
+}
+
+export const localClientsRepository: ClientsRepository = {
+  listClients() {
+    return Promise.resolve(loadClientList());
+  },
+
+  getClient(id: string) {
+    return Promise.resolve(loadClientList().find((c) => c.id === id) ?? null);
+  },
+
+  createClient(input: ClientCreateInput) {
+    const list = loadClientList();
+    const owner = input.primaryConsultantId ? consultantName(input.primaryConsultantId) : undefined;
+    const now = new Date().toISOString();
+    const record: ClientRecord = {
+      id: crypto.randomUUID(),
+      name: input.name.trim(),
+      status: 'Active',
+      cmmcPath: input.cmmcPath,
+      cmmcLevel: cmmcLevelForPath(input.cmmcPath),
+      riskRating: null,
+      readinessPhase: 'Intake',
+      cageCode: input.cageCode?.trim() || null,
+      dibRole: input.dibRole ?? null,
+      contractTypes: input.contractTypes ?? [],
+      primaryContactName: input.primaryContactName?.trim() || null,
+      primaryContactEmail: input.primaryContactEmail?.trim() || null,
+      primaryContactTitle: input.primaryContactTitle?.trim() || null,
+      primaryConsultantId: input.primaryConsultantId ?? null,
+      owner: owner ?? null,
+      deadline: null,
+      notes: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    saveClientList([...list, record]);
+    // The 110 assessment rows are VIRTUAL in local mode: baseAssessmentsFor()
+    // returns 110 'Not Reviewed' rows for any non-demo client, so there is no
+    // 110-row write loop — getAssessments(newId) already yields exactly 110.
+    if (input.primaryConsultantId) {
+      void this.assignConsultant(record.id, input.primaryConsultantId, true);
+    }
+    return Promise.resolve(record);
+  },
+
+  updateClient(id: string, patch: ClientPatch) {
+    const list = loadClientList();
+    const idx = list.findIndex((c) => c.id === id);
+    if (idx === -1) {
+      return Promise.reject(new RepositoryError('unknown-client', 'That client does not exist.'));
+    }
+    const owner =
+      patch.primaryConsultantId !== undefined
+        ? (patch.primaryConsultantId ? consultantName(patch.primaryConsultantId) ?? null : null)
+        : list[idx].owner;
+    const next: ClientRecord = {
+      ...list[idx],
+      ...patch,
+      // Keep cmmcLevel consistent with cmmcPath unless the patch set it explicitly.
+      cmmcLevel:
+        patch.cmmcLevel !== undefined
+          ? patch.cmmcLevel
+          : patch.cmmcPath !== undefined
+            ? cmmcLevelForPath(patch.cmmcPath)
+            : list[idx].cmmcLevel,
+      owner,
+      updatedAt: new Date().toISOString(),
+    };
+    const updated = [...list];
+    updated[idx] = next;
+    saveClientList(updated);
+    return Promise.resolve(next);
+  },
+
+  archiveClient(id: string) {
+    return this.updateClient(id, { status: 'Closed' });
+  },
+
+  listAssessmentStatuses() {
+    return Promise.resolve(readLocalAssessmentStatuses());
+  },
+
+  listAssignableConsultants() {
+    return Promise.resolve(SEED_ASSIGNABLE_CONSULTANTS);
+  },
+
+  listAssignments(clientId: string) {
+    return Promise.resolve(loadAssignmentMap()[clientId] ?? []);
+  },
+
+  assignConsultant(clientId: string, profileId: string, isPrimary = false) {
+    const map = loadAssignmentMap();
+    const existing = map[clientId] ?? [];
+    if (!existing.some((a) => a.profileId === profileId)) {
+      existing.push({
+        id: crypto.randomUUID(),
+        clientId,
+        profileId,
+        profileName: consultantName(profileId) ?? null,
+        role: 'benchmark_fox_consultant',
+        isPrimary,
+      });
+      saveJson(LS_ASSIGNMENTS, { ...map, [clientId]: existing });
+    }
+    return Promise.resolve();
+  },
+
+  removeAssignment(clientId: string, profileId: string) {
+    // localStorage edit (not a Supabase hard-delete) — engagements stay records,
+    // but a staff assignment may be revoked.
+    const map = loadAssignmentMap();
+    const next = (map[clientId] ?? []).filter((a) => a.profileId !== profileId);
+    saveJson(LS_ASSIGNMENTS, { ...map, [clientId]: next });
     return Promise.resolve();
   },
 };

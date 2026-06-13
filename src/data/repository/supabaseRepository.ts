@@ -17,7 +17,14 @@
      user-presentable message (no SQL / table names / row data).
    ============================================================ */
 import { getSupabase } from '../../lib/supabaseClient';
-import type { ClientControlAssessment } from '../types';
+import type {
+  AssignableConsultant,
+  ClientAssignment,
+  ClientControlAssessment,
+  ClientCreateInput,
+  ClientPatch,
+  ClientRecord,
+} from '../types';
 import { SEED_ASSESSMENTS } from '../controls';
 import { DEFAULT_INTAKE, type IntakeState } from '../intake';
 import { DEFAULT_SCOPE, type ScopeState } from '../scope';
@@ -30,14 +37,24 @@ import { isUuid, resolveClientUuid } from './clientIds';
 import {
   assessmentRowToDomain,
   assessmentToRowPayload,
+  clientCreateToRowPayload,
+  clientPatchToRowPayload,
+  clientRowToDomain,
   intakeRowToDomain,
   intakeToRowPayload,
   scopeAssetRowToDomain,
   scopeAssetToRowPayload,
   scopeRowToSummary,
   scopeSummaryToRowPayload,
+  type AssessmentRowPayload,
 } from './mappers';
-import { RepositoryError, type AssessmentPatch, type ClientDataRepository } from './types';
+import {
+  RepositoryError,
+  type AssessmentPatch,
+  type ClientAssessmentStatus,
+  type ClientDataRepository,
+  type ClientsRepository,
+} from './types';
 
 const ASSESSMENTS = 'client_control_assessments';
 const INTAKE = 'intake_records';
@@ -45,6 +62,9 @@ const SCOPE = 'scope_records';
 const SCOPE_ASSETS = 'scope_assets';
 const AUDIT = 'audit_events';
 const CLIENTS = 'clients';
+const CLIENT_ASSIGNMENTS = 'client_assignments';
+const ORGANIZATIONS = 'organizations';
+const PROFILES = 'profiles';
 
 const SEED_BY_CONTROL = new Map(SEED_ASSESSMENTS.map((s) => [s.controlId, s]));
 
@@ -458,4 +478,273 @@ export const supabaseRepository: ClientDataRepository = {
   saveIntake,
   getScope,
   saveScope,
+};
+
+/* ============================================================
+   CLIENTS + ASSIGNMENTS (Task 07)
+
+   Engagements are RECORDS: archiveClient flips status to 'Closed' (never a
+   hard delete), assignment removal is a deleted_at soft-delete. createClient
+   inserts the client, optionally assigns a consultant, then seeds the 110
+   control assessment rows in ONE batch insert (never a 110-row loop) and
+   appends a client.created audit event. RLS (004) gates all of this to admins
+   (consultants are read-only on assigned clients; creation is admin-only).
+   ============================================================ */
+
+/** Resolve profile display names for a set of ids (RLS: admins read profiles;
+    others get an empty map — names degrade to null, never an error). */
+async function fetchProfileNames(ids: string[]): Promise<Map<string, string>> {
+  const names = new Map<string, string>();
+  const unique = [...new Set(ids.filter(Boolean))];
+  if (unique.length === 0) return names;
+  const { data, error } = await getSupabase().from(PROFILES).select('id, full_name').in('id', unique);
+  if (error) return names; // best-effort; non-admins can't read profiles under RLS
+  for (const p of (data ?? []) as { id: string; full_name: string }[]) names.set(p.id, p.full_name);
+  return names;
+}
+
+/** Build the 110 'Not Reviewed' seed assessment rows for a new client (pure). */
+export function seedAssessmentRowsForClient(
+  clientUuid: string,
+  maps: { byNatural: Map<string, string> },
+): AssessmentRowPayload[] {
+  return SEED_ASSESSMENTS.map((seed) => {
+    const controlUuid = maps.byNatural.get(seed.controlId);
+    if (!controlUuid) {
+      throw new RepositoryError('unknown-control', 'That control is not in the cloud workspace.');
+    }
+    return assessmentToRowPayload(
+      {
+        clientId: seed.clientId,
+        controlId: seed.controlId,
+        status: 'Not Reviewed',
+        sspStatus: 'Not Reviewed',
+        evidenceStatus: 'Not Requested',
+        poamStatus: 'None',
+        risk: 'Medium',
+        owner: 'Unassigned',
+      },
+      { clientUuid, controlUuid },
+    );
+  });
+}
+
+async function listClients(): Promise<ClientRecord[]> {
+  return guard('load-failed', 'Could not load clients from the cloud workspace.', async () => {
+    const { data, error } = await getSupabase()
+      .from(CLIENTS)
+      .select('*')
+      .is('deleted_at', null)
+      .order('created_at', { ascending: true });
+    if (error) throw new RepositoryError('load-failed', 'Could not load clients.', { cause: error });
+
+    const rows = data ?? [];
+    const names = await fetchProfileNames(
+      rows.map((r) => r.primary_consultant_id).filter((id): id is string => Boolean(id)),
+    );
+    return rows.map((r) =>
+      clientRowToDomain(r, r.primary_consultant_id ? names.get(r.primary_consultant_id) ?? null : null),
+    );
+  });
+}
+
+async function getClient(id: string): Promise<ClientRecord | null> {
+  return guard('load-failed', 'Could not load the client.', async () => {
+    const clientUuid = resolveClientUuid(id);
+    const { data, error } = await getSupabase()
+      .from(CLIENTS)
+      .select('*')
+      .eq('id', clientUuid)
+      .is('deleted_at', null)
+      .maybeSingle();
+    if (error) throw new RepositoryError('load-failed', 'Could not load the client.', { cause: error });
+    if (!data) return null;
+    const names = await fetchProfileNames(data.primary_consultant_id ? [data.primary_consultant_id] : []);
+    return clientRowToDomain(data, data.primary_consultant_id ? names.get(data.primary_consultant_id) ?? null : null);
+  });
+}
+
+async function createClient(input: ClientCreateInput): Promise<ClientRecord> {
+  return guard('save-failed', 'Could not create the client in the cloud workspace.', async () => {
+    const sb = getSupabase();
+
+    // 1. Resolve the owning organization (internal Benchmark Fox org first).
+    const { data: org, error: orgError } = await sb
+      .from(ORGANIZATIONS)
+      .select('id')
+      .order('is_internal', { ascending: false })
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    if (orgError) throw new RepositoryError('save-failed', 'Could not create the client.', { cause: orgError });
+    if (!org) {
+      throw new RepositoryError(
+        'save-failed',
+        'No organization is configured for the workspace yet. Contact an administrator.',
+      );
+    }
+    const organizationId = (org as { id: string }).id;
+
+    // 2. Insert the client row.
+    const { data: inserted, error: insertError } = await sb
+      .from(CLIENTS)
+      .insert({ organization_id: organizationId, ...clientCreateToRowPayload(input) })
+      .select('*')
+      .single();
+    if (insertError || !inserted) {
+      throw new RepositoryError('save-failed', 'Could not create the client.', { cause: insertError });
+    }
+    const clientUuid = inserted.id;
+
+    // 3. Initial consultant assignment (authoritative tenancy mapping).
+    if (input.primaryConsultantId) {
+      const { error: assignError } = await sb.from(CLIENT_ASSIGNMENTS).upsert(
+        {
+          client_id: clientUuid,
+          profile_id: input.primaryConsultantId,
+          role: 'benchmark_fox_consultant',
+          is_primary: true,
+          deleted_at: null,
+        },
+        { onConflict: 'client_id,profile_id' },
+      );
+      if (assignError) {
+        throw new RepositoryError('save-failed', 'Could not assign the consultant.', { cause: assignError });
+      }
+    }
+
+    // 4. Seed the 110 control assessment rows in ONE batch insert.
+    const maps = await getControlIdMaps();
+    const { error: seedError } = await sb
+      .from(ASSESSMENTS)
+      .insert(seedAssessmentRowsForClient(clientUuid, maps));
+    if (seedError) {
+      throw new RepositoryError('save-failed', 'Could not initialize the control set.', { cause: seedError });
+    }
+
+    // 5. Append a client.created audit event (best-effort — the DB stamps the actor).
+    await sb.from(AUDIT).insert({ action: 'client.created', client_id: clientUuid }).then(
+      () => undefined,
+      () => undefined,
+    );
+
+    const names = await fetchProfileNames(input.primaryConsultantId ? [input.primaryConsultantId] : []);
+    return clientRowToDomain(
+      inserted,
+      input.primaryConsultantId ? names.get(input.primaryConsultantId) ?? null : null,
+    );
+  });
+}
+
+async function updateClient(id: string, patch: ClientPatch): Promise<ClientRecord> {
+  return guard('save-failed', 'Could not save the client changes.', async () => {
+    const clientUuid = resolveClientUuid(id);
+    const payload = clientPatchToRowPayload(patch);
+    const { data, error } = await getSupabase()
+      .from(CLIENTS)
+      .update(payload)
+      .eq('id', clientUuid)
+      .select('*')
+      .single();
+    if (error || !data) throw new RepositoryError('save-failed', 'Could not save the client changes.', { cause: error });
+    const names = await fetchProfileNames(data.primary_consultant_id ? [data.primary_consultant_id] : []);
+    return clientRowToDomain(data, data.primary_consultant_id ? names.get(data.primary_consultant_id) ?? null : null);
+  });
+}
+
+/** Archive: status -> 'Closed'. NEVER hard-deletes (engagements are records). */
+async function archiveClient(id: string): Promise<ClientRecord> {
+  return updateClient(id, { status: 'Closed' });
+}
+
+async function listAssessmentStatuses(): Promise<ClientAssessmentStatus[]> {
+  return guard('load-failed', 'Could not load client readiness.', async () => {
+    const maps = await getControlIdMaps();
+    const { data, error } = await getSupabase()
+      .from(ASSESSMENTS)
+      .select('client_id, control_id, readiness_status');
+    if (error) throw new RepositoryError('load-failed', 'Could not load client readiness.', { cause: error });
+    return (data ?? []).map((r) => ({
+      clientId: r.client_id,
+      controlId: maps.byUuid.get(r.control_id) ?? r.control_id,
+      status: r.readiness_status,
+    }));
+  });
+}
+
+async function listAssignableConsultants(): Promise<AssignableConsultant[]> {
+  return guard('load-failed', 'Could not load assignable staff.', async () => {
+    const { data, error } = await getSupabase()
+      .from(PROFILES)
+      .select('id, full_name, email, role')
+      .in('role', ['benchmark_fox_admin', 'benchmark_fox_consultant']);
+    if (error) throw new RepositoryError('load-failed', 'Could not load assignable staff.', { cause: error });
+    return (data ?? []).map((p) => ({ id: p.id, name: p.full_name, email: p.email, role: p.role }));
+  });
+}
+
+async function listAssignments(clientId: string): Promise<ClientAssignment[]> {
+  return guard('load-failed', 'Could not load client assignments.', async () => {
+    const clientUuid = resolveClientUuid(clientId);
+    const { data, error } = await getSupabase()
+      .from(CLIENT_ASSIGNMENTS)
+      .select('id, client_id, profile_id, role, is_primary')
+      .eq('client_id', clientUuid)
+      .is('deleted_at', null);
+    if (error) throw new RepositoryError('load-failed', 'Could not load client assignments.', { cause: error });
+
+    const rows = data ?? [];
+    const names = await fetchProfileNames(rows.map((r) => r.profile_id));
+    return rows.map((r) => ({
+      id: r.id,
+      clientId: r.client_id,
+      profileId: r.profile_id,
+      profileName: names.get(r.profile_id) ?? null,
+      role: r.role,
+      isPrimary: r.is_primary,
+    }));
+  });
+}
+
+async function assignConsultant(clientId: string, profileId: string, isPrimary = false): Promise<void> {
+  return guard('save-failed', 'Could not assign the consultant.', async () => {
+    const clientUuid = resolveClientUuid(clientId);
+    const { error } = await getSupabase().from(CLIENT_ASSIGNMENTS).upsert(
+      {
+        client_id: clientUuid,
+        profile_id: profileId,
+        role: 'benchmark_fox_consultant',
+        is_primary: isPrimary,
+        deleted_at: null,
+      },
+      { onConflict: 'client_id,profile_id' },
+    );
+    if (error) throw new RepositoryError('save-failed', 'Could not assign the consultant.', { cause: error });
+  });
+}
+
+/** Remove an assignment by SOFT-DELETE (deleted_at) — never a hard delete. */
+async function removeAssignment(clientId: string, profileId: string): Promise<void> {
+  return guard('save-failed', 'Could not remove the assignment.', async () => {
+    const clientUuid = resolveClientUuid(clientId);
+    const { error } = await getSupabase()
+      .from(CLIENT_ASSIGNMENTS)
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('client_id', clientUuid)
+      .eq('profile_id', profileId);
+    if (error) throw new RepositoryError('save-failed', 'Could not remove the assignment.', { cause: error });
+  });
+}
+
+export const supabaseClientsRepository: ClientsRepository = {
+  listClients,
+  getClient,
+  createClient,
+  updateClient,
+  archiveClient,
+  listAssessmentStatuses,
+  listAssignableConsultants,
+  listAssignments,
+  assignConsultant,
+  removeAssignment,
 };

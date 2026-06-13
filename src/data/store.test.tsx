@@ -7,7 +7,7 @@
 import { act, renderHook } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { describe, expect, it } from 'vitest';
-import { CURRENT_CLIENT_ID } from './clients';
+import { DEMO_CLIENT_ID } from './clients';
 import { SEED_ASSESSMENTS } from './controls';
 import { DEFAULT_INTAKE } from './intake';
 import { DataProvider, useData } from './store';
@@ -36,8 +36,8 @@ describe('assessment persistence (saveJson/loadJson round-trip)', () => {
     act(() => result.current.updateAssessment('3.1.1', { status: 'Partial' }));
 
     const raw = JSON.parse(localStorage.getItem(LS_ASSESS) ?? '{}') as Record<string, unknown>;
-    expect(Object.keys(raw)).toEqual([`${CURRENT_CLIENT_ID}:3.1.1`]);
-    expect(raw[`${CURRENT_CLIENT_ID}:3.1.1`]).toEqual({ status: 'Partial' });
+    expect(Object.keys(raw)).toEqual([`${DEMO_CLIENT_ID}:3.1.1`]);
+    expect(raw[`${DEMO_CLIENT_ID}:3.1.1`]).toEqual({ status: 'Partial' });
   });
 
   it('merges the override onto the seed without losing untouched fields', () => {
@@ -56,7 +56,7 @@ describe('assessment persistence (saveJson/loadJson round-trip)', () => {
     act(() => result.current.updateAssessment('3.1.2', { status: 'Met' }));
     act(() => result.current.updateAssessment('3.1.2', { owner: 'CIO' }));
     const raw = JSON.parse(localStorage.getItem(LS_ASSESS) ?? '{}') as Record<string, unknown>;
-    expect(raw[`${CURRENT_CLIENT_ID}:3.1.2`]).toEqual({ status: 'Met', owner: 'CIO' });
+    expect(raw[`${DEMO_CLIENT_ID}:3.1.2`]).toEqual({ status: 'Met', owner: 'CIO' });
     expect(result.current.assessmentFor('3.1.2')?.status).toBe('Met');
     expect(result.current.assessmentFor('3.1.2')?.owner).toBe('CIO');
   });

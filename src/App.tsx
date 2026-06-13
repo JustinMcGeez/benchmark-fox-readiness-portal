@@ -2,12 +2,15 @@
    App — router host, screen-index launcher, live tweaks
    (routes + ScreenKey↔path mapping live in src/routes.tsx)
    ============================================================ */
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { BrowserRouter, useLocation } from 'react-router-dom';
 import { LayoutGrid } from 'lucide-react';
 import type { Density, NavStyle, ScreenKey, TweakValues } from './types';
 import { AuthProvider } from './auth/AuthProvider';
 import { DataProvider } from './data/store';
+import { ClientsProvider } from './data/clientsStore';
+import { DEMO_CLIENT_ID } from './data/clients';
+import { clientIdFromPathname } from './data/clientRoute';
 import { Btn } from './components/primitives';
 import { TweaksPanel, TweakSection, TweakRadio, useTweaks } from './tweaks/TweaksPanel';
 import { AppRoutes, screenKeyFromPath, useGo } from './routes';
@@ -75,12 +78,24 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <DataProvider>
-          <AppChrome />
-        </DataProvider>
+        <ClientsProvider>
+          <CurrentClientScope>
+            <AppChrome />
+          </CurrentClientScope>
+        </ClientsProvider>
       </AuthProvider>
     </BrowserRouter>
   );
+}
+
+/* Scopes the per-client DataProvider to the client in the URL. Re-renders on
+   navigation (useLocation), so switching clients re-points every client-scoped
+   screen at the new client's assessments/intake/scope. Off a client route it
+   falls back to the demo engagement (e.g. the internal Dashboard). */
+function CurrentClientScope({ children }: { children: ReactNode }) {
+  const { pathname } = useLocation();
+  const clientId = clientIdFromPathname(pathname) ?? DEMO_CLIENT_ID;
+  return <DataProvider clientId={clientId}>{children}</DataProvider>;
 }
 
 function AppChrome() {

@@ -12,7 +12,16 @@
      the domain: the seed values are display strings ('08/15/2026',
      'Jul 1, 2026'), not ISO dates, and neither field is patchable.
    ============================================================ */
-import type { ClientControlAssessment } from '../types';
+import type {
+  ClientControlAssessment,
+  ClientCreateInput,
+  ClientPatch,
+  ClientRecord,
+  ClientStatus,
+  CmmcPathValue,
+  DibRole,
+  RiskLevel,
+} from '../types';
 import { DEFAULT_INTAKE, type ChoiceOption, type IntakeState } from '../intake';
 import {
   ASSET_CATEGORIES,
@@ -28,6 +37,114 @@ export type AssessmentRow = Tables['client_control_assessments']['Row'];
 export type IntakeRow = Tables['intake_records']['Row'];
 export type ScopeRow = Tables['scope_records']['Row'];
 export type ScopeAssetRow = Tables['scope_assets']['Row'];
+export type ClientRow = Tables['clients']['Row'];
+export type ClientUpdatePayload = Tables['clients']['Update'];
+
+/* ---- clients (Task 07) ---- */
+
+const CLIENT_STATUSES: ClientStatus[] = ['Prospect', 'Active', 'On Hold', 'Closed'];
+const CMMC_PATHS: CmmcPathValue[] = ['Level 1', 'Level 2', 'Level 3', 'Undetermined'];
+const RISK_LEVELS: RiskLevel[] = ['Low', 'Medium', 'High', 'Critical'];
+
+const asEnum = <T extends string>(value: string | null, allowed: T[], fallback: T): T =>
+  value !== null && (allowed as string[]).includes(value) ? (value as T) : fallback;
+
+/** Parse a jsonb string[] (e.g. contract_types); anything malformed → []. */
+function parseStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === 'string');
+}
+
+/** cmmc_path → concrete cmmc_level the DB stores (L1/L2, or null when not L1/L2). */
+export function cmmcLevelForPath(path: CmmcPathValue): 'L1' | 'L2' | null {
+  if (path === 'Level 1') return 'L1';
+  if (path === 'Level 2') return 'L2';
+  return null;
+}
+
+/** ownerName is resolved from a separate profiles lookup (RLS-permitting). */
+export function clientRowToDomain(row: ClientRow, ownerName?: string | null): ClientRecord {
+  return {
+    id: row.id,
+    name: row.name,
+    status: asEnum<ClientStatus>(row.status, CLIENT_STATUSES, 'Active'),
+    cmmcPath: asEnum<CmmcPathValue>(row.cmmc_path, CMMC_PATHS, 'Undetermined'),
+    cmmcLevel: row.cmmc_level === 'L1' || row.cmmc_level === 'L2' ? row.cmmc_level : null,
+    riskRating: row.risk_rating !== null && (RISK_LEVELS as string[]).includes(row.risk_rating)
+      ? (row.risk_rating as RiskLevel)
+      : null,
+    readinessPhase: row.readiness_phase,
+    cageCode: row.cage_code,
+    dibRole: (row.dib_role as DibRole | null) ?? null,
+    contractTypes: parseStringArray(row.contract_types),
+    primaryContactName: row.primary_contact_name,
+    primaryContactEmail: row.primary_contact_email,
+    primaryContactTitle: row.primary_contact_title,
+    primaryConsultantId: row.primary_consultant_id,
+    owner: ownerName ?? null,
+    deadline: row.deadline,
+    notes: row.notes,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+/** Columns the repository writes when creating a client (org_id added by caller). */
+export interface ClientCreateRowPayload {
+  name: string;
+  status: ClientStatus;
+  cmmc_path: CmmcPathValue;
+  cmmc_level: 'L1' | 'L2' | null;
+  readiness_phase: string;
+  cage_code: string | null;
+  dib_role: string | null;
+  contract_types: Json;
+  primary_contact_name: string | null;
+  primary_contact_email: string | null;
+  primary_contact_title: string | null;
+  primary_consultant_id: string | null;
+}
+
+export function clientCreateToRowPayload(input: ClientCreateInput): ClientCreateRowPayload {
+  return {
+    name: input.name.trim(),
+    status: 'Active',
+    cmmc_path: input.cmmcPath,
+    cmmc_level: cmmcLevelForPath(input.cmmcPath),
+    readiness_phase: 'Intake',
+    cage_code: input.cageCode?.trim() || null,
+    dib_role: input.dibRole ?? null,
+    contract_types: input.contractTypes ?? [],
+    primary_contact_name: input.primaryContactName?.trim() || null,
+    primary_contact_email: input.primaryContactEmail?.trim() || null,
+    primary_contact_title: input.primaryContactTitle?.trim() || null,
+    primary_consultant_id: input.primaryConsultantId ?? null,
+  };
+}
+
+/** Map a domain ClientPatch onto the DB column names it touches. */
+export function clientPatchToRowPayload(patch: ClientPatch): ClientUpdatePayload {
+  const out: Record<string, Json> = {};
+  if (patch.name !== undefined) out.name = patch.name.trim();
+  if (patch.status !== undefined) out.status = patch.status;
+  if (patch.cmmcPath !== undefined) {
+    out.cmmc_path = patch.cmmcPath;
+    out.cmmc_level = cmmcLevelForPath(patch.cmmcPath);
+  }
+  if (patch.cmmcLevel !== undefined) out.cmmc_level = patch.cmmcLevel;
+  if (patch.riskRating !== undefined) out.risk_rating = patch.riskRating;
+  if (patch.readinessPhase !== undefined) out.readiness_phase = patch.readinessPhase;
+  if (patch.cageCode !== undefined) out.cage_code = patch.cageCode ?? null;
+  if (patch.dibRole !== undefined) out.dib_role = patch.dibRole ?? null;
+  if (patch.contractTypes !== undefined) out.contract_types = patch.contractTypes;
+  if (patch.primaryContactName !== undefined) out.primary_contact_name = patch.primaryContactName ?? null;
+  if (patch.primaryContactEmail !== undefined) out.primary_contact_email = patch.primaryContactEmail ?? null;
+  if (patch.primaryContactTitle !== undefined) out.primary_contact_title = patch.primaryContactTitle ?? null;
+  if (patch.primaryConsultantId !== undefined) out.primary_consultant_id = patch.primaryConsultantId ?? null;
+  if (patch.deadline !== undefined) out.deadline = patch.deadline ?? null;
+  if (patch.notes !== undefined) out.notes = patch.notes ?? null;
+  return out as unknown as ClientUpdatePayload;
+}
 
 /* ---- control assessments ---- */
 

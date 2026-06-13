@@ -74,6 +74,103 @@ export interface Client {
   active: boolean;
 }
 
+/* ---- real, persisted client engagement (Task 07) ---- */
+
+/** Lifecycle status of an engagement (mirrors the client_status DB enum). */
+export type ClientStatus = 'Prospect' | 'Active' | 'On Hold' | 'Closed';
+
+/** Target CMMC path (mirrors the cmmc_path DB enum). */
+export type CmmcPathValue = 'Level 1' | 'Level 2' | 'Level 3' | 'Undetermined';
+
+/** Position in the defense industrial base supply chain. */
+export type DibRole = 'Prime' | 'Subcontractor' | 'Both' | 'Unknown';
+
+/**
+ * A real, DB-backed client engagement — the record the multi-client tool reads
+ * and writes through the ClientsRepository. Distinct from the display-only
+ * `Client` seed shape (which carries pre-computed demo summary numbers); a
+ * ClientRecord's readiness/SPRS are always computed live from its assessments.
+ * NON-CUI engagement metadata only (HARD RULE: no CUI, no evidence files).
+ */
+export interface ClientRecord {
+  id: string;
+  name: string;
+  status: ClientStatus;
+  cmmcPath: CmmcPathValue;
+  /** Concrete target level once known; null while Undetermined. */
+  cmmcLevel: 'L1' | 'L2' | null;
+  riskRating: RiskLevel | null;
+  readinessPhase: string;
+  cageCode?: string | null;
+  dibRole?: DibRole | null;
+  contractTypes: string[];
+  primaryContactName?: string | null;
+  primaryContactEmail?: string | null;
+  primaryContactTitle?: string | null;
+  primaryConsultantId?: string | null;
+  /** Display name of the primary consultant (denormalized for the list). */
+  owner?: string | null;
+  deadline?: string | null;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Fields the Create Client wizard collects (everything else is defaulted). */
+export interface ClientCreateInput {
+  name: string;
+  cmmcPath: CmmcPathValue;
+  cageCode?: string;
+  dibRole?: DibRole;
+  contractTypes?: string[];
+  primaryContactName?: string;
+  primaryContactEmail?: string;
+  primaryContactTitle?: string;
+  /** Optional initial consultant assignment (admins only). */
+  primaryConsultantId?: string;
+}
+
+/** Editable fields on an existing client. */
+export type ClientPatch = Partial<
+  Pick<
+    ClientRecord,
+    | 'name'
+    | 'status'
+    | 'cmmcPath'
+    | 'cmmcLevel'
+    | 'riskRating'
+    | 'readinessPhase'
+    | 'cageCode'
+    | 'dibRole'
+    | 'contractTypes'
+    | 'primaryContactName'
+    | 'primaryContactEmail'
+    | 'primaryContactTitle'
+    | 'primaryConsultantId'
+    | 'deadline'
+    | 'notes'
+  >
+>;
+
+/** A Benchmark Fox staff member who may be assigned to a client. */
+export interface AssignableConsultant {
+  id: string;
+  name: string;
+  email?: string;
+  role: string;
+}
+
+/** A staff↔client assignment row. */
+export interface ClientAssignment {
+  id: string;
+  clientId: string;
+  profileId: string;
+  /** Denormalized display name (resolved from profiles where readable). */
+  profileName?: string | null;
+  role: string;
+  isPrimary: boolean;
+}
+
 /**
  * Official SPRS deduction values (DoD Assessment Methodology, Annex A):
  * -5 / -3 / -1, plus 0 for the single documented "NA" control (3.12.4).

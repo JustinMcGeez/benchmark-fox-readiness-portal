@@ -26,7 +26,7 @@ import {
   controlObjectiveCoverage,
   coveredObjectiveIdsForControl,
 } from '../lib/objectives';
-import { CURRENT_CLIENT } from '../data/clients';
+import { useCurrentClient } from '../data/clientsStore';
 import { EVIDENCE_ITEMS } from '../data/evidence';
 import { POAM_ITEMS } from '../data/poam';
 import { TASKS } from '../data/tasks';
@@ -52,6 +52,7 @@ export function SSPScreen({ go }: ScreenProps) {
   const { assessments, selectControl } = useData();
   // Control definitions (titles/families) from the reference-data provider.
   const { controlsById } = useReference();
+  const currentClient = useCurrentClient();
   const [tab, setTab] = useState('Control Statements');
   const [filter, setFilter] = useState<SspStatus | 'All'>('All');
 
@@ -72,7 +73,7 @@ export function SSPScreen({ go }: ScreenProps) {
   return (
     <div className="col">
       <PageHead
-        title={`SSP Workspace — ${CURRENT_CLIENT.name}`}
+        title={`SSP Workspace — ${currentClient?.name ?? 'Client'}`}
         sub="Track SSP completeness, accuracy, and implementation statements."
         actions={<Btn onClick={() => go('reports')}>Export SSP</Btn>}
       />
@@ -226,6 +227,7 @@ export function SSPScreen({ go }: ScreenProps) {
 export function POAMScreen({ go }: ScreenProps) {
   const { selectControl } = useData();
   const { controlsById } = useReference();
+  const currentClient = useCurrentClient();
   // default to the first blocker, otherwise the first POA&M item
   const defaultPoam = POAM_ITEMS.find((p) => p.classification === 'Blocker') ?? POAM_ITEMS[0];
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -236,7 +238,7 @@ export function POAMScreen({ go }: ScreenProps) {
   return (
     <div className="col">
       <PageHead
-        title={`POA&M Tracker — ${CURRENT_CLIENT.name}`}
+        title={`POA&M Tracker — ${currentClient?.name ?? 'Client'}`}
         sub="Manage weaknesses, owners, milestones, and validation status."
         actions={<Btn primary>+ New POA&M Item</Btn>}
       />
@@ -372,6 +374,7 @@ export function POAMScreen({ go }: ScreenProps) {
 /* ---------- 14. EVIDENCE HUB ---------- */
 export function EvidenceScreen(_: ScreenProps) {
   const { controlsById } = useReference();
+  const currentClient = useCurrentClient();
   // default to the first missing/needs-revision item, otherwise the first item
   const defaultEvidence =
     EVIDENCE_ITEMS.find((e) => e.status === 'Missing' || e.status === 'Needs Revision') ?? EVIDENCE_ITEMS[0];
@@ -382,7 +385,7 @@ export function EvidenceScreen(_: ScreenProps) {
   return (
     <div className="col">
       <PageHead
-        title={`Evidence Hub — ${CURRENT_CLIENT.name}`}
+        title={`Evidence Hub — ${currentClient?.name ?? 'Client'}`}
         sub="Request, review, and map evidence to controls."
         actions={<Btn primary>+ Request Evidence</Btn>}
       />
@@ -524,6 +527,7 @@ export function EvidenceScreen(_: ScreenProps) {
 const HIGH_PRIORITY = new Set(['Critical', 'High']);
 export function TasksScreen(_: ScreenProps) {
   const { controlsById } = useReference();
+  const currentClient = useCurrentClient();
   // default to the first blocked task, otherwise the first high/critical task,
   // otherwise the first task
   const defaultTask =
@@ -535,7 +539,7 @@ export function TasksScreen(_: ScreenProps) {
   return (
     <div className="col">
       <PageHead
-        title={`Tasks — ${CURRENT_CLIENT.name}`}
+        title={`Tasks — ${currentClient?.name ?? 'Client'}`}
         sub="Assign and track remediation, evidence, SSP, and POA&M work."
         actions={<Btn primary>+ New Task</Btn>}
       />

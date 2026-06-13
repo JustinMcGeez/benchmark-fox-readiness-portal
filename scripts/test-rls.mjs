@@ -629,3 +629,110 @@ test('client-role users never see internal-only audit actions; staff do', async 
   assert.equal(staff.error, null);
   assert.ok(staff.data.length >= 1, 'BF staff should see internal actions for their client');
 });
+
+// ===========================================================================
+// CLIENTS + ASSIGNMENTS endpoints (Task 07): client CRUD is admin-only and
+// cross-client isolated; assignments are admin-managed and honor soft-delete.
+// ===========================================================================
+const ADMIN_CREATED_CLIENT = '05000000-0000-4000-8000-0000000000ac';
+
+test('consultant reads only assigned clients from the clients table', async () => {
+  const { data, error } = await clients.consultant
+    .from('clients')
+    .select('id')
+    .in('id', [CLIENT_A, CLIENT_B]);
+  assert.equal(error, null);
+  const ids = new Set(data.map((r) => r.id));
+  assert.ok(ids.has(CLIENT_A), 'consultant should see assigned client A');
+  assert.ok(!ids.has(CLIENT_B), 'consultant must NOT see unassigned client B');
+});
+
+test('consultant cannot CREATE a client (admin-only)', async () => {
+  const { error } = await clients.consultant
+    .from('clients')
+    .insert({
+      id: '05000000-0000-4000-8000-0000000000c9',
+      organization_id: orgId,
+      name: 'Sneaky Co',
+      status: 'Active',
+    })
+    .select();
+  assert.notEqual(error, null, 'consultant client insert must be rejected');
+  assert.equal(error.code, RLS_VIOLATION);
+});
+
+test('consultant cannot UPDATE another client (0 rows)', async () => {
+  const { data, error } = await clients.consultant
+    .from('clients')
+    .update({ name: 'hijacked' })
+    .eq('id', CLIENT_B)
+    .select();
+  assert.equal(error, null);
+  assert.equal(data.length, 0, 'consultant must not write client B');
+});
+
+test('admin CAN create a client (and the new profile columns exist)', async () => {
+  const { data, error } = await clients.admin
+    .from('clients')
+    .upsert(
+      {
+        id: ADMIN_CREATED_CLIENT,
+        organization_id: orgId,
+        name: 'Admin Created Co',
+        status: 'Active',
+        cage_code: '1ABC2',
+        dib_role: 'Prime',
+        contract_types: ['DFARS 252.204-7012'],
+        primary_contact_name: 'Pat Lee',
+      },
+      { onConflict: 'id' },
+    )
+    .select();
+  assert.equal(error, null, '006 columns must exist and admin may create clients');
+  assert.equal(data.length, 1);
+});
+
+test('consultant cannot CREATE an assignment (admin-only)', async () => {
+  const { error } = await clients.consultant
+    .from('client_assignments')
+    .insert({ client_id: CLIENT_A, profile_id: profileIds.readonly, role: 'readonly_viewer' })
+    .select();
+  assert.notEqual(error, null, 'consultant assignment insert must be rejected');
+  assert.equal(error.code, RLS_VIOLATION);
+});
+
+test('soft-removing an assignment (deleted_at) revokes access via the helpers', async () => {
+  // Grant consultant access to client B by assigning them (admin).
+  const grant = await admin
+    .from('client_assignments')
+    .upsert(
+      {
+        client_id: CLIENT_B,
+        profile_id: profileIds.consultant,
+        role: 'benchmark_fox_consultant',
+        deleted_at: null,
+      },
+      { onConflict: 'client_id,profile_id' },
+    )
+    .select();
+  assert.equal(grant.error, null);
+
+  const granted = await clients.consultant.from('clients').select('id').eq('id', CLIENT_B);
+  assert.equal(granted.error, null);
+  assert.equal(granted.data.length, 1, 'a live assignment grants access to client B');
+
+  // Soft-remove the assignment (what removeAssignment does — never a hard delete).
+  const remove = await admin
+    .from('client_assignments')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('client_id', CLIENT_B)
+    .eq('profile_id', profileIds.consultant)
+    .select();
+  assert.equal(remove.error, null);
+  assert.equal(remove.data.length, 1);
+
+  // is_assigned_to_client now ignores the soft-deleted row → access revoked.
+  const revoked = await clients.consultant.from('clients').select('id').eq('id', CLIENT_B);
+  assert.equal(revoked.error, null, 'cross-client read is filtered, not an error');
+  assert.equal(revoked.data.length, 0, 'soft-removed assignment must revoke client B access');
+});

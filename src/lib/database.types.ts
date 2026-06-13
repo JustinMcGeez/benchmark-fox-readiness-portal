@@ -104,8 +104,26 @@ export interface Database {
         secondary_consultant_id: string | null;
         deadline: string | null;
         notes: string | null;
+        /** Added by 006_client_profile_fields.sql. */
+        cage_code: string | null;
+        dib_role: string | null;
+        contract_types: Json;
+        primary_contact_name: string | null;
+        primary_contact_email: string | null;
+        primary_contact_title: string | null;
         created_at: string;
         updated_at: string;
+        deleted_at: string | null;
+      }>;
+      client_assignments: TableShape<{
+        id: string;
+        client_id: string;
+        profile_id: string;
+        role: AppRoleEnum;
+        is_primary: boolean;
+        created_at: string;
+        updated_at: string;
+        /** Added by 006_client_profile_fields.sql (soft-delete). */
         deleted_at: string | null;
       }>;
       client_control_assessments: TableShape<{

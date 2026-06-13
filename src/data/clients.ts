@@ -3,10 +3,22 @@
    The active engagement (Acme) has a full control assessment set in
    controls.ts; other clients carry summary fields for the list view.
    ============================================================ */
-import type { AppUser, AuditEvent, Client } from './types';
+import type {
+  AppUser,
+  AssignableConsultant,
+  AuditEvent,
+  Client,
+  ClientRecord,
+  CmmcPathValue,
+} from './types';
 
-/** The client currently in context throughout the client-scoped screens. */
-export const CURRENT_CLIENT_ID = 'acme';
+/**
+ * The demo engagement id. Used as the default client context off any
+ * client-scoped route (e.g. the internal Dashboard), and as the clientId
+ * stamped on the bundled seed data (controls/evidence/poam/tasks). The active
+ * client on a client-scoped screen always comes from the route, never this.
+ */
+export const DEMO_CLIENT_ID = 'acme';
 
 export const CLIENTS: Client[] = [
   {
@@ -93,8 +105,38 @@ export const CLIENTS: Client[] = [
 
 export const clientById = (id: string): Client | undefined => CLIENTS.find((c) => c.id === id);
 
-/** The active client record (used for client-scoped screen titles/context). */
-export const CURRENT_CLIENT: Client = clientById(CURRENT_CLIENT_ID) ?? CLIENTS[0];
+/* ---- real client records (Task 07) — Local Prototype mode seed ------------
+   The clients list / CRUD work off ClientRecord (DB-backed in Supabase mode).
+   In Local Prototype mode the list is seeded from these and persisted to
+   localStorage (bf_clients_v1). Derived from the display CLIENTS above so the
+   demo shows the same six engagements; readiness/SPRS are computed live from
+   each client's real assessments (never these display numbers). --------------- */
+
+const CMMC_PATH_FROM_LEVEL: Record<string, CmmcPathValue> = {
+  'Level 1': 'Level 1',
+  'Level 2': 'Level 2',
+  'Level 3': 'Level 3',
+};
+
+function seedCmmcPath(level: string): CmmcPathValue {
+  return CMMC_PATH_FROM_LEVEL[level] ?? 'Undetermined';
+}
+
+export const SEED_CLIENT_RECORDS: ClientRecord[] = CLIENTS.map((c) => {
+  const cmmcPath = seedCmmcPath(c.level);
+  return {
+    id: c.id,
+    name: c.name,
+    status: 'Active',
+    cmmcPath,
+    cmmcLevel: cmmcPath === 'Level 1' ? 'L1' : cmmcPath === 'Level 2' ? 'L2' : null,
+    riskRating: c.riskRating,
+    readinessPhase: c.phase,
+    contractTypes: [],
+    owner: c.owner,
+    deadline: c.deadline ?? null,
+  };
+});
 
 /** Platform users (Settings → Users). */
 export const USERS: AppUser[] = [
@@ -102,6 +144,11 @@ export const USERS: AppUser[] = [
   { id: 'u2', name: 'Dana', email: 'dana@benchmarkfox.com', role: 'Consultant', status: 'Active' },
   { id: 'u3', name: 'Client IT', email: 'it@client.com', role: 'Evidence Uploader', status: 'Invited' },
 ];
+
+/** Benchmark Fox staff assignable to a client (Local Prototype mode). */
+export const SEED_ASSIGNABLE_CONSULTANTS: AssignableConsultant[] = USERS.filter(
+  (u) => u.role === 'Admin' || u.role === 'Consultant',
+).map((u) => ({ id: u.id, name: u.name, email: u.email, role: u.role }));
 
 export const AUDIT_EVENTS: AuditEvent[] = [
   {

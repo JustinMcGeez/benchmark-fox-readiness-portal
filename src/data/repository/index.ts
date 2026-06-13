@@ -14,15 +14,17 @@
 import { useMemo } from 'react';
 import { isSupabaseConfigured } from '../../lib/supabaseClient';
 import { useOptionalAuth } from '../../auth/AuthProvider';
-import { localRepository } from './localRepository';
-import { supabaseRepository } from './supabaseRepository';
-import type { ClientDataRepository } from './types';
+import { localClientsRepository, localRepository } from './localRepository';
+import { supabaseClientsRepository, supabaseRepository } from './supabaseRepository';
+import type { ClientDataRepository, ClientsRepository } from './types';
 
 export type RepositoryMode = 'local' | 'supabase';
 
 export interface RepositorySelection {
   mode: RepositoryMode;
   repository: ClientDataRepository;
+  /** Clients + assignments repository for the same mode. */
+  clients: ClientsRepository;
 }
 
 export function useRepository(): RepositorySelection {
@@ -31,11 +33,11 @@ export function useRepository(): RepositorySelection {
   return useMemo<RepositorySelection>(
     () =>
       isSupabaseConfigured && authed
-        ? { mode: 'supabase', repository: supabaseRepository }
-        : { mode: 'local', repository: localRepository },
+        ? { mode: 'supabase', repository: supabaseRepository, clients: supabaseClientsRepository }
+        : { mode: 'local', repository: localRepository, clients: localClientsRepository },
     [authed],
   );
 }
 
-export type { ClientDataRepository } from './types';
+export type { ClientDataRepository, ClientsRepository } from './types';
 export { RepositoryError, isRepositoryError } from './types';

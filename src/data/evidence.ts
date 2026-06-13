@@ -1,11 +1,11 @@
 /* Seed data — evidence items for the active client. */
 import type { EvidenceItem } from './types';
-import { CURRENT_CLIENT_ID } from './clients';
+import { DEMO_CLIENT_ID } from './clients';
 
 export const EVIDENCE_ITEMS: EvidenceItem[] = [
   {
     id: 'ev-1',
-    clientId: CURRENT_CLIENT_ID,
+    clientId: DEMO_CLIENT_ID,
     title: 'MFA Configuration Screenshot',
     controlId: '3.5.3',
     assessmentObjective: '3.5.3[a]',
@@ -21,7 +21,7 @@ export const EVIDENCE_ITEMS: EvidenceItem[] = [
   },
   {
     id: 'ev-2',
-    clientId: CURRENT_CLIENT_ID,
+    clientId: DEMO_CLIENT_ID,
     title: 'Quarterly Access Review',
     controlId: '3.1.5',
     owner: 'HR / IT',
@@ -31,7 +31,7 @@ export const EVIDENCE_ITEMS: EvidenceItem[] = [
   },
   {
     id: 'ev-3',
-    clientId: CURRENT_CLIENT_ID,
+    clientId: DEMO_CLIENT_ID,
     title: 'Firewall Rules Export',
     controlId: '3.13.1',
     owner: 'MSP',
@@ -41,7 +41,7 @@ export const EVIDENCE_ITEMS: EvidenceItem[] = [
   },
   {
     id: 'ev-4',
-    clientId: CURRENT_CLIENT_ID,
+    clientId: DEMO_CLIENT_ID,
     title: 'Audit Log Retention Policy',
     controlId: '3.3.1',
     owner: 'MSP',
@@ -51,7 +51,7 @@ export const EVIDENCE_ITEMS: EvidenceItem[] = [
   },
   {
     id: 'ev-5',
-    clientId: CURRENT_CLIENT_ID,
+    clientId: DEMO_CLIENT_ID,
     title: 'Entra ID Group Export',
     controlId: '3.1.1',
     owner: 'IT Lead',
@@ -61,7 +61,7 @@ export const EVIDENCE_ITEMS: EvidenceItem[] = [
   },
   {
     id: 'ev-6',
-    clientId: CURRENT_CLIENT_ID,
+    clientId: DEMO_CLIENT_ID,
     title: 'Intune Compliance Policy',
     controlId: '3.1.1',
     owner: 'IT Lead',

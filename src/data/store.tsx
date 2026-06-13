@@ -23,7 +23,7 @@ import {
   useQueryClient,
 } from '@tanstack/react-query';
 import type { ClientControlAssessment } from './types';
-import { CURRENT_CLIENT_ID } from './clients';
+import { DEMO_CLIENT_ID } from './clients';
 import { SEED_ASSESSMENTS } from './controls';
 import { DEFAULT_INTAKE, type IntakeState } from './intake';
 import { DEFAULT_SCOPE, type ScopeAsset, type ScopeState, type ScopeSummary } from './scope';
@@ -32,6 +32,7 @@ import { MigrationPrompt } from './MigrationPrompt';
 import { RepositoryError, useRepository, type ClientDataRepository } from './repository';
 import type { AssessmentPatch } from './repository/types';
 import {
+  baseAssessmentsFor,
   LS_ASSESS,
   LS_INTAKE,
   LS_SCOPE,
@@ -88,7 +89,15 @@ const DataContext = createContext<DataContextValue | null>(null);
 
 /* ---- provider: owns the QueryClient, then the engine ---- */
 
-export function DataProvider({ children }: { children: ReactNode }) {
+export function DataProvider({
+  clientId = DEMO_CLIENT_ID,
+  children,
+}: {
+  /** The client the data is scoped to (from the route; defaults to the demo
+      engagement off any client-scoped route, e.g. the internal Dashboard). */
+  clientId?: string;
+  children: ReactNode;
+}) {
   const [queryClient] = useState(
     () =>
       new QueryClient({
@@ -100,12 +109,12 @@ export function DataProvider({ children }: { children: ReactNode }) {
   );
   return (
     <QueryClientProvider client={queryClient}>
-      <DataEngine>{children}</DataEngine>
+      <DataEngine clientId={clientId}>{children}</DataEngine>
     </QueryClientProvider>
   );
 }
 
-function DataEngine({ children }: { children: ReactNode }) {
+function DataEngine({ clientId, children }: { clientId: string; children: ReactNode }) {
   const { mode, repository } = useRepository();
 
   /* selected control is shared by both modes and out of this task's scope */
@@ -120,18 +129,18 @@ function DataEngine({ children }: { children: ReactNode }) {
   const [mutationError, setMutationError] = useState<string | null>(null);
 
   /* Both engines run every render (stable hook order); only one is exposed. */
-  const local = useLocalEngine();
-  const remote = useSupabaseEngine(repository, mode === 'supabase', setMutationError);
+  const local = useLocalEngine(clientId);
+  const remote = useSupabaseEngine(repository, clientId, mode === 'supabase', setMutationError);
   const engine = mode === 'supabase' ? remote : local;
 
   const value = useMemo<DataContextValue>(
     () => ({
-      currentClientId: CURRENT_CLIENT_ID,
+      currentClientId: clientId,
       selectedControlId,
       selectControl,
       ...engine.slice,
     }),
-    [selectedControlId, selectControl, engine.slice],
+    [clientId, selectedControlId, selectControl, engine.slice],
   );
 
   let body: ReactNode = children;
@@ -142,7 +151,7 @@ function DataEngine({ children }: { children: ReactNode }) {
   return (
     <DataContext.Provider value={value}>
       {body}
-      {ready && <MigrationPrompt clientId={CURRENT_CLIENT_ID} onError={setMutationError} />}
+      {ready && <MigrationPrompt clientId={clientId} onError={setMutationError} />}
       {mutationError && (
         <MutationErrorToast message={mutationError} onDismiss={() => setMutationError(null)} />
       )}
@@ -153,18 +162,18 @@ function DataEngine({ children }: { children: ReactNode }) {
 /* ============================================================
    Local engine — the original synchronous localStorage logic.
    ============================================================ */
-function useLocalEngine(): EngineResult {
+function useLocalEngine(clientId: string): EngineResult {
   const [overrides, setOverrides] = useState<Overrides>(loadOverrides);
   const [intake, setIntake] = useState<IntakeState>(() => loadJson(LS_INTAKE, DEFAULT_INTAKE));
   const [scope, setScope] = useState<ScopeState>(() => loadJson(LS_SCOPE, DEFAULT_SCOPE));
 
   const assessments = useMemo(
     () =>
-      SEED_ASSESSMENTS.map((a) => {
-        const ov = overrides[overrideKey(a.clientId, a.controlId)];
+      baseAssessmentsFor(clientId).map((a) => {
+        const ov = overrides[overrideKey(clientId, a.controlId)];
         return ov ? { ...a, ...ov } : a;
       }),
-    [overrides],
+    [overrides, clientId],
   );
 
   const assessmentFor = useCallback(
@@ -172,14 +181,17 @@ function useLocalEngine(): EngineResult {
     [assessments],
   );
 
-  const updateAssessment = useCallback((controlId: string, patch: AssessmentPatch) => {
-    setOverrides((prev) => {
-      const k = overrideKey(CURRENT_CLIENT_ID, controlId);
-      const next = { ...prev, [k]: { ...prev[k], ...patch } };
-      saveJson(LS_ASSESS, next);
-      return next;
-    });
-  }, []);
+  const updateAssessment = useCallback(
+    (controlId: string, patch: AssessmentPatch) => {
+      setOverrides((prev) => {
+        const k = overrideKey(clientId, controlId);
+        const next = { ...prev, [k]: { ...prev[k], ...patch } };
+        saveJson(LS_ASSESS, next);
+        return next;
+      });
+    },
+    [clientId],
+  );
 
   const persistIntake = useCallback((next: IntakeState) => {
     saveJson(LS_INTAKE, next);
@@ -323,11 +335,11 @@ function useLocalEngine(): EngineResult {
    ============================================================ */
 function useSupabaseEngine(
   repository: ClientDataRepository,
+  clientId: string,
   enabled: boolean,
   setMutationError: (message: string) => void,
 ): EngineResult {
   const qc = useQueryClient();
-  const clientId = CURRENT_CLIENT_ID;
   const assessmentsKey = useMemo(() => ['assessments', clientId] as const, [clientId]);
   const intakeKey = useMemo(() => ['intake', clientId] as const, [clientId]);
   const scopeKey = useMemo(() => ['scope', clientId] as const, [clientId]);

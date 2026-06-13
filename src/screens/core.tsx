@@ -1,12 +1,19 @@
 /* ============================================================
    Screens — core: Login, Internal Dashboard, Clients, Create Client
    ============================================================ */
-import { useEffect, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useState, type FormEvent } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import type { ScreenProps } from '../types';
+import type {
+  ClientControlAssessment,
+  CmmcPathValue,
+  DibRole,
+  ReadinessStatus,
+} from '../data/types';
 import { ShieldCheck } from 'lucide-react';
 import { signInErrorMessage, useAuth } from '../auth/AuthProvider';
 import {
+  Badge,
   BarChart,
   Btn,
   Card,
@@ -14,17 +21,42 @@ import {
   Field,
   PageHead,
   RiskBadge,
-  Select,
   StatCard,
   Toolbar,
+  WarnBanner,
 } from '../components/primitives';
 import { BrandLockup, BrandLogo } from '../components/Brand';
-import { AUDIT_EVENTS, CLIENTS, CURRENT_CLIENT_ID } from '../data/clients';
+import { AUDIT_EVENTS, CLIENTS, DEMO_CLIENT_ID } from '../data/clients';
 import { POAM_ITEMS } from '../data/poam';
 import { useData } from '../data/store';
+import { useClients } from '../data/clientsStore';
 import { useReference } from '../data/referenceStore';
 import { formatScore, readinessPct, sprsScore } from '../lib/scoring';
 import { blockerItems, openPoamItems } from '../lib/selectors';
+
+/* Client management (create/archive) is admin-only in Supabase mode; in Local
+   Prototype mode (no auth) it is always available so demos can show the flow. */
+function useCanManageClients(): boolean {
+  const { isConfigured, role } = useAuth();
+  return !isConfigured || role === 'benchmark_fox_admin';
+}
+
+/* Build scoring-shaped rows from per-client readiness statuses (status +
+   controlId are all the scoring engine reads; other fields are placeholders). */
+function toScoringAssessments(
+  statuses: { controlId: string; status: ReadinessStatus }[],
+): ClientControlAssessment[] {
+  return statuses.map((s) => ({
+    clientId: '',
+    controlId: s.controlId,
+    status: s.status,
+    sspStatus: 'Not Reviewed',
+    evidenceStatus: 'Not Requested',
+    poamStatus: 'None',
+    risk: 'Medium',
+    owner: 'Unassigned',
+  }));
+}
 
 const RISK_REASON: Record<string, string> = {
   Intake: 'Intake incomplete',
@@ -314,12 +346,13 @@ export function LoginScreen({ go }: ScreenProps) {
 export function DashboardScreen({ go }: ScreenProps) {
   const { assessments } = useData();
   const { controlsById } = useReference();
+  const canManage = useCanManageClients();
 
   // active client computes live; others use their seed summary
   const activeReadiness = readinessPct(assessments);
   const activeScore = sprsScore(assessments, controlsById);
   const clientReadiness = (id: string, fallback: number) =>
-    id === 'acme' ? activeReadiness : fallback;
+    id === DEMO_CLIENT_ID ? activeReadiness : fallback;
 
   const activeClients = CLIENTS.filter((c) => c.active);
   const avgReadiness = Math.round(
@@ -347,9 +380,11 @@ export function DashboardScreen({ go }: ScreenProps) {
         actions={
           <>
             <Btn onClick={() => go('reports')}>Generate Report</Btn>
-            <Btn primary onClick={() => go('create-client')}>
-              + New Client
-            </Btn>
+            {canManage && (
+              <Btn primary onClick={() => go('create-client')}>
+                + New Client
+              </Btn>
+            )}
           </>
         }
       />
@@ -423,27 +458,27 @@ export function DashboardScreen({ go }: ScreenProps) {
 
 /* ---------- 3. CLIENTS LIST ---------- */
 export function ClientsScreen({ go }: ScreenProps) {
-  const { assessments } = useData();
+  const navigate = useNavigate();
+  const { clients, assessmentStatusesByClientId, loading, error, archiveClient } = useClients();
   const { controlsById } = useReference();
-  // Only the active client has assessment data; its readiness/score compute live.
-  // Other clients have no assessments, so we show an honest placeholder instead of
-  // presenting seed numbers as if they were computed.
-  const liveReadiness = readinessPct(assessments);
-  const liveScore = formatScore(sprsScore(assessments, controlsById));
-  const placeholderFor = (c: (typeof CLIENTS)[number]) =>
-    c.phase === 'Intake' || c.cmmcPath === 'Unknown' ? 'Not started' : 'Seed summary only';
+  const canManage = useCanManageClients();
+  const colSpan = canManage ? 9 : 8;
+
   return (
     <div className="col">
       <PageHead
         title="Clients"
         sub="Manage all Benchmark Fox readiness engagements."
         actions={
-          <Btn primary onClick={() => go('create-client')}>
-            + New Client
-          </Btn>
+          canManage ? (
+            <Btn primary onClick={() => go('create-client')}>
+              + New Client
+            </Btn>
+          ) : undefined
         }
       />
       <Toolbar search="Search clients…" filters={['CMMC Level', 'Risk', 'Phase', 'Consultant', 'Status']} />
+      {error && <WarnBanner tone="bad">{error}</WarnBanner>}
       <Card style={{ padding: '6px 6px' }}>
         <table className="w-table">
           <thead>
@@ -455,55 +490,78 @@ export function ClientsScreen({ go }: ScreenProps) {
               <th>Risk</th>
               <th>Phase</th>
               <th>Owner</th>
-              <th>Updated</th>
+              <th>Status</th>
+              {canManage && <th />}
             </tr>
           </thead>
           <tbody>
-            {CLIENTS.map((c) => {
-              const live = c.id === CURRENT_CLIENT_ID;
+            {clients.map((c) => {
+              // Live readiness/SPRS computed from the client's REAL assessments.
+              const statuses = assessmentStatusesByClientId[c.id] ?? [];
+              const started = statuses.some((s) => s.status !== 'Not Reviewed');
+              const asmts = toScoringAssessments(statuses);
+              const readiness = readinessPct(asmts);
+              const score = formatScore(sprsScore(asmts, controlsById));
+              const closed = c.status === 'Closed';
               return (
-              <tr key={c.id} onClick={() => go('client-dashboard')}>
-                <td style={{ fontWeight: 700 }}>{c.name}</td>
-                <td className="mono" style={{ fontSize: '.85em' }}>
-                  {c.cmmcPath}
-                </td>
-                <td>
-                  {live ? (
-                    <div className="center" style={{ gap: 8 }}>
-                      <span className="bar-track" style={{ width: 60 }}>
-                        <span className="bar-fill" style={{ width: liveReadiness + '%' }} />
+                <tr
+                  key={c.id}
+                  onClick={() => navigate('/clients/' + c.id)}
+                  style={{ opacity: closed ? 0.62 : 1 }}
+                >
+                  <td style={{ fontWeight: 700 }}>{c.name}</td>
+                  <td className="mono" style={{ fontSize: '.85em' }}>
+                    {c.cmmcPath}
+                  </td>
+                  <td>
+                    {started ? (
+                      <div className="center" style={{ gap: 8 }}>
+                        <span className="bar-track" style={{ width: 60 }}>
+                          <span className="bar-fill" style={{ width: readiness + '%' }} />
+                        </span>
+                        <span className="mono" style={{ fontSize: '.85em' }}>
+                          {readiness}%
+                        </span>
+                        <span
+                          className="mono faint"
+                          title="Computed from assessments"
+                          style={{ fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.04em' }}
+                        >
+                          live
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="muted" style={{ fontSize: '.85em' }} title="No reviewed controls yet">
+                        Not started
                       </span>
-                      <span className="mono" style={{ fontSize: '.85em' }}>
-                        {liveReadiness}%
-                      </span>
-                      <span
-                        className="mono faint"
-                        title="Computed from assessments"
-                        style={{ fontSize: '.6rem', textTransform: 'uppercase', letterSpacing: '.04em' }}
-                      >
-                        live
-                      </span>
-                    </div>
-                  ) : (
-                    <span className="muted" style={{ fontSize: '.85em' }} title="No assessment data yet">
-                      {placeholderFor(c)}
-                    </span>
+                    )}
+                  </td>
+                  <td className="num">{started ? score : <span className="faint">—</span>}</td>
+                  <td>{c.riskRating ? <RiskBadge level={c.riskRating} /> : <span className="faint">—</span>}</td>
+                  <td className="muted">{c.readinessPhase}</td>
+                  <td>{c.owner || <span className="faint">—</span>}</td>
+                  <td>
+                    <Badge tone={closed ? 'none' : 'ok'}>{c.status}</Badge>
+                  </td>
+                  {canManage && (
+                    <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                      {!closed && (
+                        <Btn sm ghost onClick={() => void archiveClient(c.id)}>
+                          Archive
+                        </Btn>
+                      )}
+                    </td>
                   )}
-                </td>
-                <td className="num">
-                  {live ? liveScore : <span className="faint">—</span>}
-                </td>
-                <td>
-                  <RiskBadge level={c.riskRating} />
-                </td>
-                <td className="muted">{c.phase}</td>
-                <td>{c.owner}</td>
-                <td className="faint mono" style={{ fontSize: '.82em' }}>
-                  {c.lastUpdated}
-                </td>
-              </tr>
+                </tr>
               );
             })}
+            {clients.length === 0 && (
+              <tr>
+                <td colSpan={colSpan} className="muted" style={{ padding: 18, textAlign: 'center' }}>
+                  {loading ? 'Loading clients…' : 'No clients yet. Create your first engagement.'}
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </Card>
@@ -511,39 +569,296 @@ export function ClientsScreen({ go }: ScreenProps) {
   );
 }
 
-/* ---------- 4. CREATE CLIENT ---------- */
+/* ---------- 4. CREATE CLIENT (multi-step wizard) ---------- */
+const WIZARD_STEPS = ['Organization', 'CMMC Target', 'Primary Contact', 'Assignment', 'Review'];
+const CMMC_PATH_OPTIONS: CmmcPathValue[] = ['Level 1', 'Level 2', 'Undetermined'];
+const DIB_ROLE_OPTIONS: DibRole[] = ['Prime', 'Subcontractor', 'Both', 'Unknown'];
+const CONTRACT_TYPE_OPTIONS = [
+  'FAR 52.204-21',
+  'DFARS 252.204-7012',
+  'DFARS 252.204-7019',
+  'DFARS 252.204-7020',
+  'DFARS 252.204-7021',
+];
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 export function CreateClientScreen({ go }: ScreenProps) {
+  const navigate = useNavigate();
+  const { clients, assignableConsultants, createClient } = useClients();
+
+  const [step, setStep] = useState(0);
+  const [name, setName] = useState('');
+  const [cageCode, setCageCode] = useState('');
+  const [dibRole, setDibRole] = useState<DibRole>('Unknown');
+  const [contractTypes, setContractTypes] = useState<string[]>(['DFARS 252.204-7012']);
+  const [cmmcPath, setCmmcPath] = useState<CmmcPathValue>('Level 2');
+  const [contactName, setContactName] = useState('');
+  const [contactEmail, setContactEmail] = useState('');
+  const [contactTitle, setContactTitle] = useState('');
+  const [consultantId, setConsultantId] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const trimmedName = name.trim();
+  const nameError = trimmedName.length === 0;
+  const duplicate =
+    !nameError && clients.some((c) => c.name.trim().toLowerCase() === trimmedName.toLowerCase());
+  const emailEntered = contactEmail.trim().length > 0;
+  const emailError = emailEntered && !EMAIL_RE.test(contactEmail.trim());
+
+  const toggleContract = (label: string) =>
+    setContractTypes((prev) =>
+      prev.includes(label) ? prev.filter((x) => x !== label) : [...prev, label],
+    );
+
+  const last = step === WIZARD_STEPS.length - 1;
+  const canAdvance = (step === 0 ? !nameError : true) && (step === 2 ? !emailError : true);
+  const canCreate = !nameError && !emailError && !submitting;
+
+  const onCreate = async () => {
+    if (!canCreate) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const record = await createClient({
+        name: trimmedName,
+        cmmcPath,
+        cageCode: cageCode.trim() || undefined,
+        dibRole,
+        contractTypes,
+        primaryContactName: contactName.trim() || undefined,
+        primaryContactEmail: contactEmail.trim() || undefined,
+        primaryContactTitle: contactTitle.trim() || undefined,
+        primaryConsultantId: consultantId || undefined,
+      });
+      navigate('/clients/' + record.id);
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : 'Could not create the client. Please try again.');
+      setSubmitting(false);
+    }
+  };
+
+  const consultantName =
+    assignableConsultants.find((c) => c.id === consultantId)?.name ?? 'Unassigned';
+
   return (
     <div className="col" style={{ maxWidth: 820 }}>
-      <PageHead title="Create New Client" sub="Add basic client and engagement details." />
-      <Card title="Company Information">
-        <div className="grid-2">
-          <Field label="LEGAL COMPANY NAME" placeholder="Acme Defense Systems, LLC" />
-          <Field label="DBA / TRADE NAME" placeholder="Acme Defense" />
-          <Field label="WEBSITE" placeholder="acmedefense.com" />
-          <Field label="PRIMARY LOCATION" placeholder="Huntsville, AL" />
+      <PageHead title="Create New Client" sub="Add a new CMMC readiness engagement." />
+      <Card>
+        <div className="w-steps" style={{ marginBottom: 18 }}>
+          {WIZARD_STEPS.map((s, i) => (
+            <Fragment key={s}>
+              <span
+                className={'w-step' + (i === step ? ' on' : i < step ? ' done' : '')}
+                onClick={() => setStep(i)}
+                style={{ cursor: 'pointer' }}
+              >
+                <span className="n">{i < step ? '✓' : i + 1}</span>
+                <span className={'lbl' + (i === step ? ' cur' : '')}>{s}</span>
+              </span>
+              {i < WIZARD_STEPS.length - 1 && <span className="w-step-line" />}
+            </Fragment>
+          ))}
+        </div>
+        <div className="mono faint" style={{ fontSize: '.78em', marginBottom: 14 }}>
+          STEP {step + 1} OF {WIZARD_STEPS.length}
+        </div>
+
+        {step === 0 && (
+          <div className="col" style={{ gap: 14 }}>
+            <div className="grid-2">
+              <Field
+                label="LEGAL COMPANY NAME"
+                name="client-name"
+                placeholder="Acme Defense Systems, LLC"
+                value={name}
+                onChange={setName}
+              />
+              <Field
+                label="CAGE CODE (OPTIONAL)"
+                name="client-cage"
+                placeholder="1ABC2"
+                value={cageCode}
+                onChange={setCageCode}
+              />
+            </div>
+            {nameError && (
+              <span className="annot" style={{ color: '#a23a20' }}>
+                Company name is required.
+              </span>
+            )}
+            {duplicate && (
+              <WarnBanner tone="warn">
+                A client named “{trimmedName}” already exists. You can still continue if this is a
+                separate engagement.
+              </WarnBanner>
+            )}
+            <div className="w-field" style={{ maxWidth: 320 }}>
+              <label className="w-label" htmlFor="client-dib">
+                DIB ROLE
+              </label>
+              <select
+                id="client-dib"
+                className="w-input"
+                value={dibRole}
+                onChange={(e) => setDibRole(e.target.value as DibRole)}
+              >
+                {DIB_ROLE_OPTIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="col" style={{ gap: 8 }}>
+              <span className="muted">Applicable contract clauses</span>
+              <div className="grid-2">
+                {CONTRACT_TYPE_OPTIONS.map((label) => (
+                  <span key={label} onClick={() => toggleContract(label)} style={{ cursor: 'pointer' }}>
+                    <Check label={label} on={contractTypes.includes(label)} />
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {step === 1 && (
+          <div className="col" style={{ gap: 12 }}>
+            <span className="muted">Target CMMC level for this engagement</span>
+            <div className="row gap-sm wrap">
+              {CMMC_PATH_OPTIONS.map((p) => (
+                <span key={p} onClick={() => setCmmcPath(p)} style={{ cursor: 'pointer' }}>
+                  <Check radio label={p} on={cmmcPath === p} />
+                </span>
+              ))}
+            </div>
+            <p className="annot" style={{ margin: 0 }}>
+              The final path is confirmed during intake and scoping — this sets the starting target.
+            </p>
+          </div>
+        )}
+
+        {step === 2 && (
+          <div className="grid-2">
+            <Field
+              label="CONTACT NAME"
+              name="contact-name"
+              placeholder="Full name"
+              value={contactName}
+              onChange={setContactName}
+            />
+            <Field
+              label="CONTACT EMAIL"
+              name="contact-email"
+              type="email"
+              placeholder="contact@client.com"
+              value={contactEmail}
+              onChange={setContactEmail}
+            />
+            <Field
+              label="CONTACT TITLE"
+              name="contact-title"
+              placeholder="CIO / IT Director"
+              value={contactTitle}
+              onChange={setContactTitle}
+            />
+            {emailError && (
+              <span className="annot" style={{ color: '#a23a20', alignSelf: 'flex-end' }}>
+                Enter a valid email address.
+              </span>
+            )}
+          </div>
+        )}
+
+        {step === 3 && (
+          <div className="col" style={{ gap: 12 }}>
+            <span className="muted">Initial consultant assignment</span>
+            <div className="w-field" style={{ maxWidth: 380 }}>
+              <label className="w-label" htmlFor="client-consultant">
+                ASSIGNED CONSULTANT
+              </label>
+              <select
+                id="client-consultant"
+                className="w-input"
+                value={consultantId}
+                onChange={(e) => setConsultantId(e.target.value)}
+              >
+                <option value="">Unassigned</option>
+                {assignableConsultants.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} · {c.role}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <p className="annot" style={{ margin: 0 }}>
+              Consultants only see clients they are assigned to. You can change assignments later.
+            </p>
+          </div>
+        )}
+
+        {step === 4 && (
+          <div className="w-box fill" style={{ padding: 18 }}>
+            <span className="w-eyebrow">Review</span>
+            <div className="grid-2 mt" style={{ gap: 10 }}>
+              {(
+                [
+                  ['Company name', trimmedName || '—'],
+                  ['CAGE code', cageCode.trim() || '—'],
+                  ['DIB role', dibRole],
+                  ['Target CMMC', cmmcPath],
+                  ['Contract clauses', contractTypes.length ? contractTypes.join(', ') : 'None'],
+                  ['Primary contact', contactName.trim() || '—'],
+                  ['Contact email', contactEmail.trim() || '—'],
+                  ['Assigned consultant', consultantName],
+                ] as [string, string][]
+              ).map(([k, v]) => (
+                <div
+                  key={k}
+                  className="between w-box"
+                  style={{ padding: '8px 12px', background: 'var(--white)', gap: 10 }}
+                >
+                  <span className="muted">{k}</span>
+                  <span style={{ textAlign: 'right' }}>{v}</span>
+                </div>
+              ))}
+            </div>
+            {duplicate && (
+              <WarnBanner tone="warn">
+                A client named “{trimmedName}” already exists — continuing will create a separate
+                engagement.
+              </WarnBanner>
+            )}
+            <p className="annot" style={{ marginTop: 10 }}>
+              Creating the client seeds all 110 NIST SP 800-171 control assessments as “Not
+              Reviewed”.
+            </p>
+          </div>
+        )}
+
+        <hr className="w-hr" />
+        {submitError && (
+          <div role="alert" className="center" style={{ gap: 8, fontSize: '.85rem', color: '#a23a20' }}>
+            <span className="dot bad" style={{ width: 9, height: 9, borderRadius: '50%', flex: 'none' }} />
+            {submitError}
+          </div>
+        )}
+        <div className="between">
+          <Btn ghost onClick={() => (step > 0 ? setStep(step - 1) : go('clients'))}>
+            ← Back
+          </Btn>
+          {last ? (
+            <Btn primary onClick={onCreate} disabled={!canCreate}>
+              {submitting ? 'Creating…' : 'Create Client'}
+            </Btn>
+          ) : (
+            <Btn primary onClick={() => canAdvance && setStep(step + 1)} disabled={!canAdvance}>
+              Next →
+            </Btn>
+          )}
         </div>
       </Card>
-      <Card title="Primary Contact">
-        <div className="grid-2">
-          <Field label="NAME" placeholder="Full name" />
-          <Field label="EMAIL" placeholder="contact@client.com" />
-          <Field label="PHONE" placeholder="(555) 000-0000" />
-          <Field label="TITLE" placeholder="CIO / IT Director" />
-        </div>
-      </Card>
-      <Card title="Engagement">
-        <div className="grid-2">
-          <Select label="ENGAGEMENT TYPE" value="CMMC Readiness Program" />
-          <Select label="ASSIGNED CONSULTANT" value="Justin" />
-        </div>
-      </Card>
-      <div className="row gap-sm" style={{ justifyContent: 'flex-end' }}>
-        <Btn onClick={() => go('clients')}>Save Client</Btn>
-        <Btn primary onClick={() => go('intake')}>
-          Save and Start Intake
-        </Btn>
-      </div>
     </div>
   );
 }

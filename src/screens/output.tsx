@@ -18,7 +18,8 @@ import {
 import { BrandLockup } from '../components/Brand';
 import { BackendStatusCard } from '../components/BackendStatusCard';
 import { EXPORT_FORMATS, REPORTS } from '../data/reports';
-import { CURRENT_CLIENT, USERS } from '../data/clients';
+import { USERS } from '../data/clients';
+import { useClients, useCurrentClient } from '../data/clientsStore';
 import {
   useAuditLog,
   AUDIT_FILTER_ALL,
@@ -46,10 +47,11 @@ import { ScoringWarning } from '../components/ScoringWarning';
 
 /* ---------- 16. REPORTS ---------- */
 export function ReportsScreen({ go }: ScreenProps) {
+  const currentClient = useCurrentClient();
   return (
     <div className="col">
       <PageHead
-        title={`Reports — ${CURRENT_CLIENT.name}`}
+        title={`Reports — ${currentClient?.name ?? 'Client'}`}
         sub="Generate client-ready Benchmark Fox readiness deliverables."
       />
       <div className="grid-2">
@@ -109,6 +111,7 @@ export function ReportsScreen({ go }: ScreenProps) {
 export function ReportPreviewScreen({ go }: ScreenProps) {
   const { assessments } = useData();
   const { controlsById, controls } = useReference();
+  const currentClient = useCurrentClient();
   const readiness = readinessPct(assessments);
   const sprs = estimateSprs(assessments, controlsById);
   const drivers = topDeductionDrivers(assessments, controlsById, 5);
@@ -119,7 +122,7 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
     <div className="col">
       <PageHead
         title="Report Preview: Executive Readiness Summary"
-        sub={`Client: ${CURRENT_CLIENT.name} · Prepared by Benchmark Fox`}
+        sub={`Client: ${currentClient?.name ?? 'Client'} · Prepared by Benchmark Fox`}
         actions={
           <>
             <Btn onClick={() => go('reports')}>Edit Sections</Btn>
@@ -145,7 +148,7 @@ export function ReportPreviewScreen({ go }: ScreenProps) {
             Executive CMMC Readiness Summary
           </h2>
           <p className="muted" style={{ marginTop: 4 }}>
-            {CURRENT_CLIENT.name} · {CURRENT_CLIENT.cmmcPath}
+            {currentClient?.name ?? 'Client'} · {currentClient?.cmmcPath ?? 'Undetermined'}
           </p>
           <div className="grid-3 mt">
             <div className="w-box" style={{ padding: 12, textAlign: 'center' }}>
@@ -539,8 +542,10 @@ export function SettingsScreen(_: ScreenProps) {
 
 /* ---------- 21. MOBILE DIRECTION ---------- */
 export function MobileScreen(_: ScreenProps) {
-  const { assessments } = useData();
+  const { assessments, currentClientId } = useData();
+  const { clients } = useClients();
   const { controlsById } = useReference();
+  const clientName = clients.find((c) => c.id === currentClientId)?.name ?? 'Client';
   const readiness = readinessPct(assessments);
   const sprs = estimateSprs(assessments, controlsById);
   const blockers = blockerItems(POAM_ITEMS).length;
@@ -582,7 +587,7 @@ export function MobileScreen(_: ScreenProps) {
                 <div className="muted" style={{ fontSize: '.8em' }}>
                   Client
                 </div>
-                <strong>{CURRENT_CLIENT.name}</strong>
+                <strong>{clientName}</strong>
               </div>
               <div className="grid-2" style={{ gap: 8 }}>
                 <div className="w-box" style={{ padding: 10, textAlign: 'center' }}>

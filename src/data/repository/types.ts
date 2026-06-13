@@ -10,7 +10,15 @@
    The repository adapts STORAGE to the DOMAIN types in src/data/
    (types.ts / intake.ts / scope.ts) — never the reverse.
    ============================================================ */
-import type { ClientControlAssessment } from '../types';
+import type {
+  AssignableConsultant,
+  ClientAssignment,
+  ClientControlAssessment,
+  ClientCreateInput,
+  ClientPatch,
+  ClientRecord,
+  ReadinessStatus,
+} from '../types';
 import type { IntakeState } from '../intake';
 import type { ScopeState } from '../scope';
 
@@ -29,6 +37,36 @@ export interface ClientDataRepository {
   saveIntake(clientId: string, intake: IntakeState): Promise<void>;
   getScope(clientId: string): Promise<ScopeState>;
   saveScope(clientId: string, scope: ScopeState): Promise<void>;
+}
+
+/** Per-client readiness status used to compute live readiness/SPRS in the list. */
+export interface ClientAssessmentStatus {
+  clientId: string;
+  controlId: string;
+  status: ReadinessStatus;
+}
+
+/**
+ * Clients + assignments (Task 07). Engagements are RECORDS: a client is never
+ * hard-deleted — archiveClient sets status to 'Closed'. createClient also seeds
+ * the 110 control assessment rows (one batch, never a 110-insert loop).
+ */
+export interface ClientsRepository {
+  listClients(): Promise<ClientRecord[]>;
+  getClient(id: string): Promise<ClientRecord | null>;
+  createClient(input: ClientCreateInput): Promise<ClientRecord>;
+  updateClient(id: string, patch: ClientPatch): Promise<ClientRecord>;
+  /** Archive (status → 'Closed'). NEVER hard-deletes. */
+  archiveClient(id: string): Promise<ClientRecord>;
+
+  /** Readiness statuses for every client the caller can see (list readiness). */
+  listAssessmentStatuses(): Promise<ClientAssessmentStatus[]>;
+
+  /** Staff who can be assigned (admins/consultants). */
+  listAssignableConsultants(): Promise<AssignableConsultant[]>;
+  listAssignments(clientId: string): Promise<ClientAssignment[]>;
+  assignConsultant(clientId: string, profileId: string, isPrimary?: boolean): Promise<void>;
+  removeAssignment(clientId: string, profileId: string): Promise<void>;
 }
 
 export type RepositoryErrorKind =
