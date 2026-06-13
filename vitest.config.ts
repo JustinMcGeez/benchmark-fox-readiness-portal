@@ -17,7 +17,7 @@ export default mergeConfig(
       include: ['src/**/*.test.{ts,tsx}'],
       coverage: {
         provider: 'v8',
-        include: ['src/lib/**', 'src/data/store.ts'],
+        include: ['src/lib/**', 'src/data/store.tsx', 'src/data/repository/**'],
         reporter: ['text', 'html'],
       },
     },

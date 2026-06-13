@@ -21,47 +21,19 @@ import { CURRENT_CLIENT_ID } from './clients';
 import { SEED_ASSESSMENTS } from './controls';
 import { DEFAULT_INTAKE, type IntakeState } from './intake';
 import { DEFAULT_SCOPE, type ScopeAsset, type ScopeState, type ScopeSummary } from './scope';
+import type { AssessmentPatch } from './repository/types';
+import {
+  LS_ASSESS,
+  LS_INTAKE,
+  LS_SCOPE,
+  loadJson,
+  loadOverrides,
+  overrideKey,
+  saveJson,
+  type Overrides,
+} from './repository/localRepository';
 
-const LS_ASSESS = 'bf_assessments_v1';
 const LS_SELECTED = 'bf_selected_control';
-const LS_INTAKE = 'bf_intake_v1';
-const LS_SCOPE = 'bf_scope_v1';
-
-function loadJson<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    return raw ? ({ ...fallback, ...(JSON.parse(raw) as T) } as T) : fallback;
-  } catch {
-    return fallback;
-  }
-}
-function saveJson(key: string, value: unknown) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    /* ignore quota / private-mode errors */
-  }
-}
-
-/** Editable fields the matrix/detail can change. */
-type AssessmentPatch = Partial<
-  Pick<
-    ClientControlAssessment,
-    'status' | 'sspStatus' | 'evidenceStatus' | 'poamStatus' | 'owner' | 'consultantNotes' | 'sspStatement'
-  >
->;
-type Overrides = Record<string, AssessmentPatch>;
-
-const overrideKey = (clientId: string, controlId: string) => `${clientId}:${controlId}`;
-
-function loadOverrides(): Overrides {
-  try {
-    const raw = localStorage.getItem(LS_ASSESS);
-    return raw ? (JSON.parse(raw) as Overrides) : {};
-  } catch {
-    return {};
-  }
-}
 
 interface DataContextValue {
   currentClientId: string;
