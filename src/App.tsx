@@ -7,6 +7,7 @@ import { BrowserRouter, useLocation } from 'react-router-dom';
 import { LayoutGrid } from 'lucide-react';
 import type { Density, NavStyle, ScreenKey, TweakValues } from './types';
 import { AuthProvider } from './auth/AuthProvider';
+import { DataProvider } from './data/store';
 import { Btn } from './components/primitives';
 import { TweaksPanel, TweakSection, TweakRadio, useTweaks } from './tweaks/TweaksPanel';
 import { AppRoutes, screenKeyFromPath, useGo } from './routes';
@@ -74,7 +75,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <AppChrome />
+        <DataProvider>
+          <AppChrome />
+        </DataProvider>
       </AuthProvider>
     </BrowserRouter>
   );

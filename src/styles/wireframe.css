@@ -334,3 +334,17 @@ hr.w-hr { border: none; border-top: 1px solid var(--line); margin: var(--gap) 0;
 .navitem { transition: background .12s, color .12s; }
 
 @media (max-width: 1100px) { .hide-narrow { display: none; } }
+
+/* ---- loading skeleton (async data path) ---- */
+.w-skeleton {
+  background: var(--fill);
+  border-radius: var(--r-xs);
+  animation: w-skeleton-pulse 1.3s ease-in-out infinite;
+}
+@keyframes w-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .5; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .w-skeleton { animation: none; }
+}
