@@ -8,9 +8,12 @@
      - AUTHENTICATE (Supabase Auth) and READ the caller's own profiles row via
        the auth layer (Task 03):
          authService → AuthProvider → useAuth
+     - READ/WRITE per-client data (control assessments, intake, scope) via the
+       repository layer (Task 04):
+         src/data/repository/supabaseRepository.ts → src/data/store.tsx (useData)
    Those layers are the ONLY approved app paths to Supabase — screens and other
-   components must not import or query this client directly (enforced by
-   scripts/check-supabase-readonly-integration.mjs).
+   components must not import or query this client directly, nor import the
+   repository modules (enforced by scripts/check-supabase-readonly-integration.mjs).
 
    Configuration-gated (see .env.example):
      VITE_SUPABASE_URL       — your Supabase project URL
@@ -20,10 +23,11 @@
    local generated data, and auth is disabled (Local Prototype mode). Nothing
    throws at import time.
 
-   NOT implemented in this phase: client-specific WRITES of any kind. Assessments,
-   intake, scope, evidence metadata, POA&M, tasks, and reports remain in
-   localStorage (src/data/store.ts). No CUI and no evidence/SSP/POA&M/report
-   files are stored in Supabase. Client writes are a later phase.
+   Persisted to Supabase (Task 04, configured + authed): control assessments,
+   intake, and scope, through the repository layer. Evidence metadata, POA&M,
+   tasks, and reports remain in localStorage until their own tasks. In Local
+   Prototype mode (no env vars) everything stays in localStorage. No CUI and no
+   evidence/SSP/POA&M/report FILES are ever stored in Supabase.
 
    Auth/session security: supabase-js owns session persistence + auto-refresh
    (persistSession/autoRefreshToken below). App code never reads, writes, or
