@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { BrowserRouter, useLocation } from 'react-router-dom';
 import { LayoutGrid } from 'lucide-react';
 import type { Density, NavStyle, ScreenKey, TweakValues } from './types';
+import { AuthProvider } from './auth/AuthProvider';
 import { Btn } from './components/primitives';
 import { TweaksPanel, TweakSection, TweakRadio, useTweaks } from './tweaks/TweaksPanel';
 import { AppRoutes, screenKeyFromPath, useGo } from './routes';
@@ -72,7 +73,9 @@ const DENSITY_OPTIONS: Density[] = ['breathable', 'dense'];
 export default function App() {
   return (
     <BrowserRouter>
-      <AppChrome />
+      <AuthProvider>
+        <AppChrome />
+      </AuthProvider>
     </BrowserRouter>
   );
 }

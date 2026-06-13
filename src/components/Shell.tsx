@@ -2,7 +2,8 @@
    APP SHELL — three navigation variations (sidebar / topnav / hybrid)
    plus the client-context tab strip. Navy brand chrome.
    ============================================================ */
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Activity,
   Bell,
@@ -20,7 +21,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { Go, NavStyle, ScreenKey } from '../types';
-import { RiskBadge } from './primitives';
+import { ROLE_LABELS, useAuth } from '../auth/AuthProvider';
+import { Badge, Btn, RiskBadge } from './primitives';
 import { BrandLockup, BrandMark } from './Brand';
 import { CURRENT_CLIENT } from '../data/clients';
 
@@ -74,6 +76,121 @@ const CLIENT_SCREENS: ScreenKey[] = [
   'report-preview',
 ];
 
+/* user menu (Task 03): signed-in email + role badge + Sign out. In Local
+   Prototype mode there is no session, so it shows "Demo user". Keeps the
+   original avatar-circle + name look in the navy top bar. */
+function UserMenu() {
+  const { isConfigured, session, profile, role, signOut } = useAuth();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const [signingOut, setSigningOut] = useState(false);
+
+  const email = session?.user?.email ?? '';
+  const displayName = !isConfigured ? 'Demo user' : profile?.fullName || email || 'Signed in';
+  const initial = (displayName.trim().charAt(0) || 'U').toUpperCase();
+
+  const onSignOut = async () => {
+    if (signingOut) return;
+    setSigningOut(true);
+    await signOut(); // clears ONLY Supabase auth state — bf_* demo keys stay
+    setSigningOut(false);
+    setOpen(false);
+    navigate('/login', { replace: true });
+  };
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        aria-label="User menu"
+        aria-expanded={open}
+        style={{
+          appearance: 'none',
+          border: 0,
+          background: 'transparent',
+          padding: 0,
+          font: 'inherit',
+          cursor: 'pointer',
+        }}
+      >
+        <span className="center" style={{ gap: 9, color: 'var(--navy-ink)' }}>
+          <span
+            style={{
+              width: 30,
+              height: 30,
+              borderRadius: '50%',
+              background: 'rgba(255,255,255,.12)',
+              border: '1px solid rgba(255,255,255,.22)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '.8rem',
+              fontWeight: 700,
+              fontFamily: 'var(--head)',
+            }}
+          >
+            {initial}
+          </span>
+          <span style={{ fontSize: '.88rem', fontWeight: 600 }} className="hide-narrow">
+            {displayName}
+          </span>
+        </span>
+      </button>
+      {open && (
+        <>
+          {/* click-away layer */}
+          <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 1002 }} />
+          <div
+            className="w-card col"
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 10px)',
+              right: 0,
+              zIndex: 1003,
+              minWidth: 230,
+              padding: 14,
+              gap: 10,
+              boxShadow: 'var(--sh-md)',
+              textAlign: 'left',
+              color: 'var(--ink)',
+            }}
+          >
+            {isConfigured ? (
+              <>
+                <div className="col" style={{ gap: 3 }}>
+                  <span style={{ fontSize: '.88rem', fontWeight: 600 }}>{displayName}</span>
+                  {email && (
+                    <span className="mono muted" style={{ fontSize: '.78rem' }}>
+                      {email}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  {role ? (
+                    <Badge tone="none">{ROLE_LABELS[role]}</Badge>
+                  ) : (
+                    <Badge tone="warn">No role assigned</Badge>
+                  )}
+                </div>
+                <Btn sm onClick={onSignOut} disabled={signingOut} style={{ justifyContent: 'center' }}>
+                  {signingOut ? 'Signing out…' : 'Sign out'}
+                </Btn>
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: '.88rem', fontWeight: 600 }}>Demo user</span>
+                <span className="muted" style={{ fontSize: '.8rem' }}>
+                  Local Prototype mode — auth disabled
+                </span>
+              </>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* shared top-bar right cluster: search + notifications + profile */
 function TopActions({ compact = false }: { compact?: boolean }) {
   return (
@@ -96,28 +213,7 @@ function TopActions({ compact = false }: { compact?: boolean }) {
         </div>
       )}
       <Bell size={18} strokeWidth={2} style={{ color: 'rgba(243,246,251,.78)' }} />
-      <div className="center" style={{ gap: 9, color: 'var(--navy-ink)' }}>
-        <span
-          style={{
-            width: 30,
-            height: 30,
-            borderRadius: '50%',
-            background: 'rgba(255,255,255,.12)',
-            border: '1px solid rgba(255,255,255,.22)',
-            display: 'inline-flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '.8rem',
-            fontWeight: 700,
-            fontFamily: 'var(--head)',
-          }}
-        >
-          J
-        </span>
-        <span style={{ fontSize: '.88rem', fontWeight: 600 }} className="hide-narrow">
-          Justin
-        </span>
-      </div>
+      <UserMenu />
     </div>
   );
 }

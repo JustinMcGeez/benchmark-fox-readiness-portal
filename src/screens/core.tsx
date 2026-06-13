@@ -1,8 +1,11 @@
 /* ============================================================
    Screens — core: Login, Internal Dashboard, Clients, Create Client
    ============================================================ */
+import { useEffect, useState, type FormEvent } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { ScreenProps } from '../types';
 import { ShieldCheck } from 'lucide-react';
+import { signInErrorMessage, useAuth } from '../auth/AuthProvider';
 import {
   BarChart,
   Btn,
@@ -37,7 +40,178 @@ const activityTone = (action: string): 'ok' | 'warn' | 'none' => {
 };
 
 /* ---------- 1. LOGIN ---------- */
+
+/* The real sign-in card (Supabase configured): email+password or magic link,
+   inline generic errors, return-to-intended-destination after login. */
+function SignInCard() {
+  const { signInWithPassword, signInWithMagicLink, session } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [mode, setMode] = useState<'password' | 'magic-link'>('password');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  /* ProtectedRoute stashes the originally requested URL in location.state.
+     Only in-app absolute paths are honored ('/x' but not '//x'), so a forged
+     history state can never redirect outside the app. */
+  const from = (location.state as { from?: string } | null)?.from;
+  const safeFrom = from && from.startsWith('/') && !from.startsWith('//') ? from : null;
+  const destination = safeFrom && safeFrom !== '/login' ? safeFrom : '/dashboard';
+
+  /* Already signed in (restored session, or magic-link landing): continue. */
+  useEffect(() => {
+    if (session) navigate(destination, { replace: true });
+  }, [session, destination, navigate]);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (submitting) return;
+    setError(null);
+    setNotice(null);
+    const address = email.trim();
+    if (mode === 'password') {
+      if (!address || !password) {
+        setError('Enter your email and password.');
+        return;
+      }
+      setSubmitting(true);
+      const result = await signInWithPassword(address, password);
+      setSubmitting(false);
+      if (!result.ok) {
+        setError(signInErrorMessage(result.error));
+        return;
+      }
+      navigate(destination, { replace: true });
+    } else {
+      if (!address) {
+        setError('Enter your email address.');
+        return;
+      }
+      setSubmitting(true);
+      const result = await signInWithMagicLink(address);
+      setSubmitting(false);
+      if (!result.ok) {
+        setError(signInErrorMessage(result.error));
+        return;
+      }
+      // Neutral on purpose — never confirms whether the address is registered.
+      setNotice('If an account exists for that address, a sign-in link is on its way. Check your inbox.');
+    }
+  };
+
+  const switchMode = () => {
+    setMode((m) => (m === 'password' ? 'magic-link' : 'password'));
+    setError(null);
+    setNotice(null);
+  };
+
+  return (
+    <form className="w-card col" style={{ textAlign: 'left', gap: 16 }} onSubmit={submit}>
+      <Field
+        label="Email address"
+        placeholder="you@benchmarkfox.com"
+        type="email"
+        name="email"
+        autoComplete="email"
+        disabled={submitting}
+        value={email}
+        onChange={setEmail}
+      />
+      {mode === 'password' && (
+        <Field
+          label="Password"
+          placeholder="••••••••"
+          type="password"
+          name="password"
+          autoComplete="current-password"
+          disabled={submitting}
+          value={password}
+          onChange={setPassword}
+        />
+      )}
+      {error && (
+        <div role="alert" className="center" style={{ gap: 8, fontSize: '.85rem', color: '#a23a20' }}>
+          <span className="dot bad" style={{ width: 9, height: 9, borderRadius: '50%', flex: 'none' }} />
+          {error}
+        </div>
+      )}
+      {notice && (
+        <div role="status" className="center" style={{ gap: 8, fontSize: '.85rem', color: 'var(--ink-soft)' }}>
+          <span className="dot ok" style={{ width: 9, height: 9, borderRadius: '50%', flex: 'none' }} />
+          {notice}
+        </div>
+      )}
+      {mode === 'password' && (
+        <div className="between">
+          <Check label="Remember this device" on />
+          <a className="annot" style={{ fontSize: '.82rem' }}>
+            Forgot password?
+          </a>
+        </div>
+      )}
+      <Btn
+        primary
+        type="submit"
+        disabled={submitting}
+        style={{ width: '100%', justifyContent: 'center', padding: '11px' }}
+      >
+        {mode === 'password'
+          ? submitting
+            ? 'Signing In…'
+            : 'Sign In'
+          : submitting
+            ? 'Sending…'
+            : 'Send Magic Link'}
+      </Btn>
+      <a
+        className="annot"
+        onClick={switchMode}
+        style={{ fontSize: '.82rem', textAlign: 'center', cursor: 'pointer' }}
+      >
+        {mode === 'password' ? 'Email me a magic link instead' : 'Use password instead'}
+      </a>
+      <div
+        className="center"
+        style={{ gap: 8, justifyContent: 'center', color: 'var(--ink-faint)', fontSize: '.8rem' }}
+      >
+        <span className="dot ok" style={{ width: 7, height: 7, borderRadius: '50%' }} />
+        {mode === 'password' ? 'MFA prompt follows sign-in' : 'One-time sign-in link, no password needed'}
+      </div>
+    </form>
+  );
+}
+
+/* Local Prototype mode keeps the original non-functional demo card exactly. */
+function DemoSignInCard({ go }: ScreenProps) {
+  return (
+    <div className="w-card col" style={{ textAlign: 'left', gap: 16 }}>
+      <Field label="Email address" placeholder="you@benchmarkfox.com" />
+      <Field label="Password" placeholder="••••••••" />
+      <div className="between">
+        <Check label="Remember this device" on />
+        <a className="annot" style={{ fontSize: '.82rem' }}>
+          Forgot password?
+        </a>
+      </div>
+      <Btn primary onClick={() => go('dashboard')} style={{ width: '100%', justifyContent: 'center', padding: '11px' }}>
+        Sign In
+      </Btn>
+      <div
+        className="center"
+        style={{ gap: 8, justifyContent: 'center', color: 'var(--ink-faint)', fontSize: '.8rem' }}
+      >
+        <span className="dot ok" style={{ width: 7, height: 7, borderRadius: '50%' }} /> MFA prompt
+        follows sign-in
+      </div>
+    </div>
+  );
+}
+
 export function LoginScreen({ go }: ScreenProps) {
+  const { isConfigured } = useAuth();
   return (
     <div style={{ minHeight: '100vh', display: 'flex' }}>
       {/* brand panel */}
@@ -129,26 +303,7 @@ export function LoginScreen({ go }: ScreenProps) {
           <p className="w-sub" style={{ textAlign: 'center', marginBottom: 26 }}>
             Authorized Benchmark Fox users only.
           </p>
-          <div className="w-card col" style={{ textAlign: 'left', gap: 16 }}>
-            <Field label="Email address" placeholder="you@benchmarkfox.com" />
-            <Field label="Password" placeholder="••••••••" />
-            <div className="between">
-              <Check label="Remember this device" on />
-              <a className="annot" style={{ fontSize: '.82rem' }}>
-                Forgot password?
-              </a>
-            </div>
-            <Btn primary onClick={() => go('dashboard')} style={{ width: '100%', justifyContent: 'center', padding: '11px' }}>
-              Sign In
-            </Btn>
-            <div
-              className="center"
-              style={{ gap: 8, justifyContent: 'center', color: 'var(--ink-faint)', fontSize: '.8rem' }}
-            >
-              <span className="dot ok" style={{ width: 7, height: 7, borderRadius: '50%' }} /> MFA prompt
-              follows sign-in
-            </div>
-          </div>
+          {isConfigured ? <SignInCard /> : <DemoSignInCard go={go} />}
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@
    mapping, the legacy ?screen= redirect, and the `go` adapter that
    keeps every screen component's existing `go(screenKey)` API working.
    ============================================================ */
-import { useCallback, useEffect, type ComponentType } from 'react';
+import { useCallback, useEffect, useState, type ComponentType, type ReactNode } from 'react';
 import {
   generatePath,
   Link,
@@ -18,6 +18,8 @@ import {
   useSearchParams,
 } from 'react-router-dom';
 import type { Go, NavStyle, ScreenKey, ScreenProps } from './types';
+import type { AppRoleEnum } from './lib/database.types';
+import { useAuth } from './auth/AuthProvider';
 import { Shell } from './components/Shell';
 import { useData } from './data/store';
 import { clientById, CURRENT_CLIENT_ID } from './data/clients';
@@ -148,11 +150,120 @@ export function useGo(): Go {
    Route components
    ------------------------------------------------------------ */
 
-/** PLACEHOLDER (Task 03 — Supabase Auth): currently a pass-through.
-    The auth guard slots in here: check the session and redirect
-    unauthenticated users to /login. Wraps every route except /login. */
+/* Dismissible "auth disabled" notice shown on every protected route in
+   Local Prototype mode (no Supabase env vars). Dismissal sticks for the
+   browser session; fixed bottom-center so no layout shifts. */
+const LOCAL_BANNER_DISMISSED_KEY = 'bf_local_banner_dismissed';
+
+function LocalModeBanner() {
+  const [dismissed, setDismissed] = useState(
+    () => sessionStorage.getItem(LOCAL_BANNER_DISMISSED_KEY) === '1',
+  );
+  if (dismissed) return null;
+  return (
+    <div
+      role="status"
+      className="w-card center"
+      style={{
+        position: 'fixed',
+        bottom: 16,
+        left: '50%',
+        transform: 'translateX(-50%)',
+        zIndex: 999,
+        gap: 10,
+        padding: '8px 10px 8px 14px',
+        borderStyle: 'dashed',
+        boxShadow: 'var(--sh-md)',
+        fontSize: '.85rem',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      <span className="dot warn" style={{ width: 9, height: 9, borderRadius: '50%', flex: 'none' }} />
+      Local Prototype mode — auth disabled
+      <button
+        className="w-btn sm"
+        aria-label="Dismiss"
+        onClick={() => {
+          sessionStorage.setItem(LOCAL_BANNER_DISMISSED_KEY, '1');
+          setDismissed(true);
+        }}
+      >
+        ✕
+      </button>
+    </div>
+  );
+}
+
+/* Minimal full-screen placeholder while the session/profile is restored. */
+function AuthPendingScreen() {
+  return (
+    <div className="center" style={{ minHeight: '100vh', justifyContent: 'center' }}>
+      <span className="muted" style={{ fontSize: '.9rem' }}>
+        Checking session…
+      </span>
+    </div>
+  );
+}
+
+/** Auth guard (Task 03 — Supabase Auth). Wraps every route except /login.
+    Local Prototype mode (no Supabase env vars): render freely, with the
+    dismissible banner, so demos keep working. Supabase mode: no session →
+    redirect to /login, remembering the intended URL so the Login screen can
+    return there after sign-in. */
 export function ProtectedRoute() {
+  const { isConfigured, loading, session } = useAuth();
+  const location = useLocation();
+  if (!isConfigured) {
+    return (
+      <>
+        <LocalModeBanner />
+        <Outlet />
+      </>
+    );
+  }
+  if (loading && !session) return <AuthPendingScreen />;
+  if (!session) {
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+  }
   return <Outlet />;
+}
+
+/** Role guard for role-scoped areas (used by later tasks, e.g. the client
+    portal). Pass-through in Local Prototype mode; otherwise requires a
+    session AND one of the given roles. While the profile row is still
+    loading (session-but-no-profile race) it shows the pending screen
+    instead of mis-deciding. */
+export function RequireRole({
+  roles,
+  children,
+}: {
+  roles: readonly AppRoleEnum[];
+  children: ReactNode;
+}) {
+  const { isConfigured, loading, session, role } = useAuth();
+  const location = useLocation();
+  if (!isConfigured) return <>{children}</>;
+  if (loading) return <AuthPendingScreen />;
+  if (!session) {
+    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+  }
+  if (!role || !roles.includes(role)) {
+    return (
+      <div className="center" style={{ minHeight: '60vh', justifyContent: 'center', padding: 24 }}>
+        <div className="w-card col" style={{ maxWidth: 440, padding: 28, gap: 12, textAlign: 'center' }}>
+          <h1 className="w-h1">No access</h1>
+          <p className="muted" style={{ margin: 0 }}>
+            Your account doesn&rsquo;t have access to this area. Contact a Benchmark Fox
+            administrator if you believe that&rsquo;s wrong.
+          </p>
+          <Link to="/dashboard" className="w-btn primary" style={{ justifyContent: 'center' }}>
+            Go to Dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+  return <>{children}</>;
 }
 
 /* Layout route: app shell (sidebar/topnav/hybrid) around every screen

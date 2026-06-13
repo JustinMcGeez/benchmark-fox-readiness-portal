@@ -13,7 +13,8 @@
 
    Rules:
    A. SCREENS: no file under src/screens may import the Supabase client/SDK or
-      call supabase.from(...) / getSupabase().
+      call supabase.from(...) / getSupabase(). (Screens use auth via the
+      AuthProvider context — useAuth() — never the client.)
    B. SDK LOCATION: only src/lib/supabaseClient.ts may import
       '@supabase/supabase-js'.
    C. RUNTIME ACCESS: the Supabase client (the `supabase`/`getSupabase` binding,
@@ -21,6 +22,7 @@
         - src/lib/supabaseClient.ts
         - src/services/referenceDataService.ts
         - src/services/supabaseReadOnlyGuard.ts
+        - src/services/authService.ts        (Task 03: auth + own-profile read)
         - src/hooks/useReferenceData.ts
       (Importing the `isSupabaseConfigured` flag from supabaseClient is allowed
       anywhere — that's configuration, not Supabase access.)
@@ -46,6 +48,7 @@ const RUNTIME_ALLOW = new Set([
   'src/lib/supabaseClient.ts',
   'src/services/referenceDataService.ts',
   'src/services/supabaseReadOnlyGuard.ts',
+  'src/services/authService.ts', // Task 03: Supabase Auth + own-profile SELECT (no writes)
   'src/hooks/useReferenceData.ts',
 ]);
 const SDK_ALLOWED = 'src/lib/supabaseClient.ts';
@@ -137,9 +140,10 @@ if (violations.length > 0) {
   console.error('\n✗ check:supabase-readonly FAILED — ' + `${violations.length} violation(s):\n`);
   for (const v of violations) console.error(`  ${v.path}:${v.line} — ${v.msg}`);
   console.error(
-    '\n  Route all Supabase reads through the service/hook/provider layer:\n' +
+    '\n  Route all Supabase reads through the service/hook/provider layers:\n' +
       '    src/services/referenceDataService.ts → src/hooks/useReferenceData.ts → ' +
       'src/data/referenceStore.tsx\n' +
+      '    src/services/authService.ts → src/auth/AuthProvider.tsx (useAuth)\n' +
       '  SDK import only in src/lib/supabaseClient.ts; no Supabase writes in src/ ' +
       '(writes live only in scripts/ seeding/validation).\n',
   );

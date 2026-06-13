@@ -14,6 +14,8 @@ export function Btn({
   sm,
   onClick,
   style,
+  type = 'button',
+  disabled,
 }: {
   children: ReactNode;
   primary?: boolean;
@@ -21,12 +23,14 @@ export function Btn({
   sm?: boolean;
   onClick?: () => void;
   style?: CSSProperties;
+  type?: 'button' | 'submit';
+  disabled?: boolean;
 }) {
   const cls = ['w-btn', primary && 'primary', ghost && 'ghost', sm && 'sm']
     .filter(Boolean)
     .join(' ');
   return (
-    <button className={cls} style={style} onClick={onClick}>
+    <button className={cls} style={style} onClick={onClick} type={type} disabled={disabled}>
       {children}
     </button>
   );
@@ -40,6 +44,11 @@ export function Field({
   w,
   rows,
   style,
+  type,
+  name,
+  autoComplete,
+  disabled,
+  onChange,
 }: {
   label?: string;
   value?: string;
@@ -48,22 +57,44 @@ export function Field({
   w?: number | string;
   rows?: number;
   style?: CSSProperties;
+  type?: string;
+  name?: string;
+  autoComplete?: string;
+  disabled?: boolean;
+  /** With onChange the input is CONTROLLED (value + onChange); without it the
+      wireframe behavior is unchanged (defaultValue, freely editable). */
+  onChange?: (value: string) => void;
 }) {
+  const valueProps = onChange
+    ? { value: value ?? '', onChange: (e: { target: { value: string } }) => onChange(e.target.value) }
+    : { defaultValue: value };
   return (
     <div className="w-field" style={{ width: w, ...style }}>
-      {label && <span className="w-label">{label}</span>}
+      {label && (
+        <label className="w-label" htmlFor={name}>
+          {label}
+        </label>
+      )}
       {area ? (
         <textarea
           className={'w-input' + (value ? '' : ' placeholder')}
-          defaultValue={value}
           placeholder={placeholder}
           rows={rows ?? 4}
+          id={name}
+          name={name}
+          disabled={disabled}
+          {...valueProps}
         />
       ) : (
         <input
           className={'w-input' + (value ? '' : ' placeholder')}
-          defaultValue={value}
           placeholder={placeholder}
+          type={type}
+          id={name}
+          name={name}
+          autoComplete={autoComplete}
+          disabled={disabled}
+          {...valueProps}
         />
       )}
     </div>

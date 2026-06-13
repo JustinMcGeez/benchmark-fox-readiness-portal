@@ -10,6 +10,7 @@ import { afterEach } from 'vitest';
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  sessionStorage.clear(); // e.g. bf_local_banner_dismissed (Local Prototype banner)
 });
 
 // jsdom does not implement ResizeObserver (used by TweaksPanel).

@@ -78,6 +78,18 @@ interface TableShape<Row> {
 export interface Database {
   public: {
     Tables: {
+      profiles: TableShape<{
+        id: string;
+        user_id: string | null;
+        organization_id: string | null;
+        full_name: string;
+        email: string;
+        /** Single primary app role — added by 002_auth_profiles.sql. */
+        role: AppRoleEnum;
+        status: string;
+        created_at: string;
+        updated_at: string;
+      }>;
       clients: TableShape<{
         id: string;
         organization_id: string;
@@ -155,10 +167,10 @@ export interface Database {
         user_agent: string | null;
         created_at: string;
       }>;
-      // Other tables (organizations, profiles, user_roles, client_assignments,
+      // Other tables (organizations, user_roles, client_assignments,
       // control_families, controls, source_references,
       // control_source_references, intake_records, scope_records, scope_assets,
-      // poam_items, tasks, reports) are defined in the migration and will appear
+      // poam_items, tasks, reports) are defined in the migrations and will appear
       // here once `supabase gen types typescript` is run. Until then the index
       // signature below keeps the build green.
       [table: string]: TableShape<Record<string, unknown>>;
