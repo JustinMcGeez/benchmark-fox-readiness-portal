@@ -40,14 +40,18 @@ import {
   type SspInput,
   type SspModel,
 } from './sspModel';
-import { READINESS_SUPPORT_DISCLAIMER } from '../../data/disclaimers';
+import {
+  DOD_AM_CITATION,
+  exportFilename,
+  NAVY,
+  RED,
+  READINESS_SUPPORT_DISCLAIMER,
+  SILVER,
+  WHITE,
+} from './common';
 import { formatScore } from '../scoring';
 
-/* ---- palette (matches the wireframe tokens) ---- */
-const NAVY = '0A2348';
-const SILVER = '7E8691';
-const RED = 'C0392B';
-const WHITE = 'FFFFFF';
+/* ---- palette: navy/silver/red/white shared via common.ts; fonts are docx-specific ---- */
 const HEADING_FONT = 'Montserrat';
 const BODY_FONT = 'Calibri';
 
@@ -342,7 +346,7 @@ export function buildSspDocxDocument(model: SspModel): Document {
     ),
   );
   children.push(
-    labelLine('Methodology', 'NIST SP 800-171 DoD Assessment Methodology, Version 1.2.1 (Annex A)'),
+    labelLine('Methodology', DOD_AM_CITATION),
   );
   for (const w of model.sprs.warnings) children.push(body(w, { italics: true, color: SILVER, size: 18 }));
   children.push(body(READINESS_SUPPORT_DISCLAIMER, { italics: true, color: SILVER, size: 18 }));
@@ -418,16 +422,9 @@ export function buildSspDocxDocument(model: SspModel): Document {
   });
 }
 
-/** Sanitize a string into a filename-safe slug. */
-function slug(s: string): string {
-  return s.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'Client';
-}
-
-/** Suggested download filename, e.g. "SSP_Acme_Defense_2026-06-13.docx". */
+/** Suggested download filename, e.g. "Acme_Defense_SSP_2026-06-13.docx". */
 export function sspFilename(model: SspModel): string {
-  const d = model.meta.generatedAt;
-  const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  return `SSP_${slug(model.meta.clientName)}_${date}.docx`;
+  return exportFilename(model.meta.clientName, 'SSP', 'docx', model.meta.generatedAt);
 }
 
 /** PURE entry point: SSP data in → Word .docx Blob out. No DOM, no storage. */

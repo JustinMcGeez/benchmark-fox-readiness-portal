@@ -221,6 +221,37 @@ export function topDeductionDrivers(
     .slice(0, limit);
 }
 
+export interface RemediationProjection {
+  /** The control's current readiness status. */
+  status: ReadinessStatus;
+  /** Current estimated SPRS score across all assessments. */
+  currentScore: number;
+  /** Point value this control currently deducts (positive magnitude; 0 if none). */
+  deduction: number;
+  /** Estimated score if this single control were remediated to Met. */
+  projectedScore: number;
+}
+
+/**
+ * Projected SPRS estimate if ONE control were remediated to Met, reusing the
+ * isolated engine (no scoring math may live in the exporters). Remediating a
+ * control that currently deducts removes exactly its deduction, so the projected
+ * score is the current estimate plus that control's deduction impact. A control
+ * already implemented (Met / Not Applicable) deducts 0 → projected == current.
+ */
+export function projectedScoreIfRemediated(
+  assessments: ClientControlAssessment[],
+  controlsById: Record<string, Control>,
+  controlId: string,
+): RemediationProjection {
+  const currentScore = estimateSprs(assessments, controlsById).estimatedSprsScore;
+  const assessment = assessments.find((a) => a.controlId === controlId);
+  const control = controlsById[controlId];
+  const status: ReadinessStatus = assessment?.status ?? 'Not Reviewed';
+  const deduction = assessment ? deductionImpact(assessment, control) : 0;
+  return { status, currentScore, deduction, projectedScore: currentScore + deduction };
+}
+
 export function scoreByFamily(
   assessments: ClientControlAssessment[],
   controlsById: Record<string, Control>,

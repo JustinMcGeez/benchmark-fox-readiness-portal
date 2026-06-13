@@ -53,6 +53,7 @@ describe('generateSspBlob', () => {
 describe('sspFilename', () => {
   it('slugs the client name and stamps the date', () => {
     const model = buildSspModel(input);
-    expect(sspFilename(model)).toBe('SSP_Acme_Defense_Systems_2026-06-13.docx');
+    // Unified Task 10 convention: {clientSlug}_{deliverable}_{YYYY-MM-DD}.{ext}
+    expect(sspFilename(model)).toBe('Acme_Defense_Systems_SSP_2026-06-13.docx');
   });
 });

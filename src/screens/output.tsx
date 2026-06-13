@@ -2,7 +2,7 @@
    Screens — output: Reports, Report Preview, Knowledge, Audit,
    Settings, Mobile
    ============================================================ */
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { FileText, Menu } from 'lucide-react';
 import type { ScreenProps, Tone } from '../types';
 import {
@@ -17,7 +17,6 @@ import {
 } from '../components/primitives';
 import { BrandLockup } from '../components/Brand';
 import { BackendStatusCard } from '../components/BackendStatusCard';
-import { EXPORT_FORMATS, REPORTS } from '../data/reports';
 import { READINESS_SUPPORT_DISCLAIMER } from '../data/disclaimers';
 import { USERS } from '../data/clients';
 import { useClients, useCurrentClient } from '../data/clientsStore';
@@ -50,8 +49,64 @@ import {
 import { SourceRefs } from '../components/SourceRefs';
 import { ScoringWarning } from '../components/ScoringWarning';
 import { GenerateSspButton } from '../components/SspExport';
+import { GeneratePoamButton, GenerateSprsReportButton } from '../components/ReportExports';
 
 /* ---------- 16. REPORTS ---------- */
+/** One live deliverable row: icon, title + extension, description, data feeds, action. */
+function DeliverableCard({
+  title,
+  ext,
+  description,
+  feeds,
+  action,
+}: {
+  title: string;
+  ext: string;
+  description: string;
+  feeds: string[];
+  action: ReactNode;
+}) {
+  return (
+    <div className="w-card between" style={{ alignItems: 'center' }}>
+      <div className="center" style={{ gap: 14 }}>
+        <span
+          className="center"
+          style={{
+            width: 44,
+            height: 44,
+            flex: 'none',
+            justifyContent: 'center',
+            borderRadius: 10,
+            background: 'var(--fill)',
+            color: 'var(--navy)',
+          }}
+        >
+          <FileText size={20} strokeWidth={2} />
+        </span>
+        <div>
+          <div className="w-h2" style={{ fontSize: '1.1em' }}>
+            {title}{' '}
+            <span className="mono faint" style={{ fontSize: '.7rem' }}>
+              {ext}
+            </span>
+          </div>
+          <p className="muted" style={{ margin: '2px 0 4px', fontSize: '.88em' }}>
+            {description}
+          </p>
+          <div className="row wrap gap-sm">
+            {feeds.map((f) => (
+              <span key={f} className="mono faint" style={{ fontSize: '.7rem' }}>
+                · {f}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+      {action}
+    </div>
+  );
+}
+
 export function ReportsScreen({ go }: ScreenProps) {
   const currentClient = useCurrentClient();
   return (
@@ -59,57 +114,31 @@ export function ReportsScreen({ go }: ScreenProps) {
       <PageHead
         title={`Reports — ${currentClient?.name ?? 'Client'}`}
         sub="Generate client-ready Benchmark Fox readiness deliverables."
-        actions={<GenerateSspButton />}
+        actions={<Btn onClick={() => go('report-preview')}>Report preview</Btn>}
       />
       <div className="grid-2">
-        {REPORTS.map((r) => (
-          <div key={r.id} className="w-card between" style={{ alignItems: 'center' }}>
-            <div className="center" style={{ gap: 14 }}>
-              <span
-                className="center"
-                style={{
-                  width: 44,
-                  height: 44,
-                  flex: 'none',
-                  justifyContent: 'center',
-                  borderRadius: 10,
-                  background: 'var(--fill)',
-                  color: 'var(--navy)',
-                }}
-              >
-                <FileText size={20} strokeWidth={2} />
-              </span>
-              <div>
-                <div className="w-h2" style={{ fontSize: '1.1em' }}>
-                  {r.title}
-                </div>
-                <p className="muted" style={{ margin: '2px 0 4px', fontSize: '.88em' }}>
-                  {r.description}
-                </p>
-                <div className="row wrap gap-sm">
-                  {r.feeds.map((f) => (
-                    <span key={f} className="mono faint" style={{ fontSize: '.7rem' }}>
-                      · {f}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <Btn primary onClick={() => go('report-preview')}>
-              Generate
-            </Btn>
-          </div>
-        ))}
+        <DeliverableCard
+          title="System Security Plan"
+          ext=".docx"
+          description="Full SSP: all 110 controls with official requirement text, implementation statements, and an evidence index."
+          feeds={['Control assessments', 'SSP statements', 'Evidence index']}
+          action={<GenerateSspButton />}
+        />
+        <DeliverableCard
+          title="POA&M Workbook"
+          ext=".xlsx"
+          description="Plan of Action & Milestones in the DoD/eMASS structure, with a per-item SPRS score-impact projection."
+          feeds={['POA&M items', 'Milestones', 'Score impact']}
+          action={<GeneratePoamButton />}
+        />
+        <DeliverableCard
+          title="SPRS Readiness Report"
+          ext=".pdf"
+          description="Executive SPRS estimate with readiness by family, top findings, and score-recovery opportunities."
+          feeds={['SPRS estimate', 'Readiness by family', 'Top findings']}
+          action={<GenerateSprsReportButton />}
+        />
       </div>
-      <Card title="Export Options">
-        <div className="row gap-sm wrap">
-          {EXPORT_FORMATS.map((e) => (
-            <Badge key={e} fill>
-              {e}
-            </Badge>
-          ))}
-        </div>
-      </Card>
     </div>
   );
 }
