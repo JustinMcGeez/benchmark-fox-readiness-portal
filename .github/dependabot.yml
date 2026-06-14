@@ -1,0 +1,38 @@
+# Dependabot — weekly dependency maintenance. Minor/patch updates are grouped
+# into a single PR per ecosystem to cut noise; SECURITY updates are delivered
+# immediately as their own PRs regardless of the weekly schedule (that is
+# Dependabot's built-in behavior for known advisories and is not throttled by
+# the schedule below). See docs/deployment.md.
+version: 2
+updates:
+  # Application dependencies (npm). New UI libraries are never auto-added — these
+  # PRs bump existing pinned versions only and still go through the full CI gate.
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 10
+    groups:
+      npm-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: 'deps'
+
+  # GitHub Actions used by the workflows in .github/workflows.
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    groups:
+      actions-minor-and-patch:
+        applies-to: version-updates
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: 'ci'

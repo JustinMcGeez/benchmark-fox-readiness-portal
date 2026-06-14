@@ -9,7 +9,7 @@
    ============================================================================ */
 import type { ReactNode } from 'react';
 import { Badge, Card } from './primitives';
-import { getBackendStatus } from '../lib/backendConfig';
+import { getBackendStatus, getBuildSha } from '../lib/backendConfig';
 import { useReference } from '../data/referenceStore';
 
 function Row({ label, children }: { label: string; children: ReactNode }) {
@@ -72,6 +72,11 @@ export function BackendStatusCard() {
         </Row>
         <Row label="Last checked">
           <span className="mono faint">{lastChecked}</span>
+        </Row>
+        <Row label="Build">
+          <span className="mono" title="Git commit SHA of this build (VITE_BUILD_SHA, injected by CI)">
+            {getBuildSha()}
+          </span>
         </Row>
         <Row label="Control families loaded">
           <span className="mono">{counts.families}</span>
