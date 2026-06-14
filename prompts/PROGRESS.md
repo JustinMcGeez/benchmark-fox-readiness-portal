@@ -17,6 +17,7 @@ security-reviewer subagent in addition to verifier.
 - [x] 11 — Client portal (role-scoped) [security] — prompts/11-client-portal.md
 - [ ] 12 — Resilience pass (errors, Sentry, a11y) — prompts/12-resilience-pass.md
 - [ ] 13 — CI/CD hardening + security headers — prompts/13-cicd-hardening.md
+- [ ] 14 — Staff-only consultant-notes table [security] — prompts/14-consultant-notes-table.md
 
 ## Completed log
 (/build-next appends here: date, task, one-line summary)
