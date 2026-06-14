@@ -102,6 +102,49 @@ async function guard<T>(
   }
 }
 
+/* ---- read-only retry with jittered backoff ----
+   Reads are idempotent, so a transient blip (dropped connection, 5xx) is safe
+   to retry. WRITES are NEVER retried here — a duplicate write is worse than a
+   surfaced error, so write failures bubble up and the UI offers a Retry button
+   (see src/data/store.tsx). Only transient 'load-failed' (and non-Repository
+   transport errors) are retried; deterministic domain errors (unknown-client/
+   control/evidence, not-configured) fail fast. */
+const READ_RETRY_ATTEMPTS = 3;
+const READ_RETRY_BASE_MS = 150;
+
+function isTransientReadError(e: unknown): boolean {
+  if (e instanceof RepositoryError) return e.kind === 'load-failed';
+  return true; // transport / unknown errors — worth one more try
+}
+
+function readBackoffMs(attempt: number): number {
+  // exponential base with ±50% jitter: ~75–225ms, then ~150–450ms.
+  const base = READ_RETRY_BASE_MS * 2 ** attempt;
+  return base / 2 + Math.random() * base;
+}
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/** Wrap a READ body with 3-attempt jittered backoff. Reads only — never writes. */
+async function withReadRetry<T>(body: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < READ_RETRY_ATTEMPTS; attempt++) {
+    try {
+      return await body();
+    } catch (e) {
+      lastError = e;
+      if (attempt === READ_RETRY_ATTEMPTS - 1 || !isTransientReadError(e)) throw e;
+      await delay(readBackoffMs(attempt));
+    }
+  }
+  throw lastError;
+}
+
+/** A READ wrapped in both the retry policy and the safe-error guard ('load-failed'). */
+function readGuard<T>(message: string, body: () => Promise<T>): Promise<T> {
+  return guard('load-failed', message, () => withReadRetry(body));
+}
+
 /* ---- control natural_id ↔ uuid map (cached one query, retryable) ---- */
 
 interface ControlIdMaps {
@@ -152,7 +195,7 @@ async function getAssessments(
   clientId: string,
   opts?: AssessmentReadOptions,
 ): Promise<ClientControlAssessment[]> {
-  return guard('load-failed', 'Could not load assessments from the cloud workspace.', async () => {
+  return readGuard('Could not load assessments from the cloud workspace.', async () => {
     const clientUuid = resolveClientUuid(clientId);
     const maps = await getControlIdMaps();
     const sb = getSupabase();
@@ -218,7 +261,7 @@ async function patchAssessment(
 /* ---- intake (latest non-deleted row per client) ---- */
 
 async function getIntake(clientId: string): Promise<IntakeState> {
-  return guard('load-failed', 'Could not load intake from the cloud workspace.', async () => {
+  return readGuard('Could not load intake from the cloud workspace.', async () => {
     const clientUuid = resolveClientUuid(clientId);
     const { data, error } = await getSupabase()
       .from(INTAKE)
@@ -264,7 +307,7 @@ function withUuidId<T extends { id: string }>(item: T): T {
 }
 
 async function getScope(clientId: string): Promise<ScopeState> {
-  return guard('load-failed', 'Could not load scope from the cloud workspace.', async () => {
+  return readGuard('Could not load scope from the cloud workspace.', async () => {
     const clientUuid = resolveClientUuid(clientId);
     const sb = getSupabase();
 
@@ -369,7 +412,7 @@ async function saveScope(clientId: string, scope: ScopeState): Promise<void> {
 
 /** True if the client already has any assessment/intake/scope rows in the cloud. */
 export async function hasRemoteClientData(clientId: string): Promise<boolean> {
-  return guard('load-failed', 'Could not check the cloud workspace.', async () => {
+  return readGuard('Could not check the cloud workspace.', async () => {
     const clientUuid = resolveClientUuid(clientId);
     const sb = getSupabase();
 
@@ -462,7 +505,7 @@ export interface AuditPage {
  * RLS-safe lookup; actor names ride on the row (denormalized in migration 005).
  */
 export async function listAuditEvents(query: AuditQuery): Promise<AuditPage> {
-  return guard('load-failed', 'Could not load the audit log.', async () => {
+  return readGuard('Could not load the audit log.', async () => {
     const sb = getSupabase();
     let q = sb
       .from(AUDIT)
@@ -524,7 +567,7 @@ export const supabaseRepository: ClientDataRepository = {
    ============================================================ */
 
 async function listEvidence(clientId: string): Promise<EvidenceItem[]> {
-  return guard('load-failed', 'Could not load evidence from the cloud workspace.', async () => {
+  return readGuard('Could not load evidence from the cloud workspace.', async () => {
     const clientUuid = resolveClientUuid(clientId);
     const maps = await getControlIdMaps();
     const { data, error } = await getSupabase()
@@ -677,7 +720,7 @@ export function seedAssessmentRowsForClient(
 }
 
 async function listClients(): Promise<ClientRecord[]> {
-  return guard('load-failed', 'Could not load clients from the cloud workspace.', async () => {
+  return readGuard('Could not load clients from the cloud workspace.', async () => {
     const { data, error } = await getSupabase()
       .from(CLIENTS)
       .select('*')
@@ -696,7 +739,7 @@ async function listClients(): Promise<ClientRecord[]> {
 }
 
 async function getClient(id: string): Promise<ClientRecord | null> {
-  return guard('load-failed', 'Could not load the client.', async () => {
+  return readGuard('Could not load the client.', async () => {
     const clientUuid = resolveClientUuid(id);
     const { data, error } = await getSupabase()
       .from(CLIENTS)
@@ -805,7 +848,7 @@ async function archiveClient(id: string): Promise<ClientRecord> {
 }
 
 async function listAssessmentStatuses(): Promise<ClientAssessmentStatus[]> {
-  return guard('load-failed', 'Could not load client readiness.', async () => {
+  return readGuard('Could not load client readiness.', async () => {
     const maps = await getControlIdMaps();
     const { data, error } = await getSupabase()
       .from(ASSESSMENTS)
@@ -820,7 +863,7 @@ async function listAssessmentStatuses(): Promise<ClientAssessmentStatus[]> {
 }
 
 async function listAssignableConsultants(): Promise<AssignableConsultant[]> {
-  return guard('load-failed', 'Could not load assignable staff.', async () => {
+  return readGuard('Could not load assignable staff.', async () => {
     const { data, error } = await getSupabase()
       .from(PROFILES)
       .select('id, full_name, email, role')
@@ -831,7 +874,7 @@ async function listAssignableConsultants(): Promise<AssignableConsultant[]> {
 }
 
 async function listAssignments(clientId: string): Promise<ClientAssignment[]> {
-  return guard('load-failed', 'Could not load client assignments.', async () => {
+  return readGuard('Could not load client assignments.', async () => {
     const clientUuid = resolveClientUuid(clientId);
     const { data, error } = await getSupabase()
       .from(CLIENT_ASSIGNMENTS)

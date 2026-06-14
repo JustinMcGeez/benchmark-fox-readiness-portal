@@ -219,11 +219,11 @@ function TopActions({ compact = false }: { compact?: boolean }) {
             minWidth: 220,
           }}
         >
-          <Search size={15} strokeWidth={2} />
+          <Search size={15} strokeWidth={2} aria-hidden="true" />
           <span>Search clients, controls…</span>
         </div>
       )}
-      <Bell size={18} strokeWidth={2} style={{ color: 'rgba(243,246,251,.78)' }} />
+      <Bell size={18} strokeWidth={2} aria-hidden="true" style={{ color: 'rgba(243,246,251,.78)' }} />
       <UserMenu />
     </div>
   );

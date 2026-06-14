@@ -21,6 +21,7 @@ import type { Go, NavStyle, ScreenKey, ScreenProps } from './types';
 import type { AppRoleEnum } from './lib/database.types';
 import { useAuth } from './auth/AuthProvider';
 import { isClientRole } from './auth/roles';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Shell } from './components/Shell';
 import { useData } from './data/store';
 import { useClients } from './data/clientsStore';
@@ -335,7 +336,11 @@ function ShellLayout({ navStyle }: { navStyle: NavStyle }) {
   const { pathname } = useLocation();
   return (
     <Shell screen={screenKeyFromPath(pathname) ?? 'dashboard'} go={go} navStyle={navStyle}>
-      <Outlet />
+      {/* Per-screen boundary: a crashing screen shows a recoverable panel while
+          the shell nav stays usable. resetKey=pathname clears it on navigation. */}
+      <ErrorBoundary variant="screen" resetKey={pathname}>
+        <Outlet />
+      </ErrorBoundary>
     </Shell>
   );
 }

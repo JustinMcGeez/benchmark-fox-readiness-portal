@@ -3,6 +3,7 @@
    (these render inside the client context bar from Shell)
    ============================================================ */
 import { Fragment, useMemo, useState, type CSSProperties } from 'react';
+import { Shield } from 'lucide-react';
 import type { ScreenProps } from '../types';
 import {
   Badge,
@@ -11,6 +12,7 @@ import {
   Card,
   Check,
   Donut,
+  EmptyState,
   Field,
   Legend,
   PageHead,
@@ -74,6 +76,9 @@ export function ClientDashboardScreen({ go }: ScreenProps) {
 
   const notMetTotal = counts.notMet + counts.notReviewed;
   const finalized = scoringFinalized(controlsById);
+  // Brand-new engagement: nothing reviewed and no evidence yet — guide the first
+  // step instead of presenting a dashboard of zeros as if it were progress.
+  const fresh = counts.total > 0 && counts.notReviewed === counts.total && evidence.length === 0;
 
   return (
     <div className="col">
@@ -82,6 +87,16 @@ export function ClientDashboardScreen({ go }: ScreenProps) {
         certification or constitute an official assessment.
       </WarnBanner>
       <ScoringWarning />
+      {fresh && (
+        <Card>
+          <EmptyState
+            icon={<Shield size={22} strokeWidth={1.8} />}
+            title="This engagement is just getting started"
+            message="No controls have been reviewed yet. Begin the control review to populate readiness, the SPRS estimate, and the gap analysis below."
+            action={{ label: 'Start control review', onClick: () => go('controls') }}
+          />
+        </Card>
+      )}
       <div className="grid-4">
         <StatCard k="Readiness" v={`${readiness}%`} />
         <StatCard

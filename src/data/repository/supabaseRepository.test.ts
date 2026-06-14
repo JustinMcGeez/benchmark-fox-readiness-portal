@@ -320,6 +320,46 @@ describe('error handling', () => {
   });
 });
 
+describe('read retry-with-backoff', () => {
+  it('retries a transient read failure and then succeeds', async () => {
+    let assessmentAttempts = 0;
+    holder.client = makeClient((call) => {
+      if (call.table === 'controls') return { data: controlsData };
+      if (call.table === 'client_control_assessments') {
+        assessmentAttempts++;
+        if (assessmentAttempts === 1) return { error: { message: 'transient network blip' } };
+        return { data: [assessmentRow({ readiness_status: 'Met' })] };
+      }
+      return { data: [] };
+    });
+
+    const result = await getAssessments(ACME);
+    expect(assessmentAttempts).toBe(2); // first attempt failed, retry succeeded
+    expect(result).toHaveLength(SEED_ASSESSMENTS.length);
+  });
+
+  it('NEVER retries a failed write (duplicate-write risk)', async () => {
+    let upsertAttempts = 0;
+    const client = makeClient((call) => {
+      if (call.table === 'controls') return { data: controlsData };
+      if (call.table === 'client_control_assessments' && call.terminal === 'maybeSingle') {
+        return { data: null };
+      }
+      if (call.table === 'client_control_assessments' && call.kind === 'upsert') {
+        upsertAttempts++;
+        return { error: { message: 'write failed' } };
+      }
+      return {};
+    });
+    holder.client = client;
+
+    await expect(patchAssessment(ACME, '3.1.1', { status: 'Met' })).rejects.toMatchObject({
+      kind: 'save-failed',
+    });
+    expect(upsertAttempts).toBe(1); // exactly one attempt — no retry
+  });
+});
+
 describe('hasRemoteClientData', () => {
   it('is true when any counted table has rows', async () => {
     holder.client = makeClient((call) =>

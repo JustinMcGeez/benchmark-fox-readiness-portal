@@ -42,6 +42,9 @@
   --ok: var(--risk-low);  --ok-bg: var(--risk-low-bg);  --ok-bd: var(--risk-low-bd);
   --warn: var(--risk-med); --warn-bg: var(--risk-med-bg); --warn-bd: var(--risk-med-bd);
   --bad: var(--risk-high); --bad-bg: var(--risk-high-bg); --bad-bd: var(--risk-high-bd);
+  /* crit aliases — without these the .t-crit pills lost their tint (var() was
+     undefined). The crit text (#9c2a22) on this bg meets WCAG AA (≈6.4:1). */
+  --crit: var(--risk-crit); --crit-bg: var(--risk-crit-bg); --crit-bd: var(--risk-crit-bd);
 
   /* ---- type ---- */
   --head: 'Montserrat', 'Segoe UI', system-ui, sans-serif;
@@ -100,6 +103,17 @@ html, body {
 }
 
 ::selection { background: rgba(31, 74, 133, .15); }
+
+/* ---- accessibility: visible keyboard focus on every interactive element ----
+   Zero-specificity (:where) fallback so any element-specific focus style (the
+   .w-btn / .w-input / .w-inline-select rings below) overrides it; everything
+   else focusable (links, tabs, selects, role=button) still gets a clear ring
+   on keyboard focus. Mouse focus is unaffected (:focus-visible only). */
+:where(a, button, select, input, textarea, summary, [tabindex], [role="button"], [role="link"]):focus-visible {
+  outline: 2px solid var(--navy-500);
+  outline-offset: 2px;
+  border-radius: var(--r-xs);
+}
 
 /* ---- surfaces ---- */
 .w-box {

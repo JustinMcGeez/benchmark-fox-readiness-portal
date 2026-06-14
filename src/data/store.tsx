@@ -115,6 +115,14 @@ interface EngineResult {
   retry: () => void;
 }
 
+/** A surfaced write failure. `retry` (writes only) re-runs the failed mutation —
+    writes are NEVER auto-retried (duplicate-write risk); the user chooses. */
+interface MutationError {
+  message: string;
+  retry?: () => void;
+}
+type ReportMutationError = (message: string, retry?: () => void) => void;
+
 const DataContext = createContext<DataContextValue | null>(null);
 
 /* ---- provider: owns the QueryClient, then the engine ---- */
@@ -132,8 +140,12 @@ export function DataProvider({
     () =>
       new QueryClient({
         defaultOptions: {
-          queries: { retry: false, refetchOnWindowFocus: false, staleTime: 30_000 },
-          mutations: { retry: false },
+          // networkMode 'online' (the default, set explicitly): while the browser
+          // is offline, reads pause and mutations are HELD (not failed) and resume
+          // automatically on reconnect — the connectivity banner promises this.
+          // The repository owns read retry/backoff, so react-query retry stays off.
+          queries: { retry: false, networkMode: 'online', refetchOnWindowFocus: false, staleTime: 30_000 },
+          mutations: { retry: false, networkMode: 'online' },
         },
       }),
   );
@@ -156,7 +168,11 @@ function DataEngine({ clientId, children }: { clientId: string; children: ReactN
     saveJson(LS_SELECTED, controlId);
   }, []);
 
-  const [mutationError, setMutationError] = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<MutationError | null>(null);
+  const reportMutationError = useCallback<ReportMutationError>(
+    (message, retry) => setMutationError({ message, retry }),
+    [],
+  );
 
   // Client-portal read posture: a client-role session never receives internal-
   // only fields (consultant_notes). useOptionalAuth so the store still works when
@@ -164,8 +180,8 @@ function DataEngine({ clientId, children }: { clientId: string; children: ReactN
   const hideInternal = isClientRole(useOptionalAuth()?.role ?? null);
 
   /* Both engines run every render (stable hook order); only one is exposed. */
-  const local = useLocalEngine(clientId, setMutationError, hideInternal);
-  const remote = useSupabaseEngine(repository, evidenceRepo, clientId, mode === 'supabase', setMutationError, hideInternal);
+  const local = useLocalEngine(clientId, reportMutationError, hideInternal);
+  const remote = useSupabaseEngine(repository, evidenceRepo, clientId, mode === 'supabase', reportMutationError, hideInternal);
   const engine = mode === 'supabase' ? remote : local;
 
   const value = useMemo<DataContextValue>(
@@ -186,9 +202,9 @@ function DataEngine({ clientId, children }: { clientId: string; children: ReactN
   return (
     <DataContext.Provider value={value}>
       {body}
-      {ready && <MigrationPrompt clientId={clientId} onError={setMutationError} />}
+      {ready && <MigrationPrompt clientId={clientId} onError={(m) => reportMutationError(m)} />}
       {mutationError && (
-        <MutationErrorToast message={mutationError} onDismiss={() => setMutationError(null)} />
+        <MutationErrorToast error={mutationError} onDismiss={() => setMutationError(null)} />
       )}
     </DataContext.Provider>
   );
@@ -199,7 +215,7 @@ function DataEngine({ clientId, children }: { clientId: string; children: ReactN
    ============================================================ */
 function useLocalEngine(
   clientId: string,
-  setMutationError: (message: string) => void,
+  reportMutationError: ReportMutationError,
   hideInternal: boolean,
 ): EngineResult {
   const [overrides, setOverrides] = useState<Overrides>(loadOverrides);
@@ -221,10 +237,12 @@ function useLocalEngine(
         .then(work)
         .then(() => setEvidence(readLocalEvidence(clientId)))
         .catch((e) =>
-          setMutationError(e instanceof Error ? e.message : 'Could not update evidence.'),
+          // Local evidence failures are deterministic (illegal transition) — no
+          // Retry would help, so the toast just surfaces the message.
+          reportMutationError(e instanceof Error ? e.message : 'Could not update evidence.'),
         );
     },
-    [clientId, setMutationError],
+    [clientId, reportMutationError],
   );
   const requestEvidence = useCallback(
     (input: EvidenceRequestInput) => runEvidence(() => localEvidenceRepository.create(clientId, input)),
@@ -421,7 +439,7 @@ function useSupabaseEngine(
   evidenceRepo: EvidenceRepository,
   clientId: string,
   enabled: boolean,
-  setMutationError: (message: string) => void,
+  reportMutationError: ReportMutationError,
   hideInternal: boolean,
 ): EngineResult {
   const qc = useQueryClient();
@@ -456,13 +474,16 @@ function useSupabaseEngine(
   });
 
   const reportError = useCallback(
-    (e: unknown) =>
-      setMutationError(
+    // `retry` (writes only) lets the toast re-run the failed mutation — we NEVER
+    // auto-retry a write (duplicate-write risk); the user decides.
+    (e: unknown, retry?: () => void) =>
+      reportMutationError(
         e instanceof RepositoryError || e instanceof Error
           ? e.message
           : 'Could not save your change to the cloud workspace. Please try again.',
+        retry,
       ),
-    [setMutationError],
+    [reportMutationError],
   );
 
   /* -- assessments: optimistic patch -- */
@@ -477,9 +498,9 @@ function useSupabaseEngine(
       );
       return { prev };
     },
-    onError: (e, _vars, ctx) => {
+    onError: (e, vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(assessmentsKey, ctx.prev);
-      reportError(e);
+      reportError(e, () => patchMut.mutate(vars));
     },
     onSettled: () => {
       // Only the last in-flight assessment write refetches — avoids a refetch
@@ -500,9 +521,9 @@ function useSupabaseEngine(
       qc.setQueryData<IntakeState>(intakeKey, next);
       return { prev };
     },
-    onError: (e, _next, ctx) => {
+    onError: (e, next, ctx) => {
       if (ctx?.prev) qc.setQueryData(intakeKey, ctx.prev);
-      reportError(e);
+      reportError(e, () => intakeMut.mutate(next));
     },
     onSettled: () => {
       if (qc.isMutating({ mutationKey: intakeKey }) === 1) void qc.invalidateQueries({ queryKey: intakeKey });
@@ -519,9 +540,9 @@ function useSupabaseEngine(
       qc.setQueryData<ScopeState>(scopeKey, next);
       return { prev };
     },
-    onError: (e, _next, ctx) => {
+    onError: (e, next, ctx) => {
       if (ctx?.prev) qc.setQueryData(scopeKey, ctx.prev);
-      reportError(e);
+      reportError(e, () => scopeMut.mutate(next));
     },
     onSettled: () => {
       if (qc.isMutating({ mutationKey: scopeKey }) === 1) void qc.invalidateQueries({ queryKey: scopeKey });
@@ -531,7 +552,7 @@ function useSupabaseEngine(
   /* -- evidence: create / metadata patch / legal transition -- */
   const requestMut = useMutation<EvidenceItem, unknown, EvidenceRequestInput>({
     mutationFn: (input) => evidenceRepo.create(clientId, input),
-    onError: reportError,
+    onError: (e, input) => reportError(e, () => requestMut.mutate(input)),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: evidenceKey });
     },
@@ -552,9 +573,9 @@ function useSupabaseEngine(
       );
       return { prev };
     },
-    onError: (e, _vars, ctx) => {
+    onError: (e, vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(evidenceKey, ctx.prev);
-      reportError(e);
+      reportError(e, () => updateEvidenceMut.mutate(vars));
     },
     onSettled: () => {
       if (qc.isMutating({ mutationKey: evidenceKey }) === 1) {
@@ -580,9 +601,9 @@ function useSupabaseEngine(
       );
       return { prev };
     },
-    onError: (e, _vars, ctx) => {
+    onError: (e, vars, ctx) => {
       if (ctx?.prev) qc.setQueryData(evidenceKey, ctx.prev);
-      reportError(e);
+      reportError(e, () => transitionMut.mutate(vars));
     },
     onSettled: () => {
       if (qc.isMutating({ mutationKey: evidenceKey }) === 1) {
@@ -820,7 +841,7 @@ function DataErrorPanel({ onRetry }: { onRetry: () => void }) {
   );
 }
 
-function MutationErrorToast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+function MutationErrorToast({ error, onDismiss }: { error: MutationError; onDismiss: () => void }) {
   return (
     <div
       role="alert"
@@ -840,7 +861,19 @@ function MutationErrorToast({ message, onDismiss }: { message: string; onDismiss
       }}
     >
       <span className="dot bad" style={{ width: 9, height: 9, borderRadius: '50%', flex: 'none' }} />
-      <span>{message}</span>
+      <span>{error.message}</span>
+      {/* Writes are never auto-retried; the user re-runs the failed write here. */}
+      {error.retry && (
+        <button
+          className="w-btn sm"
+          onClick={() => {
+            error.retry?.();
+            onDismiss();
+          }}
+        >
+          Retry
+        </button>
+      )}
       <button className="w-btn sm" aria-label="Dismiss" onClick={onDismiss}>
         ✕
       </button>

@@ -4,12 +4,13 @@
    assessments from the data layer; the matrix edits persist via the store.
    ============================================================ */
 import { useMemo, useState } from 'react';
-import { Search } from 'lucide-react';
+import { Search, Users } from 'lucide-react';
 import type { ScreenProps } from '../types';
 import {
   Badge,
   Btn,
   Card,
+  EmptyState,
   Field,
   InlineSelect,
   PageHead,
@@ -185,10 +186,29 @@ export function ControlMatrixScreen({ go }: ScreenProps) {
   const famOptions = [ALL, ...controlFamilies.map((f) => f.code)];
   const libraryComplete = controls.length >= EXPECTED_CONTROL_COUNT;
 
+  // Defensive empty state: the route's <ClientScope> normally guarantees a
+  // resolved client here, but if none is selected, guide the user to pick one
+  // rather than render a matrix with no engagement context.
+  if (!currentClient) {
+    return (
+      <div className="col">
+        <PageHead title="Controls" sub="Track readiness, SSP, evidence, POA&M, and ownership." />
+        <Card>
+          <EmptyState
+            icon={<Users size={22} strokeWidth={1.8} />}
+            title="No client selected"
+            message="Choose a client engagement to open its control matrix."
+            action={{ label: 'Go to Clients', onClick: () => go('clients') }}
+          />
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="col">
       <PageHead
-        title={`Controls — ${currentClient?.name ?? 'Client'}`}
+        title={`Controls — ${currentClient.name}`}
         sub="Track readiness, SSP, evidence, POA&M, score impact, and ownership."
       />
       {!libraryComplete && (
