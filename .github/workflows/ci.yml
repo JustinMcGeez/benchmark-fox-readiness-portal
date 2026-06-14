@@ -41,6 +41,42 @@ jobs:
       - name: E2E smoke tests
         run: npm run test:e2e
 
+  # Dependency vulnerability gate — production dependencies only (the ones that
+  # ship to the browser). Fails the build on HIGH or CRITICAL advisories; lower
+  # severities are reported by Dependabot (see .github/dependabot.yml) and tracked
+  # in docs/deployment.md rather than blocking PRs.
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit production dependencies (fail on high/critical)
+        run: npm audit --omit=dev --audit-level=high
+
+  # Secret scan — gitleaks over the full git history so a committed credential
+  # fails the build. (For a GitHub *organization* account this action also needs a
+  # GITLEAKS_LICENSE secret; a personal/public repo does not — see the env note.)
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history so gitleaks scans every commit, not just the tip
+
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} # required ONLY for GitHub org accounts
+
   # RLS policy tests — boot the local Supabase stack (Postgres + Auth + PostgREST),
   # apply all migrations + seed, then run the cross-tenant RLS suite as real
   # authenticated users. A policy regression fails the build. Separate job so the

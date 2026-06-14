@@ -651,6 +651,26 @@ ship); never put a Sentry **auth token** in a `VITE_` var.
   auto-retried** (duplicate-write risk) — a failed write surfaces a **Retry**
   button so the user decides.
 
+## Deployment, environments & security headers
+
+Full runbook: **[docs/deployment.md](docs/deployment.md)** — environments
+(dev / staging / production), the env-var matrix, the migration flow (staging
+auto-migrates on merge to `main`; production is a manually-approved
+`workflow_dispatch`), Supabase backups/PITR, and the CI gates
+(`npm audit` + gitleaks secret scan on every PR).
+
+**Security headers / CSP** are defined once in
+[`src/lib/securityHeaders.ts`](src/lib/securityHeaders.ts) and enforced two ways:
+a build-time `<meta>` Content-Security-Policy in the bundled `index.html` (so the
+policy holds on any host, including GitHub Pages, and is verifiable with
+`npm run preview`) and the full HTTP header set via
+[`vercel.json`](vercel.json) on the Vercel staging/production targets. The policy
+keeps `script-src` free of inline/`eval` (only `'wasm-unsafe-eval'` for the PDF
+generator's WebAssembly); the one inline allowance is **styles-only**
+(`style-src 'unsafe-inline'`, required by React inline-style props). `e2e/csp.spec.ts`
+runs the production build under the CSP and asserts zero violations across all 21
+screens plus working docx/xlsx/pdf export.
+
 ## Disclaimer
 
 This is a **readiness-support tool, not an official CMMC assessment platform**.

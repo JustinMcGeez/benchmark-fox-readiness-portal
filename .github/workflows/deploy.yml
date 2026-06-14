@@ -25,6 +25,10 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+        # Surface the deployed commit in Settings → Backend Status (the /health
+        # surface). VITE_-prefixed vars are exposed to the browser bundle by Vite.
+        env:
+          VITE_BUILD_SHA: ${{ github.sha }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

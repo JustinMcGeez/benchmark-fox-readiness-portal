@@ -21,12 +21,24 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
-  webServer: {
-    command: 'npm run dev -- --host 127.0.0.1 --port 5173 --strictPort',
-    url: 'http://127.0.0.1:5173',
-    reuseExistingServer: !process.env.CI,
-    // BF_E2E keeps vite from opening a browser tab (see vite.config.ts).
-    env: { BF_E2E: '1' },
-    timeout: 120_000,
-  },
+  webServer: [
+    {
+      command: 'npm run dev -- --host 127.0.0.1 --port 5173 --strictPort',
+      url: 'http://127.0.0.1:5173',
+      reuseExistingServer: !process.env.CI,
+      // BF_E2E keeps vite from opening a browser tab (see vite.config.ts).
+      env: { BF_E2E: '1' },
+      timeout: 120_000,
+    },
+    // Production preview (serves the built dist/) — the ONLY build that carries
+    // the CSP <meta> tag (injected at build time, see vite.config.ts). Used by
+    // e2e/csp.spec.ts to verify the policy doesn't break the app. Requires a
+    // prior `npm run build` (CI builds before e2e; the local gate does too).
+    {
+      command: 'npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
+      url: 'http://127.0.0.1:4173',
+      reuseExistingServer: !process.env.CI,
+      timeout: 120_000,
+    },
+  ],
 });

@@ -43,6 +43,16 @@ const SUPABASE_DESCRIPTION =
   'Supabase is configured. Global reference data may be read from Supabase, with ' +
   'automatic fallback to local generated data. Client edits still use localStorage.';
 
+/**
+ * Short build identifier for the Backend Status (/health) surface. The full git
+ * SHA is injected as VITE_BUILD_SHA by CI (deploy.yml / vercel.json buildCommand);
+ * when it is absent (local dev) this returns the 'dev' sentinel.
+ */
+export function getBuildSha(): string {
+  const sha = import.meta.env.VITE_BUILD_SHA?.trim();
+  return sha ? sha.slice(0, 7) : 'dev';
+}
+
 /** Snapshot of the current backend configuration. Safe to call anytime. */
 export function getBackendStatus(): BackendStatus {
   return {
