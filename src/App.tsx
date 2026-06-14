@@ -14,6 +14,7 @@ import { ClientsProvider } from './data/clientsStore';
 import { DEMO_CLIENT_ID } from './data/clients';
 import { clientIdFromPathname } from './data/clientRoute';
 import { Btn } from './components/primitives';
+import { ConnectivityBanner } from './components/ConnectivityBanner';
 import { TweaksPanel, TweakSection, TweakRadio, TweakSelect, useTweaks } from './tweaks/TweaksPanel';
 import { AppRoutes, screenKeyFromPath, useGo } from './routes';
 
@@ -163,6 +164,9 @@ function AppChrome() {
   return (
     <>
       <AppRoutes navStyle={t.navStyle} />
+
+      {/* offline indicator (both modes); reads pause + writes are held by react-query */}
+      <ConnectivityBanner />
 
       {/* screen-index launcher (internal dev affordance — hidden in the portal) */}
       {!portal && (

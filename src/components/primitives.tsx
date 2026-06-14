@@ -363,6 +363,61 @@ export function WarnBanner({ children, tone = 'warn' }: { children: ReactNode; t
   );
 }
 
+/** Designed empty state: an icon, one line, and an optional primary action.
+    Used by list screens (controls matrix, evidence hub, new client dashboard)
+    so an empty view guides the user instead of showing a blank table. */
+export function EmptyState({
+  icon,
+  title,
+  message,
+  action,
+  style,
+}: {
+  icon?: ReactNode;
+  title: string;
+  message?: string;
+  action?: { label: string; onClick: () => void };
+  style?: CSSProperties;
+}) {
+  return (
+    <div
+      className="col center"
+      style={{ alignItems: 'center', textAlign: 'center', gap: 10, padding: '48px 24px', ...style }}
+    >
+      {icon && (
+        <span
+          className="center"
+          aria-hidden="true"
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: '50%',
+            background: 'var(--fill)',
+            color: 'var(--ink-faint)',
+            justifyContent: 'center',
+            flex: 'none',
+          }}
+        >
+          {icon}
+        </span>
+      )}
+      <h3 className="w-h2" style={{ fontSize: '1.05rem' }}>
+        {title}
+      </h3>
+      {message && (
+        <p className="muted" style={{ margin: 0, maxWidth: 440 }}>
+          {message}
+        </p>
+      )}
+      {action && (
+        <Btn primary onClick={action.onClick} style={{ marginTop: 4 }}>
+          {action.label}
+        </Btn>
+      )}
+    </div>
+  );
+}
+
 export function Card({
   title,
   action,

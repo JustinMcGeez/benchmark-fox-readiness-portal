@@ -611,6 +611,46 @@ npm run typecheck
 npm run build
 ```
 
+## Error monitoring & privacy (Sentry)
+
+Production error monitoring is **opt-in** and **privacy-first**. It is enabled only
+when `VITE_SENTRY_DSN` is set; with the var unset (the default, and Local Prototype
+mode) monitoring is fully disabled, **Sentry is dead-code-eliminated from the
+bundle**, and the app behaves identically. The DSN is a **public** value (safe to
+ship); never put a Sentry **auth token** in a `VITE_` var.
+
+- **What is captured:** uncaught **errors** and **unhandled promise rejections**
+  only. **No** performance tracing, **no** session replay, **no** breadcrumbs.
+- **What is sent — strict allowlist (`beforeSend` / `scrubEvent` in
+  [`src/lib/monitoring.ts`](src/lib/monitoring.ts)):** only the error
+  **type / message / stack-frame locations** (file, function, line, column,
+  in_app), a few non-identifying envelope fields (event id, timestamp, level,
+  platform, environment, release, SDK), and our own random **`error_id`** tag.
+- **What is dropped:** request URL (which can contain client ids), the user
+  (email / id / IP), `contexts`, `extra`, **breadcrumbs**, server name, the
+  top-level `message`, and stack-frame **local variables / source-context
+  lines**. This means **no emails, client names, or intake/scope free-text** can
+  leave the browser. The allowlist is proven by
+  [`src/lib/monitoring.test.ts`](src/lib/monitoring.test.ts).
+- **No CUI, ever** — consistent with the product-wide rule, no CUI or client
+  evidence is sent to monitoring.
+
+### Resilience
+
+- **Error boundaries** — a top-level branded "Something went wrong" panel
+  (Reload + a copyable error id) plus a per-screen boundary so one screen
+  crashing leaves the navigation and the rest of the shell usable; it auto-clears
+  when you navigate. The copyable **error id** matches the `error_id` tag on the
+  captured Sentry event (when configured).
+- **Offline / spotty network** — a connectivity banner appears when the browser
+  goes offline. In Supabase mode reads pause and queued writes are held by
+  TanStack Query (`networkMode: 'online'`) and resume on reconnect; in Local
+  Prototype mode edits persist to `localStorage`.
+- **Read retry vs. write safety** — the Supabase repository retries **reads**
+  with 3-attempt jittered backoff (transient failures only). **Writes are NEVER
+  auto-retried** (duplicate-write risk) — a failed write surfaces a **Retry**
+  button so the user decides.
+
 ## Disclaimer
 
 This is a **readiness-support tool, not an official CMMC assessment platform**.

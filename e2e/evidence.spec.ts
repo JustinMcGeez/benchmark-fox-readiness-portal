@@ -22,8 +22,8 @@ test('request → link → review → accept moves objective coverage (and agree
   const clientUrl = await createClient(page);
   await page.goto(clientUrl + '/evidence');
 
-  // Empty engagement: no evidence yet.
-  await expect(page.getByText('No evidence yet.')).toBeVisible();
+  // Empty engagement: the designed empty state.
+  await expect(page.getByText('No evidence yet', { exact: true })).toBeVisible();
 
   // --- Request evidence for 3.1.1, a specific objective ---
   await page.getByRole('button', { name: '+ Request Evidence' }).click();

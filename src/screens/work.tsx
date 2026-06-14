@@ -3,12 +3,14 @@
    Data-driven from the assessment store + evidence/poam/tasks seeds.
    ============================================================ */
 import { Fragment, useMemo, useState } from 'react';
+import { FileText } from 'lucide-react';
 import type { ScreenProps } from '../types';
 import {
   Badge,
   Btn,
   Card,
   Check,
+  EmptyState,
   Field,
   InlineSelect,
   PageHead,
@@ -478,6 +480,23 @@ export function EvidenceScreen(_: ScreenProps) {
         stays in the client's secure store; record where it lives and link to it.
       </WarnBanner>
 
+      {evidence.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={<FileText size={22} strokeWidth={1.8} />}
+            title="No evidence yet"
+            message={
+              canRequest
+                ? 'Request evidence to start the request → review → accept workflow. Record metadata and a secure external link — never upload files here.'
+                : 'No evidence has been requested for this engagement yet.'
+            }
+            action={
+              canRequest ? { label: 'Request evidence', onClick: () => setRequesting(true) } : undefined
+            }
+          />
+        </Card>
+      ) : (
+        <>
       {/* status filter chips with per-status counts + the zero-coverage filter */}
       <Card style={{ padding: '6px 6px' }}>
         <div className="row wrap gap-sm" style={{ padding: '8px 10px', alignItems: 'center' }}>
@@ -529,9 +548,7 @@ export function EvidenceScreen(_: ScreenProps) {
         <Card style={{ padding: '6px 6px' }}>
           {visible.length === 0 ? (
             <p className="muted" style={{ padding: '14px 12px', margin: 0 }}>
-              {evidence.length === 0
-                ? 'No evidence yet. Use “Request Evidence” to start the workflow.'
-                : 'No evidence matches the current filter.'}
+              No evidence matches the current filter.
             </p>
           ) : (
             <table className="w-table">
@@ -600,6 +617,8 @@ export function EvidenceScreen(_: ScreenProps) {
           </Card>
         )}
       </div>
+        </>
+      )}
 
       {requesting && (
         <RequestEvidenceModal
